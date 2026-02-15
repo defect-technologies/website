@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import ProfileHeader from "@/components/ProfileHeader";
 import Timeline from "@/components/Timeline";
 import CircleCard from "@/components/CircleCard";
-import type { Circle } from "@/types";
+import type { Circle, FollowStatus } from "@/types";
 
 interface ProfilePageProps {
   params: Promise<{ username: string }>;
@@ -27,6 +27,31 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   const { data: { user: currentUser } } = await supabase.auth.getUser();
   const isOwnProfile = currentUser?.id === profile.id;
+
+  const [{ count: followerCount }, { count: followingCount }] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", profile.id)
+      .eq("status", "accepted"),
+    supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", profile.id)
+      .eq("status", "accepted"),
+  ]);
+
+  let followStatus: FollowStatus = "none";
+  if (currentUser && !isOwnProfile) {
+    const { data: follow } = await supabase
+      .from("follows")
+      .select("status")
+      .eq("follower_id", currentUser.id)
+      .eq("following_id", profile.id)
+      .maybeSingle();
+
+    if (follow) followStatus = follow.status as FollowStatus;
+  }
 
   let postsQuery = supabase
     .from("posts")
@@ -88,10 +113,16 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="pb-6 mb-6 border-b border-border">
-        <ProfileHeader profile={profile} />
+        <ProfileHeader
+          profile={profile}
+          currentUserId={currentUser?.id}
+          followerCount={followerCount || 0}
+          followingCount={followingCount || 0}
+          followStatus={followStatus}
+        />
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-6">
         <div className="rounded-lg border border-border bg-surface p-3 text-center">
           <p className="text-2xl font-bold text-primary font-serif">{totalPosts}</p>
           <p className="text-xs text-text-secondary">Posts</p>
@@ -103,6 +134,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         <div className="rounded-lg border border-border bg-surface p-3 text-center">
           <p className="text-2xl font-bold text-primary font-serif">{circles.length}</p>
           <p className="text-xs text-text-secondary">Circles</p>
+        </div>
+        <div className="rounded-lg border border-border bg-surface p-3 text-center">
+          <p className="text-2xl font-bold text-primary font-serif">{followerCount || 0}</p>
+          <p className="text-xs text-text-secondary">Followers</p>
         </div>
       </div>
 

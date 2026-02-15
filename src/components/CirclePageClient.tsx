@@ -5,7 +5,7 @@ import Timeline from "@/components/Timeline";
 import Leaderboard from "@/components/Leaderboard";
 import JoinButton from "@/components/JoinButton";
 import Badge from "@/components/ui/Badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UsersThree, Trophy, LinkSimple, Check, Copy } from "@phosphor-icons/react";
 import type { Circle, Post, LeaderboardEntry } from "@/types";
 
@@ -17,6 +17,13 @@ interface CirclePageClientProps {
   currentUserId: string;
   isMember: boolean;
   isAdmin: boolean;
+}
+
+function useMarkCircleSeen(circleId: string, isMember: boolean) {
+  useEffect(() => {
+    if (!isMember) return;
+    fetch(`/api/circles/${circleId}/seen`, { method: "POST" });
+  }, [circleId, isMember]);
 }
 
 function InviteCodeCopy({ code }: { code: string }) {
@@ -53,6 +60,8 @@ export default function CirclePageClient({
   isMember,
   isAdmin,
 }: CirclePageClientProps) {
+  useMarkCircleSeen(circle.id, isMember);
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6 pb-6 border-b border-border">

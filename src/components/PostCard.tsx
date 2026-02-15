@@ -26,6 +26,29 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function MentionText({ text }: { text: string }) {
+  const parts = text.split(/(@\w+)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("@") && part.length > 1) {
+          const username = part.slice(1);
+          return (
+            <Link
+              key={i}
+              href={`/${username}`}
+              className="text-accent font-medium hover:underline"
+            >
+              {part}
+            </Link>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
 function getFileName(url: string) {
   const rawName = url.split("?")[0]?.split("/").pop() || "file";
   try {
@@ -112,7 +135,9 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
       </div>
 
       <div className="mt-3">
-        <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">{post.content}</p>
+        <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+          <MentionText text={post.content} />
+        </p>
       </div>
 
       {post.media && post.media.length > 0 && (

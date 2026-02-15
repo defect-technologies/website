@@ -7,7 +7,8 @@ import Button from "@/components/ui/Button";
 import Select, { type SelectOption } from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { PaperPlaneTilt, Globe, Lock, Users, UsersThree, Paperclip, FileText, X } from "@phosphor-icons/react";
-import type { Circle, Group } from "@/types";
+import Avatar from "@/components/ui/Avatar";
+import type { Circle, Group, User } from "@/types";
 
 type Visibility = "personal" | "group" | "circle" | "public";
 
@@ -63,7 +64,12 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Array<PreviewItem | null>>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionResults, setMentionResults] = useState<User[]>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mentionSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const router = useRouter();
   const supabase = createClient();
   const maxAttachments = 4;
@@ -120,6 +126,76 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
 
   function removeFile(index: number) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function checkForMention(textarea: HTMLTextAreaElement) {
+    const cursorPos = textarea.selectionStart;
+    const textBefore = content.slice(0, cursorPos);
+    const match = textBefore.match(/@(\w*)$/);
+
+    if (match) {
+      const query = match[1];
+      setMentionQuery(query);
+      setMentionIndex(0);
+
+      if (query.length >= 1) {
+        clearTimeout(mentionSearchTimer.current);
+        mentionSearchTimer.current = setTimeout(async () => {
+          const { data } = await supabase
+            .from("users")
+            .select("*")
+            .ilike("username", `${query}%`)
+            .limit(5);
+          setMentionResults((data || []) as User[]);
+        }, 150);
+      } else {
+        setMentionResults([]);
+      }
+    } else {
+      setMentionQuery(null);
+      setMentionResults([]);
+    }
+  }
+
+  function insertMention(user: User) {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    const atIndex = textBefore.lastIndexOf("@");
+    const newContent = textBefore.slice(0, atIndex) + `@${user.username} ` + textAfter;
+
+    setContent(newContent);
+    setMentionQuery(null);
+    setMentionResults([]);
+
+    requestAnimationFrame(() => {
+      const newPos = atIndex + user.username.length + 2;
+      textarea.focus();
+      textarea.setSelectionRange(newPos, newPos);
+    });
+  }
+
+  function handleTextareaKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionResults.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => Math.min(i + 1, mentionResults.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      if (mentionResults[mentionIndex]) {
+        e.preventDefault();
+        insertMention(mentionResults[mentionIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setMentionQuery(null);
+      setMentionResults([]);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -183,6 +259,34 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
         body: JSON.stringify({ postId: post.id }),
       });
 
+      const mentionMatches = content.match(/@(\w+)/g);
+      if (mentionMatches) {
+        const usernames = [...new Set(mentionMatches.map((m) => m.slice(1)))];
+        const { data: mentionedUsers } = await supabase
+          .from("users")
+          .select("id, username")
+          .in("username", usernames)
+          .neq("id", user.id);
+
+        if (mentionedUsers && mentionedUsers.length > 0) {
+          const { data: profile } = await supabase
+            .from("users")
+            .select("display_name")
+            .eq("id", user.id)
+            .single();
+
+          await supabase.from("notifications").insert(
+            mentionedUsers.map((mu) => ({
+              user_id: mu.id,
+              type: "mention" as const,
+              title: "You were mentioned",
+              body: `${profile?.display_name || "Someone"} mentioned you in a post`,
+              link: post.circle_id ? `/c/${post.circle_id}` : null,
+            }))
+          );
+        }
+      }
+
       router.refresh();
     }
 
@@ -191,15 +295,42 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
 
   return (
     <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-4 space-y-3">
-      <Textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onPaste={handlePaste}
-        placeholder="What are you working on?"
-        maxChars={2500}
-        charCount={content.length}
-        className="border-0 px-0 focus:ring-0"
-      />
+      <div className="relative">
+        <Textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => {
+            setContent(e.target.value);
+            checkForMention(e.target);
+          }}
+          onKeyDown={handleTextareaKeyDown}
+          onPaste={handlePaste}
+          placeholder="What are you working on?"
+          maxChars={2500}
+          charCount={content.length}
+          className="border-0 px-0 focus:ring-0"
+        />
+        {mentionQuery !== null && mentionResults.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-surface border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+            {mentionResults.map((u, i) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => insertMention(u)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors ${
+                  i === mentionIndex ? "bg-background" : "hover:bg-background/50"
+                }`}
+              >
+                <Avatar src={u.avatar_url} name={u.display_name} size="sm" />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">{u.display_name}</p>
+                  <p className="text-xs text-text-secondary">@{u.username}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {selectedFiles.length > 0 && (
         <div className="flex gap-2 flex-wrap">
@@ -263,26 +394,36 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
             size="sm"
           />
           {visibility === "group" && groups.length > 0 && (
-            <select
+            // <select
+            //   value={groupId}
+            //   onChange={(e) => setGroupId(e.target.value)}
+            //   className="text-xs rounded-md border border-border bg-background px-2 py-1.5 text-text-primary focus:outline-none focus:ring-1 focus:ring-secondary/30"
+            // >
+            //   {groups.map((g) => (
+            //     <option key={g.id} value={g.id}>{g.name}</option>
+            //   ))}
+            // </select>
+            <Select
               value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="text-xs rounded-md border border-border bg-background px-2 py-1.5 text-text-primary focus:outline-none focus:ring-1 focus:ring-secondary/30"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
+              onChange={(nextValue) => setGroupId(nextValue)}
+              options={groups.map((g) => ({
+                value: g.id,
+                label: g.name,
+                color: g.color || undefined,
+              }))}
+              size="sm"
+            />
           )}
           {visibility === "circle" && circles.length > 0 && (
-            <select
+            <Select
               value={circleId}
-              onChange={(e) => setCircleId(e.target.value)}
-              className="text-xs rounded-md border border-border bg-background px-2 py-1.5 text-text-primary focus:outline-none focus:ring-1 focus:ring-secondary/30"
-            >
-              {circles.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={(nextValue) => setCircleId(nextValue)}
+              options={circles.map((c) => ({
+                value: c.id,
+                label: c.name,
+              }))}
+              size="sm"
+            />
           )}
           <button
             type="button"

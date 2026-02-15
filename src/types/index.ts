@@ -93,10 +93,24 @@ export interface Comment {
   author?: User;
 }
 
+export interface Follow {
+  follower_id: string;
+  following_id: string;
+  status: "pending" | "accepted";
+  created_at: string;
+  accepted_at: string | null;
+}
+
+export type FollowStatus = "none" | "pending" | "accepted";
+
+export interface CircleWithUnseen extends Circle {
+  unseen_count: number;
+}
+
 export interface Notification {
   id: string;
   user_id: string;
-  type: "new_post" | "reaction" | "comment" | "leaderboard" | "invite";
+  type: "new_post" | "reaction" | "comment" | "leaderboard" | "invite" | "mention" | "follow_request" | "follow_accepted";
   title: string;
   body: string;
   link: string | null;

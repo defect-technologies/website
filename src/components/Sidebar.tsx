@@ -6,6 +6,7 @@ import Avatar from "@/components/ui/Avatar";
 import {
   House,
   UsersThree,
+  UserList,
   User,
   Gear,
   Plus,
@@ -18,15 +19,17 @@ import type { User as UserType, Circle } from "@/types";
 interface SidebarProps {
   user: UserType | null;
   circles: Circle[];
+  unseenCounts?: Record<string, number>;
 }
 
 const navItems = [
   { href: "/", icon: House, label: "Home" },
-  { href: "/groups", icon: UsersThree, label: "Groups" },
+  { href: "/people", icon: UserList, label: "People" },
+  { href: "/groups", icon: UsersThree, label: "Audience Lists" },
   { href: "/settings", icon: Gear, label: "Settings" },
 ];
 
-export default function Sidebar({ user, circles }: SidebarProps) {
+export default function Sidebar({ user, circles, unseenCounts = {} }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -77,7 +80,7 @@ export default function Sidebar({ user, circles }: SidebarProps) {
       </nav>
 
       <div className="mt-8">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide">Circles</h3>
           <div className="flex items-center gap-1.5">
             <Link href="/join" className="text-text-secondary hover:text-accent transition-colors" title="Join with code">
@@ -88,20 +91,29 @@ export default function Sidebar({ user, circles }: SidebarProps) {
             </Link>
           </div>
         </div>
+        <p className="text-[11px] text-text-secondary/60 px-3 mb-2">Compete and share with your teams</p>
         <div className="space-y-0.5">
-          {circles.map((circle) => (
-            <Link
-              key={circle.id}
-              href={`/c/${circle.id}`}
-              className={`block px-3 py-1.5 rounded-md text-sm transition-colors truncate ${
-                pathname === `/c/${circle.id}`
-                  ? "bg-surface text-primary font-medium"
-                  : "text-text-secondary hover:text-primary hover:bg-surface"
-              }`}
-            >
-              {circle.name}
-            </Link>
-          ))}
+          {circles.map((circle) => {
+            const unseen = unseenCounts[circle.id] || 0;
+            return (
+              <Link
+                key={circle.id}
+                href={`/c/${circle.id}`}
+                className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  pathname === `/c/${circle.id}`
+                    ? "bg-surface text-primary font-medium"
+                    : "text-text-secondary hover:text-primary hover:bg-surface"
+                }`}
+              >
+                <span className="truncate">{circle.name}</span>
+                {unseen > 0 && (
+                  <span className="shrink-0 ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-accent text-white text-[10px] font-bold px-1">
+                    {unseen > 20 ? "20+" : unseen}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
           {circles.length === 0 && (
             <p className="px-3 py-1.5 text-xs text-text-secondary">No circles yet</p>
           )}

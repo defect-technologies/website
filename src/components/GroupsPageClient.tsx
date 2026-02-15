@@ -112,8 +112,8 @@ export default function GroupsPageClient({ groups: initialGroups, userId }: Grou
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-bold text-text-primary mb-1">Groups</h1>
-          <p className="text-sm text-text-secondary">Private groups for sharing posts with select people</p>
+          <h1 className="font-serif text-2xl font-bold text-text-primary mb-1">Audience Lists</h1>
+          <p className="text-sm text-text-secondary">Personal lists for controlling who sees your posts. Only you manage these.</p>
         </div>
         <Button size="sm" onClick={() => setShowCreate(!showCreate)}>
           <Plus size={16} weight="bold" />

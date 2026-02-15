@@ -27,6 +27,14 @@ export default async function HomePage() {
     .select("group_id")
     .eq("user_id", user.id);
 
+  const { data: acceptedFollows } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", user.id)
+    .eq("status", "accepted");
+
+  const followedIds = (acceptedFollows || []).map((f) => f.following_id);
+
   const groups = (ownedGroups || []) as Group[];
   const allGroupIds = [
     ...groups.map((g) => g.id),
@@ -38,6 +46,9 @@ export default async function HomePage() {
     `author_id.eq.${user.id}`,
     `visibility.eq.public`,
   ];
+  if (followedIds.length > 0) {
+    orClauses.push(`and(visibility.eq.public,author_id.in.(${followedIds.join(",")}))`);
+  }
   if (circleIds.length > 0) {
     orClauses.push(`and(visibility.eq.circle,circle_id.in.(${circleIds.join(",")}))`);
   }
