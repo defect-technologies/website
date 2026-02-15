@@ -196,7 +196,7 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
         </Link>
       </div>
 
-      {post.total_score > 0 && (
+      {/* {post.total_score > 0 && (
         <div className="mt-2 pt-2 border-t border-border/50">
           <div className="flex items-center gap-3 text-xs text-text-secondary">
             <span>Score: <strong className="text-secondary">{Math.round(post.total_score)}</strong></span>
@@ -204,7 +204,7 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
             {post.novelty_score > 0 && <span>Novelty: {Math.round(post.novelty_score)}</span>}
           </div>
         </div>
-      )}
+      )} */}
     </motion.div>
   );
 }
