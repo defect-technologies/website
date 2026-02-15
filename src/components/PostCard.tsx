@@ -185,7 +185,7 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
         <ReactionBar
           postId={post.id}
           counts={post.reaction_counts || { thumbsup: 0, heart: 0, thumbsdown: 0 }}
-          userReaction={null}
+          userReaction={post.user_reaction || null}
         />
         <Link
           href={`/c/${post.circle_id}#post-${post.id}`}

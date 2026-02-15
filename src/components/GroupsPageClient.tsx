@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -16,6 +16,7 @@ interface GroupWithMembers extends Group {
 interface GroupsPageClientProps {
   groups: GroupWithMembers[];
   userId: string;
+  followers: User[];
 }
 
 const colorOptions = [
@@ -23,7 +24,7 @@ const colorOptions = [
   "#10b981", "#f59e0b", "#ef4444", "#64748b",
 ];
 
-export default function GroupsPageClient({ groups: initialGroups, userId }: GroupsPageClientProps) {
+export default function GroupsPageClient({ groups: initialGroups, userId, followers }: GroupsPageClientProps) {
   const [groups, setGroups] = useState<GroupWithMembers[]>(initialGroups);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -31,8 +32,6 @@ export default function GroupsPageClient({ groups: initialGroups, userId }: Grou
   const [creating, setCreating] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [searching, setSearching] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -61,23 +60,6 @@ export default function GroupsPageClient({ groups: initialGroups, userId }: Grou
     setGroups(groups.filter((g) => g.id !== groupId));
   }
 
-  async function handleSearch(query: string) {
-    setSearchQuery(query);
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .ilike("username", `%${query}%`)
-      .neq("id", userId)
-      .limit(10);
-    setSearchResults((data || []) as User[]);
-    setSearching(false);
-  }
-
   async function addMember(groupId: string, user: User) {
     const { error } = await supabase
       .from("group_members")
@@ -90,7 +72,6 @@ export default function GroupsPageClient({ groups: initialGroups, userId }: Grou
           : g
       ));
       setSearchQuery("");
-      setSearchResults([]);
     }
   }
 
@@ -117,14 +98,14 @@ export default function GroupsPageClient({ groups: initialGroups, userId }: Grou
         </div>
         <Button size="sm" onClick={() => setShowCreate(!showCreate)}>
           <Plus size={16} weight="bold" />
-          New group
+          New list
         </Button>
       </div>
 
       {showCreate && (
         <form onSubmit={handleCreate} className="rounded-lg border border-border bg-surface p-4 space-y-3">
           <Input
-            label="Group name"
+            label="List name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="e.g. Work buddies"
@@ -156,109 +137,162 @@ export default function GroupsPageClient({ groups: initialGroups, userId }: Grou
       <div className="space-y-3">
         {groups.map((group) => {
           const isExpanded = expandedGroup === group.id;
-          const memberIds = group.members.map((m) => m.id);
-          const filteredResults = searchResults.filter((u) => !memberIds.includes(u.id));
 
           return (
-            <div key={group.id} className="rounded-lg border border-border bg-surface">
-              <button
-                onClick={() => setExpandedGroup(isExpanded ? null : group.id)}
-                className="w-full flex items-center gap-3 p-4 text-left cursor-pointer hover:bg-background/50 transition-colors rounded-lg"
-              >
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary">{group.name}</p>
-                  <p className="text-xs text-text-secondary">{group.members.length} members</p>
-                </div>
-                {group.is_default && (
-                  <span className="text-xs text-text-secondary bg-background px-2 py-0.5 rounded">Default</span>
-                )}
-                {!group.is_default && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(group.id); }}
-                    className="text-text-secondary hover:text-error transition-colors p-1 cursor-pointer"
-                    title="Delete group"
-                  >
-                    <Trash size={16} />
-                  </button>
-                )}
-              </button>
-
-              {isExpanded && (
-                <div className="px-4 pb-4 space-y-3 border-t border-border/50">
-                  <div className="pt-3 relative">
-                    <div className="flex items-center gap-2 border border-border rounded-md px-2.5 py-1.5 bg-background">
-                      <MagnifyingGlass size={16} className="text-text-secondary shrink-0" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Search by username..."
-                        className="flex-1 text-sm bg-transparent text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
-                      />
-                      {searchQuery && (
-                        <button onClick={() => { setSearchQuery(""); setSearchResults([]); }} className="cursor-pointer">
-                          <X size={14} className="text-text-secondary" />
-                        </button>
-                      )}
-                    </div>
-                    {filteredResults.length > 0 && (
-                      <div className="absolute z-10 top-full mt-1 w-full bg-surface border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {filteredResults.map((user) => (
-                          <button
-                            key={user.id}
-                            onClick={() => addMember(group.id, user)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-background/50 text-left cursor-pointer"
-                          >
-                            <Avatar src={user.avatar_url} name={user.display_name} size="sm" />
-                            <div>
-                              <p className="text-sm font-medium text-text-primary">{user.display_name}</p>
-                              <p className="text-xs text-text-secondary">@{user.username}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {searching && <p className="text-xs text-text-secondary mt-1">Searching...</p>}
-                  </div>
-
-                  {group.members.length === 0 ? (
-                    <div className="flex items-center gap-2 py-3 text-text-secondary">
-                      <UsersThree size={16} />
-                      <p className="text-sm">No members yet. Search to add people.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {group.members.map((member) => (
-                        <div key={member.id} className="flex items-center gap-2.5 py-1.5">
-                          <Avatar src={member.avatar_url} name={member.display_name} size="sm" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-text-primary truncate">{member.display_name}</p>
-                            <p className="text-xs text-text-secondary truncate">@{member.username}</p>
-                          </div>
-                          <button
-                            onClick={() => removeMember(group.id, member.id)}
-                            className="text-text-secondary hover:text-error transition-colors p-1 cursor-pointer"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <ExpandedGroup
+              key={group.id}
+              group={group}
+              isExpanded={isExpanded}
+              followers={followers}
+              searchQuery={isExpanded ? searchQuery : ""}
+              onToggle={() => {
+                setExpandedGroup(isExpanded ? null : group.id);
+                setSearchQuery("");
+              }}
+              onSearchChange={setSearchQuery}
+              onAdd={(user) => addMember(group.id, user)}
+              onRemove={(memberId) => removeMember(group.id, memberId)}
+              onDelete={() => handleDelete(group.id)}
+            />
           );
         })}
 
         {groups.length === 0 && (
           <div className="text-center py-12">
             <UsersThree size={32} className="mx-auto text-text-secondary mb-2" />
-            <p className="text-text-secondary text-sm">No groups yet. Create one to get started.</p>
+            <p className="text-text-secondary text-sm">No lists yet. Create one to get started.</p>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ExpandedGroup({
+  group,
+  isExpanded,
+  followers,
+  searchQuery,
+  onToggle,
+  onSearchChange,
+  onAdd,
+  onRemove,
+  onDelete,
+}: {
+  group: GroupWithMembers;
+  isExpanded: boolean;
+  followers: User[];
+  searchQuery: string;
+  onToggle: () => void;
+  onSearchChange: (q: string) => void;
+  onAdd: (user: User) => void;
+  onRemove: (memberId: string) => void;
+  onDelete: () => void;
+}) {
+  const memberIds = useMemo(() => new Set(group.members.map((m) => m.id)), [group.members]);
+
+  const filteredFollowers = useMemo(() => {
+    const available = followers.filter((f) => !memberIds.has(f.id));
+    if (!searchQuery || searchQuery.length < 1) return available;
+    const q = searchQuery.toLowerCase();
+    return available.filter(
+      (f) => f.username.toLowerCase().includes(q) || f.display_name.toLowerCase().includes(q)
+    );
+  }, [followers, memberIds, searchQuery]);
+
+  return (
+    <div className="rounded-lg border border-border bg-surface">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 p-4 text-left cursor-pointer hover:bg-background/50 transition-colors rounded-lg"
+      >
+        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary">{group.name}</p>
+          <p className="text-xs text-text-secondary">{group.members.length} members</p>
+        </div>
+        {group.is_default && (
+          <span className="text-xs text-text-secondary bg-background px-2 py-0.5 rounded">Default</span>
+        )}
+        {!group.is_default && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="text-text-secondary hover:text-error transition-colors p-1 cursor-pointer"
+            title="Delete list"
+          >
+            <Trash size={16} />
+          </button>
+        )}
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border/50">
+          <div className="pt-3 relative">
+            <div className="flex items-center gap-2 border border-border rounded-md px-2.5 py-1.5 bg-background">
+              <MagnifyingGlass size={16} className="text-text-secondary shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search your followers..."
+                className="flex-1 text-sm bg-transparent text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
+              />
+              {searchQuery && (
+                <button onClick={() => onSearchChange("")} className="cursor-pointer">
+                  <X size={14} className="text-text-secondary" />
+                </button>
+              )}
+            </div>
+            {searchQuery.length >= 1 && filteredFollowers.length > 0 && (
+              <div className="absolute z-10 top-full mt-1 w-full bg-surface border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                {filteredFollowers.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => onAdd(user)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-background/50 text-left cursor-pointer"
+                  >
+                    <Avatar src={user.avatar_url} name={user.display_name} size="sm" />
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{user.display_name}</p>
+                      <p className="text-xs text-text-secondary">@{user.username}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {searchQuery.length >= 1 && filteredFollowers.length === 0 && (
+              <p className="text-xs text-text-secondary mt-1.5">
+                No matching followers. People need to follow you before you can add them.
+              </p>
+            )}
+          </div>
+
+          {group.members.length === 0 ? (
+            <div className="flex items-center gap-2 py-3 text-text-secondary">
+              <UsersThree size={16} />
+              <p className="text-sm">No members yet. Search your followers to add people.</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {group.members.map((member) => (
+                <div key={member.id} className="flex items-center gap-2.5 py-1.5">
+                  <Avatar src={member.avatar_url} name={member.display_name} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{member.display_name}</p>
+                    <p className="text-xs text-text-secondary truncate">@{member.username}</p>
+                  </div>
+                  <button
+                    onClick={() => onRemove(member.id)}
+                    className="text-text-secondary hover:text-error transition-colors p-1 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

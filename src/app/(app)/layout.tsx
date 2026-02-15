@@ -22,6 +22,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const circles = memberships?.map((m) => (m as unknown as { circles: Record<string, unknown> }).circles).filter(Boolean) || [];
   const circleIds = (circles as { id: string }[]).map((c) => c.id);
 
+  const { count: pendingFollowCount } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("following_id", user.id)
+    .eq("status", "pending");
+
   let unseenCounts: Record<string, number> = {};
   if (circleIds.length > 0) {
     const { data: lastSeenRows } = await supabase
@@ -65,6 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           user={profile}
           circles={circles as never[]}
           unseenCounts={unseenCounts}
+          pendingFollowCount={pendingFollowCount || 0}
         />
         <main className="flex-1 min-h-screen border-x border-border/50 px-6 py-6">
           {children}

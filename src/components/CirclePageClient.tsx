@@ -5,9 +5,11 @@ import Timeline from "@/components/Timeline";
 import Leaderboard from "@/components/Leaderboard";
 import JoinButton from "@/components/JoinButton";
 import Badge from "@/components/ui/Badge";
-import { useState, useEffect } from "react";
-import { UsersThree, Trophy, LinkSimple, Check, Copy } from "@phosphor-icons/react";
-import type { Circle, Post, LeaderboardEntry } from "@/types";
+import Button from "@/components/ui/Button";
+import Avatar from "@/components/ui/Avatar";
+import { useState, useEffect, useMemo } from "react";
+import { UsersThree, Trophy, LinkSimple, Check, Copy, UserPlus, MagnifyingGlass, X } from "@phosphor-icons/react";
+import type { Circle, Post, LeaderboardEntry, User } from "@/types";
 
 interface CirclePageClientProps {
   circle: Circle & { invite_code?: string };
@@ -17,6 +19,7 @@ interface CirclePageClientProps {
   currentUserId: string;
   isMember: boolean;
   isAdmin: boolean;
+  invitableFollowers?: User[];
 }
 
 function useMarkCircleSeen(circleId: string, isMember: boolean) {
@@ -36,7 +39,7 @@ function InviteCodeCopy({ code }: { code: string }) {
   }
 
   return (
-    <div className="mt-4 flex items-center gap-2 text-xs text-text-secondary">
+    <div className="flex items-center gap-2 text-xs text-text-secondary">
       <LinkSimple size={14} />
       <span>Invite code:</span>
       <code className="bg-background px-1.5 py-0.5 rounded">{code}</code>
@@ -51,6 +54,94 @@ function InviteCodeCopy({ code }: { code: string }) {
   );
 }
 
+function InviteSection({ circleId, followers: initialFollowers }: { circleId: string; followers: User[] }) {
+  const [followers, setFollowers] = useState(initialFollowers);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+
+  const filtered = useMemo(() => {
+    if (!searchQuery) return followers;
+    const q = searchQuery.toLowerCase();
+    return followers.filter(
+      (f) => f.username.toLowerCase().includes(q) || f.display_name.toLowerCase().includes(q)
+    );
+  }, [followers, searchQuery]);
+
+  async function handleInvite(userId: string) {
+    setInvitingId(userId);
+    const res = await fetch(`/api/circles/${circleId}/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (res.ok) {
+      setInvited((prev) => new Set(prev).add(userId));
+      setFollowers((prev) => prev.filter((f) => f.id !== userId));
+    }
+    setInvitingId(null);
+  }
+
+  if (followers.length === 0 && invited.size === 0) return null;
+
+  return (
+    <div className="mt-4">
+      <button
+        onClick={() => setShowSearch(!showSearch)}
+        className="inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-accent transition-colors cursor-pointer"
+      >
+        <UserPlus size={14} />
+        Invite people
+      </button>
+
+      {showSearch && (
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-2 border border-border rounded-md px-2.5 py-1.5 bg-background">
+            <MagnifyingGlass size={14} className="text-text-secondary shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search your followers..."
+              className="flex-1 text-xs bg-transparent text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
+              autoFocus
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="cursor-pointer">
+                <X size={12} className="text-text-secondary" />
+              </button>
+            )}
+          </div>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {filtered.map((user) => (
+              <div key={user.id} className="flex items-center gap-2.5 py-1.5 px-1">
+                <Avatar src={user.avatar_url} name={user.display_name} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{user.display_name}</p>
+                  <p className="text-xs text-text-secondary truncate">@{user.username}</p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => handleInvite(user.id)}
+                  loading={invitingId === user.id}
+                >
+                  Invite
+                </Button>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-xs text-text-secondary py-2">
+                {searchQuery ? "No matching followers" : "All your followers are already in this circle"}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CirclePageClient({
   circle,
   posts,
@@ -59,6 +150,7 @@ export default function CirclePageClient({
   currentUserId,
   isMember,
   isAdmin,
+  invitableFollowers = [],
 }: CirclePageClientProps) {
   useMarkCircleSeen(circle.id, isMember);
 
@@ -91,8 +183,11 @@ export default function CirclePageClient({
           </div>
         </div>
 
-        {circle.invite_code && isMember && (
-          <InviteCodeCopy code={circle.invite_code} />
+        {isMember && (
+          <div className="mt-4 flex flex-col gap-2">
+            {circle.invite_code && <InviteCodeCopy code={circle.invite_code} />}
+            <InviteSection circleId={circle.id} followers={invitableFollowers} />
+          </div>
         )}
       </div>
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
-import { MagnifyingGlass, UserPlus, Check, Clock } from "@phosphor-icons/react";
+import { MagnifyingGlass, UserPlus, Check, Clock, XIcon, CheckIcon } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import type { User, FollowStatus } from "@/types";
 
@@ -17,6 +17,12 @@ interface PeoplePageClientProps {
   currentUserId: string;
 }
 
+interface FollowRequest {
+  follower_id: string;
+  created_at: string;
+  follower: User;
+}
+
 export default function PeoplePageClient({
   users: initialUsers,
   followStatusMap: initialFollowMap,
@@ -24,12 +30,36 @@ export default function PeoplePageClient({
   currentUserId,
 }: PeoplePageClientProps) {
   const [users, setUsers] = useState(initialUsers);
+  const [followRequests, setFollowRequests] = useState<FollowRequest[]>([]);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
   const [followMap, setFollowMap] = useState(initialFollowMap);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<User[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const supabase = createClient();
+
+  useEffect(() => {
+    async function loadFollowRequests() {
+      const { data: pendingFollows } = await supabase
+        .from("follows")
+        .select("follower_id, created_at, follower:users!follows_follower_id_fkey(*)")
+        .eq("following_id", currentUserId)
+        .eq("status", "pending");
+
+      if (pendingFollows) {
+        setFollowRequests(
+          pendingFollows.map((f) => ({
+            follower_id: f.follower_id,
+            created_at: f.created_at,
+            follower: (f as unknown as { follower: User }).follower,
+          }))
+        );
+      }
+    };
+
+    loadFollowRequests();
+  }, [supabase, currentUserId]);
 
   async function handleSearch(query: string) {
     setSearchQuery(query);
@@ -69,6 +99,19 @@ export default function PeoplePageClient({
     setLoadingId(null);
   }
 
+  async function handleFollowResponse(followerId: string, action: "accept" | "reject") {
+    setRespondingId(followerId);
+    const res = await fetch("/api/follows/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ follower_id: followerId, action }),
+    });
+    if (res.ok) {
+      setFollowRequests((prev) => prev.filter((r) => r.follower_id !== followerId));
+    }
+    setRespondingId(null);
+  }
+
   const displayUsers = searchResults ?? users;
 
   return (
@@ -77,6 +120,45 @@ export default function PeoplePageClient({
         <h1 className="font-serif text-2xl font-bold text-text-primary mb-1">People</h1>
         <p className="text-sm text-text-secondary">Discover and connect with others</p>
       </div>
+
+      {followRequests.length > 0 && (
+        <div className="pt-6 border-t border-border">
+          <h2 className="font-serif text-lg font-semibold text-text-primary mb-4">
+            Follow requests
+            <span className="ml-2 text-sm font-normal text-text-secondary">{followRequests.length}</span>
+          </h2>
+          <div className="space-y-2">
+            {followRequests.map((req) => (
+              <div key={req.follower_id} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3">
+                <Avatar src={req.follower.avatar_url} name={req.follower.display_name} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{req.follower.display_name}</p>
+                  <p className="text-xs text-text-secondary truncate">@{req.follower.username}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    onClick={() => handleFollowResponse(req.follower_id, "accept")}
+                    loading={respondingId === req.follower_id}
+                  >
+                    <CheckIcon size={14} weight="bold" />
+                    Accept
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFollowResponse(req.follower_id, "reject")}
+                    disabled={respondingId === req.follower_id}
+                  >
+                    <XIcon size={14} />
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="relative">
         <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
@@ -108,7 +190,9 @@ export default function PeoplePageClient({
                 <Link href={`/${person.username}`} className="hover:underline">
                   <p className="text-sm font-medium text-text-primary truncate">{person.display_name}</p>
                 </Link>
-                <p className="text-xs text-text-secondary truncate">@{person.username}</p>
+                <p className="text-xs text-text-secondary truncate">
+                  @{person.username}
+                </p>
                 {person.bio && (
                   <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{person.bio}</p>
                 )}

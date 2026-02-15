@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import type { Circle, LeaderboardEntry } from "@/types";
+import type { Circle, LeaderboardEntry, User } from "@/types";
 import CirclePageClient from "@/components/CirclePageClient";
 import CreateCircleClient from "@/components/CreateCircleClient";
 
@@ -76,9 +76,11 @@ export default async function CirclePage({ params }: CirclePageProps) {
   const postsWithCounts = await Promise.all(
     (posts || []).map(async (post) => {
       const [{ data: reactions }, { count: commentCount }] = await Promise.all([
-        supabase.from("reactions").select("type").eq("post_id", post.id),
+        supabase.from("reactions").select("type, user_id").eq("post_id", post.id),
         supabase.from("comments").select("*", { count: "exact", head: true }).eq("post_id", post.id),
       ]);
+
+      const myReaction = reactions?.find((r) => r.user_id === user.id);
 
       return {
         ...post,
@@ -87,6 +89,7 @@ export default async function CirclePage({ params }: CirclePageProps) {
           heart: reactions?.filter((r) => r.type === "heart").length || 0,
           thumbsdown: reactions?.filter((r) => r.type === "thumbsdown").length || 0,
         },
+        user_reaction: myReaction?.type || null,
         comment_count: commentCount || 0,
       };
     })
@@ -99,6 +102,23 @@ export default async function CirclePage({ params }: CirclePageProps) {
 
   const userCircles = (userMemberships?.map((m) => (m as unknown as { circles: Circle }).circles).filter(Boolean) || []) as Circle[];
 
+  const { data: allCircleMembers } = await supabase
+    .from("circle_memberships")
+    .select("user_id")
+    .eq("circle_id", id);
+
+  const circleMemberIds = new Set((allCircleMembers || []).map((m) => m.user_id));
+
+  const { data: followerRows } = await supabase
+    .from("follows")
+    .select("follower_id, follower:users!follows_follower_id_fkey(*)")
+    .eq("following_id", user.id)
+    .eq("status", "accepted");
+
+  const invitableFollowers = (followerRows || [])
+    .map((r) => (r as unknown as { follower: User }).follower)
+    .filter((f) => !circleMemberIds.has(f.id));
+
   return (
     <CirclePageClient
       circle={circle}
@@ -108,6 +128,7 @@ export default async function CirclePage({ params }: CirclePageProps) {
       currentUserId={user.id}
       isMember={isMember}
       isAdmin={isAdmin}
+      invitableFollowers={invitableFollowers}
     />
   );
 }

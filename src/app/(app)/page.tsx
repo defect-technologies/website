@@ -76,9 +76,11 @@ export default async function HomePage() {
   const postsWithCounts = await Promise.all(
     (posts || []).map(async (post) => {
       const [{ data: reactions }, { count: commentCount }] = await Promise.all([
-        supabase.from("reactions").select("type").eq("post_id", post.id),
+        supabase.from("reactions").select("type, user_id").eq("post_id", post.id),
         supabase.from("comments").select("*", { count: "exact", head: true }).eq("post_id", post.id),
       ]);
+
+      const myReaction = reactions?.find((r) => r.user_id === user.id);
 
       return {
         ...post,
@@ -87,6 +89,7 @@ export default async function HomePage() {
           heart: reactions?.filter((r) => r.type === "heart").length || 0,
           thumbsdown: reactions?.filter((r) => r.type === "thumbsdown").length || 0,
         },
+        user_reaction: myReaction?.type || null,
         comment_count: commentCount || 0,
       };
     })

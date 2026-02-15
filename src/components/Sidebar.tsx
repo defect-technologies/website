@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Avatar from "@/components/ui/Avatar";
@@ -20,6 +21,7 @@ interface SidebarProps {
   user: UserType | null;
   circles: Circle[];
   unseenCounts?: Record<string, number>;
+  pendingFollowCount?: number;
 }
 
 const navItems = [
@@ -29,10 +31,11 @@ const navItems = [
   { href: "/settings", icon: Gear, label: "Settings" },
 ];
 
-export default function Sidebar({ user, circles, unseenCounts = {} }: SidebarProps) {
+export default function Sidebar({ user, circles, unseenCounts: initialUnseenCounts = {}, pendingFollowCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const [unseenCounts, setUnseenCounts] = useState(initialUnseenCounts);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -49,6 +52,7 @@ export default function Sidebar({ user, circles, unseenCounts = {} }: SidebarPro
       <nav className="space-y-1">
         {navItems.map(({ href, icon: Icon, label }) => {
           const active = pathname === href;
+          const badge = href === "/people" ? pendingFollowCount : 0;
           return (
             <Link
               key={href}
@@ -60,7 +64,17 @@ export default function Sidebar({ user, circles, unseenCounts = {} }: SidebarPro
               }`}
             >
               <Icon size={20} weight={active ? "fill" : "regular"} />
-              {label}
+              <span className="flex-1 flex flex-row items-start gap-0.px">
+                {label}
+                {badge > 0 && (
+                  <div className="h-1 w-1 bg-accent rounded-full ml-1 mt-1" />
+                )}
+              </span>
+              {badge > 0 && (
+                <span className="shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-accent text-white text-[10px] font-bold px-1">
+                  {badge}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -99,6 +113,15 @@ export default function Sidebar({ user, circles, unseenCounts = {} }: SidebarPro
               <Link
                 key={circle.id}
                 href={`/c/${circle.id}`}
+                onClick={() => {
+                  if (unseen > 0) {
+                    setUnseenCounts((prev) => {
+                      const next = { ...prev };
+                      delete next[circle.id];
+                      return next;
+                    });
+                  }
+                }}
                 className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${
                   pathname === `/c/${circle.id}`
                     ? "bg-surface text-primary font-medium"

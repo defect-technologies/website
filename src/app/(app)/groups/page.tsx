@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import GroupsPageClient from "@/components/GroupsPageClient";
+import type { User } from "@/types";
 
 export default async function GroupsPage() {
   const supabase = await createClient();
@@ -27,5 +28,15 @@ export default async function GroupsPage() {
     })
   );
 
-  return <GroupsPageClient groups={groupsWithMembers} userId={user.id} />;
+  const { data: followerRows } = await supabase
+    .from("follows")
+    .select("follower_id, follower:users!follows_follower_id_fkey(*)")
+    .eq("following_id", user.id)
+    .eq("status", "accepted");
+
+  const followers = (followerRows || []).map(
+    (r) => (r as unknown as { follower: User }).follower
+  );
+
+  return <GroupsPageClient groups={groupsWithMembers} userId={user.id} followers={followers} />;
 }

@@ -57,6 +57,7 @@ export interface Post {
   media?: Media[];
   reactions?: Reaction[];
   reaction_counts?: ReactionCounts;
+  user_reaction?: string | null;
   comment_count?: number;
 }
 
