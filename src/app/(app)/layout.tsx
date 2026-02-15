@@ -22,11 +22,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const circles = memberships?.map((m) => (m as unknown as { circles: Record<string, unknown> }).circles).filter(Boolean) || [];
   const circleIds = (circles as { id: string }[]).map((c) => c.id);
 
-  const { count: pendingFollowCount } = await supabase
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("following_id", user.id)
-    .eq("status", "pending");
+  const [{ count: pendingFollowCount }, { count: unreadNotificationCount }] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", user.id)
+      .eq("status", "pending"),
+    supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("read", false),
+  ]);
 
   let unseenCounts: Record<string, number> = {};
   if (circleIds.length > 0) {
@@ -72,6 +79,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           circles={circles as never[]}
           unseenCounts={unseenCounts}
           pendingFollowCount={pendingFollowCount || 0}
+          unreadNotificationCount={unreadNotificationCount || 0}
         />
         <main className="flex-1 min-h-screen border-x border-border/50 px-6 py-6">
           {children}

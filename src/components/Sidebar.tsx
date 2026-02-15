@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import Avatar from "@/components/ui/Avatar";
 import {
   House,
@@ -10,6 +11,7 @@ import {
   UserList,
   User,
   Gear,
+  Bell,
   Plus,
   SignOut,
   LinkSimple,
@@ -22,20 +24,170 @@ interface SidebarProps {
   circles: Circle[];
   unseenCounts?: Record<string, number>;
   pendingFollowCount?: number;
+  unreadNotificationCount?: number;
 }
 
 const navItems = [
   { href: "/", icon: House, label: "Home" },
-  { href: "/people", icon: UserList, label: "People" },
+  { href: "/people", icon: UserList, label: "People", badgeKey: "people" },
+  { href: "/notifications", icon: Bell, label: "Notifications", badgeKey: "notifications" },
   { href: "/groups", icon: UsersThree, label: "Audience Lists" },
   { href: "/settings", icon: Gear, label: "Settings" },
 ];
 
-export default function Sidebar({ user, circles, unseenCounts: initialUnseenCounts = {}, pendingFollowCount = 0 }: SidebarProps) {
+function BadgePill({ count }: { count: number }) {
+  return (
+    <AnimatePresence>
+      {count > 0 && (
+        <motion.span
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 25 }}
+          className="shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-accent text-white text-[10px] font-bold px-1"
+        >
+          {count > 99 ? "99+" : count}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export default function Sidebar({
+  user,
+  circles,
+  unseenCounts: initialUnseenCounts = {},
+  pendingFollowCount: initialPendingCount = 0,
+  unreadNotificationCount: initialNotifCount = 0,
+}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [unseenCounts, setUnseenCounts] = useState(initialUnseenCounts);
+  const [pendingFollowCount, setPendingFollowCount] = useState(initialPendingCount);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(initialNotifCount);
+
+  const totalBadge = pendingFollowCount + unreadNotifCount;
+
+  useEffect(() => {
+    if (totalBadge > 0) {
+      document.title = `(${totalBadge}) Devlog`;
+    } else {
+      document.title = "Devlog";
+    }
+  }, [totalBadge]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const notifChannel = supabase
+      .channel("sidebar-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          setUnreadNotifCount((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    const followChannel = supabase
+      .channel("sidebar-follows")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "follows",
+          filter: `following_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new && (payload.new as { status: string }).status === "pending") {
+            setPendingFollowCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "follows",
+          filter: `following_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new && (payload.new as { status: string }).status === "accepted") {
+            setPendingFollowCount((prev) => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "follows",
+          filter: `following_id=eq.${user.id}`,
+        },
+        () => {
+          setPendingFollowCount((prev) => Math.max(0, prev - 1));
+        }
+      )
+      .subscribe();
+
+    const postsChannel = supabase
+      .channel("sidebar-posts")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "posts",
+        },
+        (payload) => {
+          const post = payload.new as { circle_id: string | null; author_id: string; visibility: string };
+          if (
+            post.circle_id &&
+            post.visibility === "circle" &&
+            post.author_id !== user.id &&
+            circles.some((c) => c.id === post.circle_id)
+          ) {
+            if (pathname !== `/c/${post.circle_id}`) {
+              setUnseenCounts((prev) => ({
+                ...prev,
+                [post.circle_id!]: (prev[post.circle_id!] || 0) + 1,
+              }));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notifChannel);
+      supabase.removeChannel(followChannel);
+      supabase.removeChannel(postsChannel);
+    };
+  }, [user, supabase, circles, pathname]);
+
+  // When navigating to notifications, clear the badge
+  useEffect(() => {
+    if (pathname === "/notifications") {
+      setUnreadNotifCount(0);
+    }
+  }, [pathname]);
+
+  // When navigating to people, clear follow request badge
+  useEffect(() => {
+    if (pathname === "/people") {
+      setPendingFollowCount(0);
+    }
+  }, [pathname]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -50,9 +202,11 @@ export default function Sidebar({ user, circles, unseenCounts: initialUnseenCoun
       </Link>
 
       <nav className="space-y-1">
-        {navItems.map(({ href, icon: Icon, label }) => {
+        {navItems.map(({ href, icon: Icon, label, badgeKey }) => {
           const active = pathname === href;
-          const badge = href === "/people" ? pendingFollowCount : 0;
+          const badge = badgeKey === "people" ? pendingFollowCount
+            : badgeKey === "notifications" ? unreadNotifCount
+            : 0;
           return (
             <Link
               key={href}
@@ -64,17 +218,17 @@ export default function Sidebar({ user, circles, unseenCounts: initialUnseenCoun
               }`}
             >
               <Icon size={20} weight={active ? "fill" : "regular"} />
-              <span className="flex-1 flex flex-row items-start gap-0.px">
+              <span className="flex-1 flex flex-row items-center">
                 {label}
                 {badge > 0 && (
-                  <div className="h-1 w-1 bg-accent rounded-full ml-1 mt-1" />
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="h-1.5 w-1.5 bg-accent rounded-full ml-1.5"
+                  />
                 )}
               </span>
-              {badge > 0 && (
-                <span className="shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-accent text-white text-[10px] font-bold px-1">
-                  {badge}
-                </span>
-              )}
+              <BadgePill count={badge} />
             </Link>
           );
         })}
@@ -129,11 +283,7 @@ export default function Sidebar({ user, circles, unseenCounts: initialUnseenCoun
                 }`}
               >
                 <span className="truncate">{circle.name}</span>
-                {unseen > 0 && (
-                  <span className="shrink-0 ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-accent text-white text-[10px] font-bold px-1">
-                    {unseen > 20 ? "20+" : unseen}
-                  </span>
-                )}
+                <BadgePill count={unseen > 20 ? 21 : unseen} />
               </Link>
             );
           })}
