@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -90,10 +91,10 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
   useEffect(() => {
     const nextPreviews = selectedFiles.map((file) => {
       if (file.type.startsWith("image/")) {
-        return { url: URL.createObjectURL(file), kind: "image", name: file.name };
+        return { url: URL.createObjectURL(file), kind: "image", name: file.name } as PreviewItem;
       }
       if (file.type.startsWith("video/")) {
-        return { url: URL.createObjectURL(file), kind: "video", name: file.name };
+        return { url: URL.createObjectURL(file), kind: "video", name: file.name } as PreviewItem;
       }
       return null;
     });
