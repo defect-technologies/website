@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useOptimistic, useTransition } from "react";
+import { useEffect, useRef, useState, useOptimistic, useTransition } from "react";
 import { ThumbsUp, Heart, ThumbsDown } from "@phosphor-icons/react";
-import { createClient } from "@/lib/supabase/client";
 import type { ReactionCounts } from "@/types";
 
 interface ReactionBarProps {
@@ -11,46 +10,94 @@ interface ReactionBarProps {
   userReaction?: string | null;
 }
 
+type ReactionType = "thumbsup" | "heart" | "thumbsdown";
+
 const reactionConfig = [
-  { type: "thumbsup" as const, Icon: ThumbsUp, label: "Like" },
   { type: "heart" as const, Icon: Heart, label: "Love" },
+  { type: "thumbsup" as const, Icon: ThumbsUp, label: "Like" },
   { type: "thumbsdown" as const, Icon: ThumbsDown, label: "Dislike" },
 ];
 
 export default function ReactionBar({ postId, counts: initialCounts, userReaction: initialReaction }: ReactionBarProps) {
-  const supabase = createClient();
   const [, startTransition] = useTransition();
   const [currentReaction, setCurrentReaction] = useState(initialReaction);
+  const reactionRef = useRef<string | null>(initialReaction || null);
+  const [baseCounts, setBaseCounts] = useState(initialCounts);
+  const lastCountsRef = useRef(initialCounts);
   const [optimisticCounts, addOptimistic] = useOptimistic(
-    initialCounts,
+    baseCounts,
     (state: ReactionCounts, action: { type: keyof ReactionCounts; delta: number }) => ({
       ...state,
       [action.type]: Math.max(0, state[action.type] + action.delta),
     })
   );
 
-  async function toggleReaction(type: "thumbsup" | "heart" | "thumbsdown") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  useEffect(() => {
+    const last = lastCountsRef.current;
+    if (
+      last.thumbsup !== initialCounts.thumbsup
+      || last.heart !== initialCounts.heart
+      || last.thumbsdown !== initialCounts.thumbsdown
+    ) {
+      lastCountsRef.current = initialCounts;
+      setBaseCounts(initialCounts);
+    }
+  }, [initialCounts]);
 
-    startTransition(async () => {
-      if (currentReaction === type) {
-        addOptimistic({ type, delta: -1 });
-        setCurrentReaction(null);
-        await supabase.from("reactions").delete().eq("post_id", postId).eq("user_id", user.id);
-      } else {
-        if (currentReaction) {
-          addOptimistic({ type: currentReaction as keyof ReactionCounts, delta: -1 });
-        }
-        addOptimistic({ type, delta: 1 });
-        setCurrentReaction(type);
+  useEffect(() => {
+    const nextReaction = initialReaction || null;
+    reactionRef.current = nextReaction;
+    setCurrentReaction(nextReaction);
+  }, [initialReaction]);
 
-        await supabase.from("reactions").upsert(
-          { post_id: postId, user_id: user.id, type },
-          { onConflict: "post_id,user_id" }
-        );
-      }
+  function applyOptimisticChange(previous: ReactionType | null, next: ReactionType | null) {
+    if (previous === next) return;
+    if (previous && !next) {
+      addOptimistic({ type: previous, delta: -1 });
+      return;
+    }
+    if (!previous && next) {
+      addOptimistic({ type: next, delta: 1 });
+      return;
+    }
+    if (previous && next) {
+      addOptimistic({ type: previous, delta: -1 });
+      addOptimistic({ type: next, delta: 1 });
+    }
+  }
+
+  async function toggleReaction(type: ReactionType) {
+    const previous = reactionRef.current;
+    const next = previous === type ? null : type;
+
+    startTransition(() => {
+      applyOptimisticChange(previous as ReactionType | null, next);
+
+      reactionRef.current = next;
+      setCurrentReaction(next);
     });
+
+    try {
+      const response = await fetch("/api/reactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId, type }),
+      });
+
+      if (!response.ok) {
+        startTransition(() => {
+          applyOptimisticChange(next, previous as ReactionType | null);
+          reactionRef.current = previous;
+          setCurrentReaction(previous);
+        });
+      }
+    } catch {
+      startTransition(() => {
+        applyOptimisticChange(next, previous as ReactionType | null);
+        reactionRef.current = previous;
+        setCurrentReaction(previous);
+      });
+    }
   }
 
   return (
@@ -62,18 +109,21 @@ export default function ReactionBar({ postId, counts: initialCounts, userReactio
         return (
           <button
             key={type}
-            onClick={() => toggleReaction(type)}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleReaction(type);
+            }}
             aria-label={label}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1 rounded-full px-1 py-1 text-base font-medium transition-colors cursor-pointer ${
               isActive
                 ? type === "thumbsdown"
-                  ? "bg-error/10 text-error"
-                  : "bg-accent/10 text-accent"
+                  ? "text-error"
+                  : "text-accent"
                 : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
             }`}
           >
             <Icon size={16} weight={isActive ? "fill" : "regular"} />
-            {count > 0 && <span>{count}</span>}
+            <span className="text-sm">{count > 0 ? count : " "}</span>
           </button>
         );
       })}

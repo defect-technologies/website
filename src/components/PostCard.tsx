@@ -70,7 +70,7 @@ function getRotation(id: string): number {
   return normalized * 0.6 + 0.3 * (hash > 0 ? 1 : -1);
 }
 
-export default function PostCard({ post, currentUserId, onDelete, showUser }: PostCardProps) {
+export default function PostCard({ post, currentUserId, onDelete, showUser = true }: PostCardProps) {
   const supabase = createClient();
   const router = useRouter();
   const isOwner = currentUserId === post.author_id;
@@ -88,55 +88,84 @@ export default function PostCard({ post, currentUserId, onDelete, showUser }: Po
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="relative bg-white rounded-sm p-4"
+      className="relative rounded-sm p-4"
       style={{
-        boxShadow: "2px 3px 8px rgba(44,24,16,0.06), 0 1px 2px rgba(44,24,16,0.04)",
         transform: `rotate(${rotation}deg)`,
       }}
     >
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary/20 rounded-b-sm" />
-
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <Link href={`/${post.author?.username}`}>
-            <Avatar
-              src={post.author?.avatar_url}
-              name={post.author?.display_name || "User"}
-              size="xs"
-            />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/${post.author?.username}`}
-                className="text-sm font-medium text-text-secondary hover:underline"
-              >
-                {post.author?.display_name}
-              </Link>
-              <span className="text-xs text-text-secondary">{timeAgo(post.posted_at)}</span>
+        {showUser ?
+          <div className="flex items-center gap-2">
+            <Link href={`/${post.author?.username}`}>
+              <Avatar
+                src={post.author?.avatar_url}
+                name={post.author?.display_name || "User"}
+                size="xs"
+              />
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/${post.author?.username}`}
+                  className="text-sm font-medium text-text-secondary hover:underline"
+                >
+                  {post.author?.display_name}
+                </Link>
+                <span className="text-xs text-text-secondary">{timeAgo(post.posted_at)}</span>
+              </div>
             </div>
           </div>
-        </div>
+          :
+          <span className="ml-3 text-xs text-text-secondary">{timeAgo(post.posted_at)}</span>
+        }
 
-        {isOwner && (
-          <DropdownMenu
-            trigger={
-              <button className="text-text-secondary hover:text-text-primary p-1 cursor-pointer">
-                <DotsThree size={20} weight="bold" />
-              </button>
-            }
-            align="right"
-          >
-            <DropdownItem onClick={handleDelete} destructive>
-              <span className="flex items-center gap-2">
-                <Trash size={16} /> Delete post
-              </span>
-            </DropdownItem>
-          </DropdownMenu>
+        {!showUser && (
+          <div className="absolute -top-3 left-4 w-px bg-secondary/50 h-12 pointer-events-none"></div>
         )}
+
+
+        <div className="flex flex-row gap-2">
+          {post.circle && (
+            <Link href={`/c/${post.circle.id}`}>
+              <Badge>{post.circle.name}</Badge>
+            </Link>
+          )}
+          {isOwner && post.visibility === "group" && post.group && (
+            <Badge>
+              <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: post.group.color }} />
+              {post.group.name}
+            </Badge>
+          )}
+          {post.visibility !== "circle" && post.visibility !== "group" && (
+            <Badge variant={post.visibility === "public" ? "success" : "default"}>
+              {post.visibility ? post.visibility.charAt(0).toUpperCase() + post.visibility.slice(1) : "Unknown"}
+            </Badge>
+          )}
+          {isOwner && (
+            <DropdownMenu
+              trigger={
+                <button className="text-text-secondary hover:text-text-primary p-1 cursor-pointer">
+                  <DotsThree size={20} weight="bold" />
+                </button>
+              }
+              align="right"
+            >
+              <DropdownItem onClick={handleDelete} destructive>
+                <span className="flex items-center gap-2">
+                  <Trash size={16} /> Delete post
+                </span>
+              </DropdownItem>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
-      <div className="mt-1">
+      <div
+        className="mt-1 cursor-pointer"
+        onClick={() => {
+          window.location.href = `/post/${post.id}`;
+        }}
+      >
         <p className="text-lg text-text-primary whitespace-pre-wrap leading-relaxed font-serif">
           <MentionText text={post.content} />
         </p>
@@ -183,37 +212,22 @@ export default function PostCard({ post, currentUserId, onDelete, showUser }: Po
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-start gap-6 cursor-default" onClick={(e) => {e.stopPropagation();}}>
         <ReactionBar
           postId={post.id}
           counts={post.reaction_counts || { thumbsup: 0, heart: 0, thumbsdown: 0 }}
           userReaction={post.user_reaction || null}
         />
-        <div className="flex flex-row gap-2">
-          {post.circle && (
-            <Link href={`/c/${post.circle.id}`}>
-              <Badge>{post.circle.name}</Badge>
-            </Link>
-          )}
-          {isOwner && post.visibility === "group" && post.group && (
-            <Badge>
-              <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: post.group.color }} />
-              {post.group.name}
-            </Badge>
-          )}
-          {post.visibility !== "circle" && post.visibility !== "group" && (
-            <Badge variant={post.visibility === "public" ? "success" : "default"}>
-              {post.visibility}
-            </Badge>
-          )}
-          <button
-            onClick={() => setCommentsOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
-          >
-            <ChatCircle size={16} weight={commentsOpen ? "fill" : "regular"} />
-            {post.comment_count ? `${post.comment_count}` : ""}
-          </button>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setCommentsOpen((prev) => !prev);
+          }}
+          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+        >
+          <ChatCircle size={16} weight={commentsOpen ? "fill" : "regular"} />
+          {post.comment_count ? `${post.comment_count}` : ""}
+        </button>
       </div>
 
       <AnimatePresence>

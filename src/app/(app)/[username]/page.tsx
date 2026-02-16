@@ -125,14 +125,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         />
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="rounded-lg border border-border bg-surface p-3 text-center">
           <p className="text-2xl font-bold text-primary font-serif">{totalPosts}</p>
           <p className="text-xs text-text-secondary">Posts</p>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-3 text-center">
-          <p className="text-2xl font-bold text-primary font-serif">{avgScore}</p>
-          <p className="text-xs text-text-secondary">Avg score</p>
         </div>
         <div className="rounded-lg border border-border bg-surface p-3 text-center">
           <p className="text-2xl font-bold text-primary font-serif">{circles.length}</p>
@@ -157,7 +153,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
       <div>
         <h2 className="font-serif text-lg font-semibold text-text-primary mb-3">Timeline</h2>
-        <Timeline posts={postsWithCounts} currentUserId={currentUser?.id} />
+        <Timeline posts={postsWithCounts} currentUserId={currentUser?.id} isProfile={true} />
       </div>
     </div>
   );

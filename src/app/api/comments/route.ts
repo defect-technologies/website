@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await createCommentNotification(supabase, postId, user.id, content.trim());
+
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -66,4 +69,63 @@ export async function GET(request: NextRequest) {
   );
 
   return NextResponse.json(filtered);
+}
+
+async function createCommentNotification(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  postId: string,
+  commenterId: string,
+  commentContent: string
+) {
+  const { data: post } = await supabase
+    .from("posts")
+    .select("author_id")
+    .eq("id", postId)
+    .single();
+
+  if (!post || post.author_id === commenterId) return;
+
+  const { data: commenter } = await supabase
+    .from("users")
+    .select("display_name")
+    .eq("id", commenterId)
+    .single();
+
+  const { count: totalComments } = await supabase
+    .from("comments")
+    .select("*", { count: "exact", head: true })
+    .eq("post_id", postId);
+
+  const { data: existingNotif } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("related_post_id", postId)
+    .eq("type", "comment")
+    .eq("user_id", post.author_id)
+    .eq("read", false)
+    .single();
+
+  const count = totalComments || 1;
+  const title = count === 1
+    ? `${commenter?.display_name || "Someone"} commented on your post`
+    : `${count} people commented on your post`;
+  const body = count === 1
+    ? `${commentContent.substring(0, 50).trimEnd()}${commentContent.length > 50 ? "..." : ""}`
+    : "Your post is getting comments";
+
+  if (existingNotif) {
+    await supabase
+      .from("notifications")
+      .update({ title, body, created_at: new Date().toISOString() })
+      .eq("id", existingNotif.id);
+  } else {
+    await supabase.from("notifications").insert({
+      user_id: post.author_id,
+      type: "comment",
+      title,
+      body,
+      link: `/post/${postId}`,
+      related_post_id: postId,
+    });
+  }
 }

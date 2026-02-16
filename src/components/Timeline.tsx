@@ -6,6 +6,7 @@ import type { Post } from "@/types";
 interface TimelineProps {
   posts: Post[];
   currentUserId?: string;
+  isProfile?: boolean;
 }
 
 function groupByDay(posts: Post[]) {
@@ -34,7 +35,7 @@ function groupByDay(posts: Post[]) {
   return groups;
 }
 
-export default function Timeline({ posts, currentUserId }: TimelineProps) {
+export default function Timeline({ posts, currentUserId, isProfile }: TimelineProps) {
   const groups = groupByDay(posts);
 
   if (posts.length === 0) {
@@ -57,8 +58,8 @@ export default function Timeline({ posts, currentUserId }: TimelineProps) {
             <div className="h-px flex-1 bg-border/60" />
           </div>
           <div className="space-y-3">
-            {group.posts.map((post) => (
-              <PostCard key={post.id} post={post} currentUserId={currentUserId} />
+            {group.posts.map((post, index) => (
+              <PostCard key={`${post.id}-${index}`} post={post} currentUserId={currentUserId} showUser={!isProfile || index == 0} />
             ))}
           </div>
         </div>

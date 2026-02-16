@@ -117,6 +117,7 @@ export interface Notification {
   body: string;
   link: string | null;
   read: boolean;
+  related_post_id: string | null;
   created_at: string;
 }
 
