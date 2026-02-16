@@ -6,8 +6,9 @@ import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
-import { MagnifyingGlass, UserPlus, Check, Clock, XIcon, CheckIcon } from "@phosphor-icons/react";
+import { MagnifyingGlass, UserPlus, Check, Clock } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import FollowRequestCard from "@/components/FollowRequestCard";
 import type { User, FollowStatus } from "@/types";
 
 interface PeoplePageClientProps {
@@ -31,7 +32,6 @@ export default function PeoplePageClient({
 }: PeoplePageClientProps) {
   const [users, setUsers] = useState(initialUsers);
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([]);
-  const [respondingId, setRespondingId] = useState<string | null>(null);
   const [followMap, setFollowMap] = useState(initialFollowMap);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<User[] | null>(null);
@@ -99,19 +99,6 @@ export default function PeoplePageClient({
     setLoadingId(null);
   }
 
-  async function handleFollowResponse(followerId: string, action: "accept" | "reject") {
-    setRespondingId(followerId);
-    const res = await fetch("/api/follows/respond", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ follower_id: followerId, action }),
-    });
-    if (res.ok) {
-      setFollowRequests((prev) => prev.filter((r) => r.follower_id !== followerId));
-    }
-    setRespondingId(null);
-  }
-
   const displayUsers = searchResults ?? users;
 
   return (
@@ -129,32 +116,13 @@ export default function PeoplePageClient({
           </h2>
           <div className="space-y-2">
             {followRequests.map((req) => (
-              <div key={req.follower_id} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3">
-                <Avatar src={req.follower.avatar_url} name={req.follower.display_name} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">{req.follower.display_name}</p>
-                  <p className="text-xs text-text-secondary truncate">@{req.follower.username}</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    size="sm"
-                    onClick={() => handleFollowResponse(req.follower_id, "accept")}
-                    loading={respondingId === req.follower_id}
-                  >
-                    <CheckIcon size={14} weight="bold" />
-                    Accept
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleFollowResponse(req.follower_id, "reject")}
-                    disabled={respondingId === req.follower_id}
-                  >
-                    <XIcon size={14} />
-                    Decline
-                  </Button>
-                </div>
-              </div>
+              <FollowRequestCard
+                key={req.follower_id}
+                user={req.follower}
+                onResponded={(userId) => {
+                  setFollowRequests((prev) => prev.filter((r) => r.follower_id !== userId));
+                }}
+              />
             ))}
           </div>
         </div>

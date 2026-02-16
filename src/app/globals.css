@@ -2,7 +2,7 @@
 
 :root {
   --background: #F5F1E8;
-  --surface: #FFFFFF;
+  --surface: #f5f4f0;
   --primary: #2C1810;
   --secondary: #8B6F47;
   --accent: #E07A5F;
@@ -12,6 +12,8 @@
   --success: #6B8E23;
   --error: #C1440E;
   --foreground: #1A1A1A;
+  --surface-hover: #E8E3D8;
+  --surface-active: #DED8CB;
 }
 
 @theme inline {
@@ -26,6 +28,8 @@
   --color-success: var(--success);
   --color-error: var(--error);
   --color-foreground: var(--foreground);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
 
   --font-sans: var(--font-inter);
   --font-serif: var(--font-fraunces);

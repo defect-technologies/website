@@ -20,6 +20,7 @@ interface SelectProps {
   size?: "sm" | "md";
   align?: "left" | "right";
   className?: string;
+  disabled?: boolean;
 }
 
 const sizeStyles: Record<NonNullable<SelectProps["size"]>, string> = {
@@ -35,6 +36,7 @@ export default function Select({
   size = "md",
   align = "left",
   className = "",
+  disabled = false,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -64,15 +66,16 @@ export default function Select({
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => !disabled ? setOpen((prev) => !prev) : undefined}
         className={`
           inline-flex items-center gap-2 rounded-md border border-border bg-surface
           text-text-primary transition-colors
           hover:bg-background focus:outline-none focus:ring-2 focus:ring-secondary/30
           ${sizeStyles[size]}
+          ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
         `}
         aria-haspopup="listbox"
-        aria-expanded={open}
+        aria-expanded={open && !disabled}
       >
         {selected?.color && (
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: selected.color }} />
@@ -95,6 +98,7 @@ export default function Select({
             absolute z-40 mt-1 min-w-[200px] rounded-md border border-border
             bg-surface py-1 shadow-lg
             ${align === "right" ? "right-0" : "left-0"}
+            ${disabled ? "pointer-events-none opacity-50" : "pointer-events-auto"}
           `}
         >
           {options.map((option) => {
@@ -107,16 +111,16 @@ export default function Select({
                 type="button"
                 role="option"
                 aria-selected={isSelected}
-                disabled={option.disabled}
+                disabled={option.disabled || disabled}
                 onClick={() => {
-                  if (option.disabled) return;
+                  if (option.disabled || disabled) return;
                   onChange(option.value);
                   setOpen(false);
                 }}
                 className={`
                   group flex w-full items-center gap-3 px-3 py-2 text-left text-sm
                   transition-colors cursor-pointer
-                  ${option.disabled ? "cursor-not-allowed opacity-50" : "hover:bg-background"}
+                  ${option.disabled || disabled ? "cursor-not-allowed opacity-50" : "hover:bg-background"}
                 `}
               >
                 <div className="flex min-w-0 flex-1 items-center gap-2">

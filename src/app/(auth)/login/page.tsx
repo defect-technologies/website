@@ -78,7 +78,7 @@ export default function LoginPage() {
     <div className="space-y-6">
       <div className="text-center space-y-1">
         <h1 className="font-serif text-3xl font-bold text-text-primary">Welcome back</h1>
-        <p className="text-sm text-text-secondary">Sign in to your Devlog account</p>
+        <p className="text-sm text-text-secondary">Sign in to your Defect account</p>
       </div>
 
       <form onSubmit={mode === "password" ? handlePasswordLogin : handleMagicLink} className="space-y-4">

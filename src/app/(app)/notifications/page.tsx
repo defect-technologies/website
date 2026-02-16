@@ -14,5 +14,5 @@ export default async function NotificationsPage() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  return <NotificationsPageClient notifications={notifications || []} />;
+  return <NotificationsPageClient notifications={notifications || []} currentUserId={user.id} />;
 }

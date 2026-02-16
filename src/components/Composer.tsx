@@ -59,7 +59,7 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
   const [content, setContent] = useState("");
   const [circleId, setCircleId] = useState(defaultCircleId || circles[0]?.id || "");
   const [groupId, setGroupId] = useState(groups[0]?.id || "");
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [visibility, setVisibility] = useState<Visibility>(defaultCircleId ? "circle" : "public");
   const [loading, setLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Array<PreviewItem | null>>([]);
@@ -67,6 +67,7 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionResults, setMentionResults] = useState<User[]>([]);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mentionSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -279,8 +280,8 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
             mentionedUsers.map((mu) => ({
               user_id: mu.id,
               type: "mention" as const,
-              title: "You were mentioned",
-              body: `${profile?.display_name || "Someone"} mentioned you in a post`,
+              title: `${profile?.display_name || "Someone"} mentioned you`,
+              body: `${content.slice(0, 100)}${content.length > 100 ? "..." : ""}`,
               link: post.circle_id ? `/c/${post.circle_id}` : null,
             }))
           );
@@ -294,7 +295,7 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-4 space-y-3">
+    <form ref={formRef} onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-4 space-y-3">
       <div className="relative">
         <Textarea
           ref={textareaRef}
@@ -303,7 +304,14 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
             setContent(e.target.value);
             checkForMention(e.target);
           }}
-          onKeyDown={handleTextareaKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && mentionResults.length === 0) {
+              e.preventDefault();
+              formRef.current?.requestSubmit();
+              return;
+            }
+            handleTextareaKeyDown(e);
+          }}
           onPaste={handlePaste}
           placeholder="What are you working on?"
           maxChars={2500}
@@ -392,6 +400,7 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
             onChange={(nextValue) => setVisibility(nextValue as Visibility)}
             options={visibilityOptions}
             size="sm"
+            disabled={!!defaultCircleId}
           />
           {visibility === "group" && groups.length > 0 && (
             // <select
@@ -422,6 +431,7 @@ export default function Composer({ circles, groups = [], defaultCircleId }: Comp
                 value: c.id,
                 label: c.name,
               }))}
+              disabled={!!defaultCircleId}
               size="sm"
             />
           )}

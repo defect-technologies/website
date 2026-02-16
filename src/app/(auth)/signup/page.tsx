@@ -106,7 +106,7 @@ export default function SignupPage() {
             required
           />
           <p className="mt-1 text-xs text-text-secondary">
-            devlog.app/<strong>{username || "..."}</strong>
+            defect.tech/<strong>{username || "..."}</strong>
           </p>
         </div>
         <Input

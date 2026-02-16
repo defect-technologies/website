@@ -13,7 +13,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Devlog",
+  title: "Defect",
   description: "Document your journey, compete with friends",
 };
 

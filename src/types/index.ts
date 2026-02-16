@@ -90,6 +90,7 @@ export interface Comment {
   post_id: string;
   author_id: string;
   content: string;
+  visibility: "author_only" | "public";
   created_at: string;
   author?: User;
 }

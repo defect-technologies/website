@@ -33,7 +33,7 @@ export default function Leaderboard({ entries, prizeDescription }: LeaderboardPr
           <div className="flex rounded-md border border-border text-xs">
             <button
               onClick={() => setPeriod("week")}
-              className={`px-2.5 py-1 cursor-pointer transition-colors ${
+              className={`px-2.5 py-1 cursor-pointer transition-colors rounded-l-lg ${
                 period === "week" ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"
               }`}
             >
@@ -41,7 +41,7 @@ export default function Leaderboard({ entries, prizeDescription }: LeaderboardPr
             </button>
             <button
               onClick={() => setPeriod("month")}
-              className={`px-2.5 py-1 cursor-pointer transition-colors ${
+              className={`px-2.5 py-1 cursor-pointer transition-colors rounded-r-lg ${
                 period === "month" ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"
               }`}
             >

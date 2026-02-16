@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import FollowRequestCard from "@/components/FollowRequestCard";
 import {
   ThumbsUp,
   Heart,
@@ -14,10 +15,16 @@ import {
   Bell,
   CheckCircle,
 } from "@phosphor-icons/react";
-import type { Notification } from "@/types";
+import type { Notification, User } from "@/types";
 
 interface NotificationsPageClientProps {
   notifications: Notification[];
+  currentUserId: string;
+}
+
+interface FollowRequest {
+  follower_id: string;
+  follower: User;
 }
 
 const typeConfig: Record<string, { icon: typeof Bell; color: string }> = {
@@ -40,20 +47,50 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default function NotificationsPageClient({ notifications: initial }: NotificationsPageClientProps) {
+export default function NotificationsPageClient({ notifications: initial, currentUserId }: NotificationsPageClientProps) {
   const [notifications, setNotifications] = useState(initial);
+  const [pendingRequests, setPendingRequests] = useState<FollowRequest[]>([]);
+  const [handledIds, setHandledIds] = useState<Set<string>>(new Set());
   const supabase = createClient();
 
   useEffect(() => {
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-
-    supabase
-      .from("notifications")
-      .update({ read: true })
-      .in("id", unreadIds)
-      .then();
+    if (unreadIds.length > 0) {
+      supabase
+        .from("notifications")
+        .update({ read: true })
+        .in("id", unreadIds)
+        .then();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    async function loadPendingRequests() {
+      const { data } = await supabase
+        .from("follows")
+        .select("follower_id, follower:users!follows_follower_id_fkey(*)")
+        .eq("following_id", currentUserId)
+        .eq("status", "pending");
+
+      if (data) {
+        setPendingRequests(
+          data.map((f) => ({
+            follower_id: f.follower_id,
+            follower: (f as unknown as { follower: User }).follower,
+          }))
+        );
+      }
+    }
+
+    loadPendingRequests();
+  }, [supabase, currentUserId]);
+
+  const pendingByFollowerId = new Map(pendingRequests.map((r) => [r.follower_id, r]));
+
+  function handleFollowResponded(userId: string) {
+    setPendingRequests((prev) => prev.filter((r) => r.follower_id !== userId));
+    setHandledIds((prev) => new Set(prev).add(userId));
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -73,12 +110,38 @@ export default function NotificationsPageClient({ notifications: initial }: Noti
             const config = typeConfig[notif.type] || typeConfig.new_post;
             const Icon = config.icon;
 
+            if (notif.type === "follow_request") {
+              const matchingRequest = pendingRequests.find((r) => {
+                const titleLower = notif.title.toLowerCase();
+                const displayLower = r.follower.display_name.toLowerCase();
+                const usernameLower = r.follower.username.toLowerCase();
+                return titleLower.includes(displayLower) || titleLower.includes(usernameLower);
+              });
+
+              if (matchingRequest && !handledIds.has(matchingRequest.follower_id)) {
+                return (
+                  <div key={notif.id} className="py-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`shrink-0 ${config.color}`}>
+                        <Icon size={16} weight={notif.read ? "regular" : "fill"} />
+                      </div>
+                      <p className="text-xs text-text-secondary">{timeAgo(notif.created_at)}</p>
+                    </div>
+                    <FollowRequestCard
+                      user={matchingRequest.follower}
+                      onResponded={handleFollowResponded}
+                    />
+                  </div>
+                );
+              }
+            }
+
             const content = (
               <div
                 className={`flex items-start gap-3 px-3 py-3 rounded-lg transition-colors ${
                   notif.read
-                    ? "hover:bg-surface"
-                    : "bg-accent/5 hover:bg-accent/10"
+                    ? "hover:bg-surface-hover"
+                    : "bg-accent/5 hover:bg-surface-hover"
                 }`}
               >
                 <div className={`shrink-0 mt-0.5 ${config.color}`}>

@@ -69,7 +69,7 @@ export default function ReactionBar({ postId, counts: initialCounts, userReactio
                 ? type === "thumbsdown"
                   ? "bg-error/10 text-error"
                   : "bg-accent/10 text-accent"
-                : "text-text-secondary hover:bg-surface hover:text-text-primary"
+                : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
             }`}
           >
             <Icon size={16} weight={isActive ? "fill" : "regular"} />

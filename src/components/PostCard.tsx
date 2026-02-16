@@ -1,20 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import ReactionBar from "@/components/ReactionBar";
+import CommentSection from "@/components/CommentSection";
 import { ChatCircle, DotsThree, FileText, Trash } from "@phosphor-icons/react";
 import DropdownMenu, { DropdownItem } from "@/components/ui/DropdownMenu";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Post } from "@/types";
 
 interface PostCardProps {
   post: Post;
   currentUserId?: string;
   onDelete?: (postId: string) => void;
+  showUser?: boolean;
 }
 
 function timeAgo(dateStr: string) {
@@ -58,10 +61,21 @@ function getFileName(url: string) {
   }
 }
 
-export default function PostCard({ post, currentUserId, onDelete }: PostCardProps) {
+function getRotation(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+  }
+  const normalized = ((hash % 100) / 100);
+  return normalized * 0.6 + 0.3 * (hash > 0 ? 1 : -1);
+}
+
+export default function PostCard({ post, currentUserId, onDelete, showUser }: PostCardProps) {
   const supabase = createClient();
   const router = useRouter();
   const isOwner = currentUserId === post.author_id;
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const rotation = getRotation(post.id);
 
   async function handleDelete() {
     await supabase.from("posts").delete().eq("id", post.id);
@@ -74,44 +88,32 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="rounded-lg border border-border bg-surface p-4"
+      className="relative bg-white rounded-sm p-4"
+      style={{
+        boxShadow: "2px 3px 8px rgba(44,24,16,0.06), 0 1px 2px rgba(44,24,16,0.04)",
+        transform: `rotate(${rotation}deg)`,
+      }}
     >
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary/20 rounded-b-sm" />
+
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link href={`/${post.author?.username}`}>
             <Avatar
               src={post.author?.avatar_url}
               name={post.author?.display_name || "User"}
-              size="md"
+              size="xs"
             />
           </Link>
           <div>
             <div className="flex items-center gap-2">
               <Link
                 href={`/${post.author?.username}`}
-                className="text-sm font-medium text-text-primary hover:underline"
+                className="text-sm font-medium text-text-secondary hover:underline"
               >
                 {post.author?.display_name}
               </Link>
               <span className="text-xs text-text-secondary">{timeAgo(post.posted_at)}</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {post.circle && (
-                <Link href={`/c/${post.circle.id}`}>
-                  <Badge>{post.circle.name}</Badge>
-                </Link>
-              )}
-              {isOwner && post.visibility === "group" && post.group && (
-                <Badge>
-                  <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: post.group.color }} />
-                  {post.group.name}
-                </Badge>
-              )}
-              {post.visibility !== "circle" && post.visibility !== "group" && (
-                <Badge variant={post.visibility === "public" ? "success" : "default"}>
-                  {post.visibility}
-                </Badge>
-              )}
             </div>
           </div>
         </div>
@@ -134,8 +136,8 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
         )}
       </div>
 
-      <div className="mt-3">
-        <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+      <div className="mt-1">
+        <p className="text-lg text-text-primary whitespace-pre-wrap leading-relaxed font-serif">
           <MentionText text={post.content} />
         </p>
       </div>
@@ -187,24 +189,52 @@ export default function PostCard({ post, currentUserId, onDelete }: PostCardProp
           counts={post.reaction_counts || { thumbsup: 0, heart: 0, thumbsdown: 0 }}
           userReaction={post.user_reaction || null}
         />
-        <Link
-          href={`/c/${post.circle_id}#post-${post.id}`}
-          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
-        >
-          <ChatCircle size={16} />
-          {post.comment_count ? `${post.comment_count}` : ""}
-        </Link>
+        <div className="flex flex-row gap-2">
+          {post.circle && (
+            <Link href={`/c/${post.circle.id}`}>
+              <Badge>{post.circle.name}</Badge>
+            </Link>
+          )}
+          {isOwner && post.visibility === "group" && post.group && (
+            <Badge>
+              <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: post.group.color }} />
+              {post.group.name}
+            </Badge>
+          )}
+          {post.visibility !== "circle" && post.visibility !== "group" && (
+            <Badge variant={post.visibility === "public" ? "success" : "default"}>
+              {post.visibility}
+            </Badge>
+          )}
+          <button
+            onClick={() => setCommentsOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+          >
+            <ChatCircle size={16} weight={commentsOpen ? "fill" : "regular"} />
+            {post.comment_count ? `${post.comment_count}` : ""}
+          </button>
+        </div>
       </div>
 
-      {/* {post.total_score > 0 && (
-        <div className="mt-2 pt-2 border-t border-border/50">
-          <div className="flex items-center gap-3 text-xs text-text-secondary">
-            <span>Score: <strong className="text-secondary">{Math.round(post.total_score)}</strong></span>
-            {post.ai_score > 0 && <span>AI: {Math.round(post.ai_score)}</span>}
-            {post.novelty_score > 0 && <span>Novelty: {Math.round(post.novelty_score)}</span>}
-          </div>
-        </div>
-      )} */}
+      <AnimatePresence>
+        {commentsOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3">
+              <CommentSection
+                postId={post.id}
+                postAuthorId={post.author_id}
+                currentUserId={currentUserId}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -56,7 +56,7 @@ export function DropdownItem({ children, onClick, destructive }: DropdownItemPro
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-3 py-2 text-sm cursor-pointer hover:bg-background transition-colors ${
+      className={`w-full text-left px-3 py-2 text-sm cursor-pointer hover:bg-surface-hover transition-colors ${
         destructive ? "text-error" : "text-text-primary"
       }`}
     >

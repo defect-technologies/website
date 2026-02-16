@@ -71,9 +71,9 @@ export default function Sidebar({
 
   useEffect(() => {
     if (totalBadge > 0) {
-      document.title = `(${totalBadge}) Devlog`;
+      document.title = `(${totalBadge}) Defect`;
     } else {
-      document.title = "Devlog";
+      document.title = "Defect";
     }
   }, [totalBadge]);
 
@@ -198,7 +198,7 @@ export default function Sidebar({
   return (
     <aside className="w-64 shrink-0 sticky top-0 h-screen py-6 pr-6 flex flex-col">
       <Link href="/" className="font-serif text-xl font-bold text-primary mb-8">
-        Devlog
+        Defect
       </Link>
 
       <nav className="space-y-1">
@@ -213,8 +213,8 @@ export default function Sidebar({
               href={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                 active
-                  ? "bg-surface text-primary"
-                  : "text-text-secondary hover:text-primary hover:bg-surface"
+                  ? "bg-surface-hover text-primary"
+                  : "text-text-secondary hover:text-primary hover:bg-surface-hover"
               }`}
             >
               <Icon size={20} weight={active ? "fill" : "regular"} />
@@ -237,8 +237,8 @@ export default function Sidebar({
             href={`/${user.username}`}
             className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
               pathname === `/${user.username}`
-                ? "bg-surface text-primary"
-                : "text-text-secondary hover:text-primary hover:bg-surface"
+                ? "bg-surface-hover text-primary"
+                : "text-text-secondary hover:text-primary hover:bg-surface-hover"
             }`}
           >
             <User size={20} weight={pathname === `/${user.username}` ? "fill" : "regular"} />
@@ -278,8 +278,8 @@ export default function Sidebar({
                 }}
                 className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${
                   pathname === `/c/${circle.id}`
-                    ? "bg-surface text-primary font-medium"
-                    : "text-text-secondary hover:text-primary hover:bg-surface"
+                    ? "bg-surface-hover text-primary font-medium"
+                    : "text-text-secondary hover:text-primary hover:bg-surface-hover"
                 }`}
               >
                 <span className="truncate">{circle.name}</span>
