@@ -1,32 +1,42 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Defect",
-  description: "Document your journey, compete with friends",
+  title: "DEFECT.TECH — Design Studio",
+  description:
+    "Deviation is the discipline. Typefaces, identities, and web experiences designed to defect from expectation.",
+  openGraph: {
+    title: "DEFECT.TECH",
+    description: "Deviation is the discipline.",
+    siteName: "DEFECT.TECH",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DEFECT.TECH — Design Studio",
+    description: "Deviation is the discipline.",
+  },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${fraunces.variable} antialiased`}>
-        {children}
-      </body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }
