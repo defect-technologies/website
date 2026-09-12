@@ -23,7 +23,6 @@ export type LampUniform = {
 
 type Uniforms = {
   res: WebGLUniformLocation | null;
-  time: WebGLUniformLocation | null;
   lightZ: WebGLUniformLocation | null;
   radius: WebGLUniformLocation | null;
   exposure: WebGLUniformLocation | null;
@@ -63,7 +62,6 @@ function locate(gl: WebGLRenderingContext, program: WebGLProgram): Uniforms {
   const at = (name: string) => gl.getUniformLocation(program, name);
   return {
     res: at("uRes"),
-    time: at("uTime"),
     lightZ: at("uLightZ"),
     radius: at("uRadius"),
     exposure: at("uExposure"),
@@ -152,10 +150,9 @@ export class RoomRenderer {
     this.gl.uniform1f(this.uniforms.radius, LIGHT_RADIUS * pixelHeight);
   }
 
-  draw(lamps: LampUniform[], seconds: number) {
+  draw(lamps: LampUniform[]) {
     if (this.width === 0 || this.height === 0) return;
     const { spans, tints } = packLamps(lamps);
-    this.gl.uniform1f(this.uniforms.time, seconds);
     this.gl.uniform4fv(this.uniforms.lampSpan, spans);
     this.gl.uniform4fv(this.uniforms.lampTint, tints);
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);

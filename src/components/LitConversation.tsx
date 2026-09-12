@@ -8,9 +8,13 @@ import {
   scrollProgress,
 } from "@/lib/choreography";
 import { RoomRenderer, type LampUniform } from "@/lib/renderer";
-import { CONVERSATION, SPEAKER_LABEL, cssColor } from "@/lib/scene";
-
-const RENDER_SCALE = 0.62;
+import {
+  CONVERSATION,
+  SCROLL_LENGTH,
+  SPEAKER_LABEL,
+  cssColor,
+  type Lamp,
+} from "@/lib/scene";
 
 const STILLNESS = "(prefers-reduced-motion: reduce)";
 
@@ -30,43 +34,88 @@ function useMotionAllowed() {
 }
 
 function deviceQuality() {
-  return Math.min(window.devicePixelRatio || 1, 2) * RENDER_SCALE;
+  return Math.min(window.devicePixelRatio || 1, 2);
 }
 
-function measureLamp(line: HTMLElement, quality: number): LampUniform | null {
+function lineClass(lamp: Lamp) {
+  return `font-display block max-w-[88vw] text-balance leading-[0.86] font-extrabold ${
+    lamp.speaker === "studio" ? "text-left" : "text-right"
+  }`;
+}
+
+function lineStyle(lamp: Lamp) {
+  return {
+    fontSize: `calc(var(--line-size) * ${lamp.scale})`,
+    color: cssColor(lamp.rgb),
+    textShadow: glow(lamp.rgb, 1),
+  };
+}
+
+function measureLamp(
+  line: HTMLElement,
+  quality: number,
+  progress: number,
+): LampUniform | null {
   const index = Number(line.dataset.line);
   const lamp = CONVERSATION[index];
   if (!lamp) return null;
 
-  const box = line.getBoundingClientRect();
-  const middle = box.top + box.height / 2;
-  const power = lampPower(middle / window.innerHeight);
-
-  line.style.opacity = (0.05 + 0.95 * power).toFixed(3);
+  const power = lampPower(progress, index, CONVERSATION.length);
+  line.style.opacity = (0.045 + 0.955 * power).toFixed(3);
   line.style.textShadow = glow(lamp.rgb, power);
 
+  // Light lags the glyph: the words show up first, then the room catches up.
+  const emission = Math.pow(power, 2.2);
+
+  const box = line.getBoundingClientRect();
   return {
     left: box.left * quality,
     right: box.right * quality,
-    centre: (window.innerHeight - middle) * quality,
+    centre: (window.innerHeight - (box.top + box.height / 2)) * quality,
     halfHeight: box.height * 0.32 * quality,
     rgb: lamp.rgb,
-    power: power * lamp.power,
+    power: emission * lamp.power,
   };
+}
+
+/** The whole conversation at rest: no canvas, no scroll choreography. */
+function StillConversation() {
+  return (
+    <div className="px-[6vw] py-[12vh]">
+      <h1 className="font-display text-paper text-[clamp(3rem,9vw,6rem)] leading-none font-extrabold">
+        defect.tech
+      </h1>
+      <ol className="mt-[10vh] space-y-[7vh]">
+        {CONVERSATION.map((lamp) => (
+          <li
+            key={lamp.text}
+            className={lamp.speaker === "studio" ? "text-left" : "text-right"}
+          >
+            <p>
+              <span className="sr-only">{SPEAKER_LABEL[lamp.speaker]}: </span>
+              <span className={lineClass(lamp)} style={lineStyle(lamp)}>
+                {lamp.text}
+              </span>
+            </p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 export default function LitConversation() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const paperRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const markRef = useRef<HTMLDivElement>(null);
   const cueRef = useRef<HTMLDivElement>(null);
   const linesRef = useRef<HTMLElement[]>([]);
   const animated = useMotionAllowed();
 
   useEffect(() => {
-    if (!animated) return;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!animated || !canvas) return;
 
     const renderer = RoomRenderer.create(canvas);
     let quality = deviceQuality();
@@ -79,20 +128,24 @@ export default function LitConversation() {
       renderer?.resize(canvas.width, canvas.height);
     };
 
-    const tick = (now: number) => {
-      const progress = scrollProgress();
+    const paint = (progress: number) => {
       const paper = paperOpacity(progress);
       if (paperRef.current) paperRef.current.style.opacity = paper.toFixed(3);
+      if (titleRef.current) titleRef.current.style.opacity = paper.toFixed(3);
       if (markRef.current) markRef.current.style.opacity = (1 - paper).toFixed(3);
       if (cueRef.current) {
-        cueRef.current.style.opacity = Math.max(0, 1 - progress / 0.018).toFixed(3);
+        const fade = Math.max(0, 1 - progress / 0.02);
+        cueRef.current.style.opacity = (paper * fade).toFixed(3);
       }
+    };
 
+    const tick = () => {
+      const progress = scrollProgress();
+      paint(progress);
       const lamps = linesRef.current
-        .map((line) => measureLamp(line, quality))
+        .map((line) => measureLamp(line, quality, progress))
         .filter((lamp): lamp is LampUniform => lamp !== null);
-
-      renderer?.draw(lamps, now / 1000);
+      renderer?.draw(lamps);
       frame = requestAnimationFrame(tick);
     };
 
@@ -106,39 +159,25 @@ export default function LitConversation() {
     };
   }, [animated]);
 
+  if (!animated) return <StillConversation />;
+
   return (
-    <>
-      {animated && (
+    <div style={{ height: SCROLL_LENGTH }}>
+      <div className="sticky top-0 h-screen overflow-hidden">
         <canvas
           ref={canvasRef}
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 h-full w-full"
+          className="pointer-events-none absolute inset-0 h-full w-full"
         />
-      )}
 
-      <div className="relative z-20">
-        <section className="flex h-screen flex-col items-center justify-center">
-          <h1 className="font-display text-ink text-[clamp(3.5rem,13vw,9rem)] leading-none font-extrabold">
-            defect.tech
-          </h1>
-          {animated && (
-            <div
-              ref={cueRef}
-              aria-hidden="true"
-              className="absolute bottom-[12vh] h-16 w-px overflow-hidden bg-ink/15"
-            >
-              <span className="animate-trickle bg-ink/70 absolute inset-x-0 top-0 block h-5" />
-            </div>
-          )}
-        </section>
-
-        <ol>
+        <ol className="absolute inset-0 z-10">
           {CONVERSATION.map((lamp, index) => (
             <li
               key={lamp.text}
-              className={`flex h-screen items-center px-[6vw] ${
+              className={`absolute flex w-full px-[6vw] ${
                 lamp.speaker === "studio" ? "justify-start" : "justify-end"
               }`}
+              style={{ top: `${lamp.top * 100}%` }}
             >
               <p>
                 <span className="sr-only">{SPEAKER_LABEL[lamp.speaker]}: </span>
@@ -147,14 +186,8 @@ export default function LitConversation() {
                   ref={(node) => {
                     if (node) linesRef.current[index] = node;
                   }}
-                  className={`font-display block max-w-[86vw] text-balance leading-[0.86] font-extrabold sm:max-w-[62vw] ${
-                    lamp.speaker === "studio" ? "text-left" : "text-right"
-                  }`}
-                  style={{
-                    fontSize: `calc(var(--line-size) * ${lamp.scale})`,
-                    color: cssColor(lamp.rgb),
-                    textShadow: glow(lamp.rgb, 1),
-                  }}
+                  className={lineClass(lamp)}
+                  style={lineStyle(lamp)}
                 >
                   {lamp.text}
                 </span>
@@ -163,25 +196,35 @@ export default function LitConversation() {
           ))}
         </ol>
 
-        <div className="h-[70vh]" />
-      </div>
+        <div
+          ref={paperRef}
+          aria-hidden="true"
+          className="bg-paper pointer-events-none absolute inset-0 z-20"
+        />
 
-      {animated && (
-        <>
-          <div
-            ref={paperRef}
-            aria-hidden="true"
-            className="bg-paper pointer-events-none fixed inset-0 z-10"
-          />
-          <div
-            ref={markRef}
-            aria-hidden="true"
-            className="font-body fixed top-[3vh] left-[6vw] z-30 text-sm text-white/35 opacity-0"
-          >
-            defect.tech
-          </div>
-        </>
-      )}
-    </>
+        <h1
+          ref={titleRef}
+          className="font-display text-ink absolute inset-0 z-30 flex items-center justify-center text-[clamp(3.5rem,13vw,9rem)] leading-none font-extrabold"
+        >
+          defect.tech
+        </h1>
+
+        <div
+          ref={markRef}
+          aria-hidden="true"
+          className="font-body absolute top-[3vh] left-[6vw] z-30 text-sm text-white/35 opacity-0"
+        >
+          defect.tech
+        </div>
+
+        <div
+          ref={cueRef}
+          aria-hidden="true"
+          className="bg-ink/15 absolute bottom-[8vh] left-1/2 z-30 h-16 w-px -translate-x-1/2 overflow-hidden"
+        >
+          <span className="animate-trickle bg-ink/70 absolute inset-x-0 top-0 block h-5" />
+        </div>
+      </div>
+    </div>
   );
 }

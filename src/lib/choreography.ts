@@ -2,8 +2,6 @@ const FLICKER = [0, 1, 0, 0.7, 0, 0, 0.3, 0];
 const BLACKOUT_START = 0.05;
 const BLACKOUT_END = 0.086;
 
-const EMBER = 0.18;
-
 /** Opacity of the white sheet that covers the room until the lights cut out. */
 export function paperOpacity(progress: number): number {
   if (progress <= BLACKOUT_START) return 1;
@@ -17,15 +15,18 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
+const FIRST_REVEAL = 0.13;
+const CLOSING_TAIL = 0.08;
+
 /**
- * How brightly one line burns, from where its own centre sits in the viewport.
- * A line rises to full as it reaches the middle of the screen, then settles to
- * an ember once the next one takes over.
+ * The lines never move, so each one owns an equal slice of the scroll instead.
+ * A line comes up over the first half of its slice and then stays lit, so the
+ * whole conversation is burning by the end of the page.
  */
-export function lampPower(centreRatio: number): number {
-  const arrival = smoothstep(1.12, 0.68, centreRatio);
-  const handover = smoothstep(0.44, 0.1, centreRatio);
-  return arrival * (1 - (1 - EMBER) * handover);
+export function lampPower(progress: number, index: number, count: number): number {
+  const slice = (1 - FIRST_REVEAL - CLOSING_TAIL) / count;
+  const start = FIRST_REVEAL + index * slice;
+  return smoothstep(start, start + slice * 0.5, progress);
 }
 
 export function scrollProgress(): number {

@@ -6,15 +6,20 @@ export type Lamp = {
   rgb: [number, number, number];
   power: number;
   scale: number;
+  /** Where the line sits on the stage, as a fraction of viewport height. */
+  top: number;
 };
 
 export const CONVERSATION: Lamp[] = [
-  { text: "what do you want?", speaker: "studio", rgb: [255, 241, 220], power: 0.95, scale: 1 },
-  { text: "something beautiful?", speaker: "you", rgb: [63, 233, 207], power: 1.05, scale: 0.94 },
-  { text: "oh.", speaker: "studio", rgb: [255, 172, 46], power: 0.9, scale: 1.85 },
-  { text: "oh?", speaker: "you", rgb: [255, 79, 160], power: 0.95, scale: 1.85 },
-  { text: "I make that in my sleep.", speaker: "studio", rgb: [255, 58, 18], power: 1.35, scale: 1.02 },
+  { text: "what do you want?", speaker: "studio", rgb: [255, 241, 220], power: 0.95, scale: 1, top: 0.08 },
+  { text: "something beautiful?", speaker: "you", rgb: [63, 233, 207], power: 1.05, scale: 0.96, top: 0.26 },
+  { text: "oh.", speaker: "studio", rgb: [255, 172, 46], power: 0.9, scale: 1.3, top: 0.44 },
+  { text: "oh?", speaker: "you", rgb: [255, 79, 160], power: 0.95, scale: 1.3, top: 0.585 },
+  { text: "I make that in my sleep.", speaker: "studio", rgb: [255, 58, 18], power: 1.35, scale: 1.02, top: 0.755 },
 ];
+
+/** How much scroll the pinned stage consumes before the page ends. */
+export const SCROLL_LENGTH = "520vh";
 
 export type Slab = {
   x: number;
@@ -39,8 +44,12 @@ export const ROOM: Slab[] = [
 ];
 
 export const LIGHT_Z = 0.44;
-export const LIGHT_RADIUS = 0.32;
-export const EXPOSURE = 3.2;
+export const LIGHT_RADIUS = 0.3;
+/**
+ * Low, because every line stays lit: by the closing line five lamps are
+ * summing into the same wall, and the room has to still read as a dark room.
+ */
+export const EXPOSURE = 1.4;
 
 export const SPEAKER_LABEL: Record<Speaker, string> = {
   studio: "defect.tech",

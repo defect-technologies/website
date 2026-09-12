@@ -1,6 +1,6 @@
 export const MAX_LAMPS = 5;
 export const MAX_SLABS = 8;
-const SHADOW_SAMPLES = 10;
+const SHADOW_SAMPLES = 12;
 
 export const VERTEX_SOURCE = `
 attribute vec2 aPos;
@@ -17,7 +17,6 @@ precision highp float;
 #define SAMPLES ${SHADOW_SAMPLES}
 
 uniform vec2 uRes;
-uniform float uTime;
 uniform float uLightZ;
 uniform float uRadius;
 uniform float uExposure;
@@ -27,19 +26,43 @@ uniform float uSlabZ[MAX_SLABS];
 uniform vec4 uLampSpan[MAX_LAMPS];
 uniform vec4 uLampTint[MAX_LAMPS];
 
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+/**
+ * Dave Hoskins' sine-free hash. The usual fract(sin(dot(p, ...))) hash loses
+ * precision at large coordinates and lays down an axis-aligned lattice, which
+ * is what streaked this wall before.
+ */
+float hash12(vec2 p) {
+  p = fract(p * vec2(0.16632, 0.17369));
+  p += dot(p.xy, p.yx + 19.19);
+  return fract(p.x * p.y);
+}
+
+/**
+ * Jimenez's interleaved gradient noise. Spatially far more even than white
+ * noise, so shadow samples spread out instead of clumping into fizz.
+ */
+float gradientNoise(vec2 p) {
+  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
 float valueNoise(vec2 p) {
   vec2 cell = floor(p);
   vec2 f = fract(p);
   vec2 blend = f * f * (3.0 - 2.0 * f);
-  float a = hash(cell);
-  float b = hash(cell + vec2(1.0, 0.0));
-  float c = hash(cell + vec2(0.0, 1.0));
-  float d = hash(cell + vec2(1.0, 1.0));
+  float a = hash12(cell);
+  float b = hash12(cell + vec2(1.0, 0.0));
+  float c = hash12(cell + vec2(0.0, 1.0));
+  float d = hash12(cell + vec2(1.0, 1.0));
   return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
+}
+
+/**
+ * Triangular-PDF dither. Two decorrelated uniform samples summed, so the grain
+ * reads the same everywhere along a gradient; a single uniform sample leaves
+ * visible ripples where the signal sits near a quantisation step.
+ */
+float triangularDither(vec2 p) {
+  return hash12(p) + hash12(p + 17.0) - 1.0;
 }
 
 bool inside(vec2 p, vec4 slab) {
@@ -73,14 +96,21 @@ float visibility(vec3 surface, vec3 lamp, int surfaceIndex) {
 vec3 gather(vec2 px, float depth, int surfaceIndex) {
   vec3 surface = vec3(px, depth);
   vec3 total = vec3(0.0);
+
+  // One low-discrepancy offset per pixel, then evenly stratified samples along
+  // the lit line. Stratifying is what keeps the penumbra smooth without
+  // resorting to per-sample noise.
+  float offset = gradientNoise(px);
+  float riseSeed = gradientNoise(px + 41.0);
+
   for (int l = 0; l < MAX_LAMPS; l++) {
     vec4 span = uLampSpan[l];
     if (span.w <= 0.002) continue;
     vec4 tint = uLampTint[l];
     vec3 sum = vec3(0.0);
     for (int s = 0; s < SAMPLES; s++) {
-      float along = (float(s) + hash(px + vec2(float(s) * 7.3, uTime))) / float(SAMPLES);
-      float rise = (hash(px * 1.71 + vec2(float(s), uTime * 0.7)) - 0.5) * 2.0 * tint.w;
+      float along = (float(s) + offset) / float(SAMPLES);
+      float rise = (fract(along * 3.7 + riseSeed) - 0.5) * 2.0 * tint.w;
       vec3 lamp = vec3(mix(span.x, span.y, along), span.z + rise, uLightZ);
       vec3 delta = lamp - surface;
       float dist = max(length(delta), 1.0);
@@ -100,20 +130,25 @@ void main() {
   int surfaceIndex;
   frontmostSurface(px, depth, surfaceIndex);
 
-  float concrete = valueNoise(px * 0.42) * 0.55 + valueNoise(px * 1.9) * 0.45;
-  float albedo = (surfaceIndex < 0 ? 0.58 : 0.42) * (0.76 + 0.34 * concrete);
+  // Very low frequency, very low amplitude: the wall should look unevenly
+  // cast rather than textured. Anything finer reads as noise.
+  float unevenness = valueNoise(px * 0.0045);
+  float albedo = (surfaceIndex < 0 ? 0.58 : 0.42) * (0.95 + 0.1 * unevenness);
 
   vec3 lit = gather(px, depth, surfaceIndex) * uExposure * albedo;
   lit += vec3(0.008, 0.009, 0.012) * albedo;
 
   lit = lit / (lit + vec3(0.92));
-  lit = pow(lit, vec3(0.86));
+  // Barely any lift. Anything stronger drags the unlit wall up off black once
+  // several lamps are burning at once.
+  lit = pow(lit, vec3(0.95));
 
   vec2 uv = px / uRes;
   float edge = smoothstep(1.3, 0.32, length((uv - 0.5) * vec2(1.12, 1.0)) * 1.62);
-  lit *= mix(0.68, 1.0, edge);
+  lit *= mix(0.5, 1.0, edge);
 
-  lit += (hash(px * 1.31 + vec2(uTime * 41.0)) - 0.5) * 0.02;
+  // Last thing before the 8-bit write, in the space being quantised.
+  lit += triangularDither(px) / 255.0;
 
   gl_FragColor = vec4(max(lit, vec3(0.0)), 1.0);
 }
