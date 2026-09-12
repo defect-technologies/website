@@ -38,7 +38,7 @@ function deviceQuality() {
 }
 
 function lineClass(lamp: Lamp) {
-  return `font-display block max-w-[88vw] text-balance leading-[0.86] font-extrabold ${
+  return `font-display block max-w-[88vw] text-balance uppercase leading-[0.82] font-black ${
     lamp.speaker === "studio" ? "text-left" : "text-right"
   }`;
 }
@@ -61,7 +61,8 @@ function measureLamp(
   if (!lamp) return null;
 
   const power = lampPower(progress, index, CONVERSATION.length);
-  line.style.opacity = (0.045 + 0.955 * power).toFixed(3);
+  // Not there at all until it switches on.
+  line.style.opacity = power.toFixed(3);
   line.style.textShadow = glow(lamp.rgb, power);
 
   // Light lags the glyph: the words show up first, then the room catches up.
@@ -120,12 +121,15 @@ export default function LitConversation() {
     const renderer = RoomRenderer.create(canvas);
     let quality = deviceQuality();
     let frame = 0;
+    let lastProgress = -1;
+    let dirty = true;
 
     const fit = () => {
       quality = deviceQuality();
       canvas.width = Math.round(window.innerWidth * quality);
       canvas.height = Math.round(window.innerHeight * quality);
       renderer?.resize(canvas.width, canvas.height);
+      dirty = true;
     };
 
     const paint = (progress: number) => {
@@ -139,14 +143,21 @@ export default function LitConversation() {
       }
     };
 
+    // The room only changes when the scroll does. Sitting still costs one
+    // comparison per frame instead of a full-screen shader pass, which is the
+    // difference between idling at zero and pinning a GPU forever.
     const tick = () => {
+      frame = requestAnimationFrame(tick);
       const progress = scrollProgress();
+      if (!dirty && progress === lastProgress) return;
+      lastProgress = progress;
+      dirty = false;
+
       paint(progress);
       const lamps = linesRef.current
         .map((line) => measureLamp(line, quality, progress))
         .filter((lamp): lamp is LampUniform => lamp !== null);
       renderer?.draw(lamps);
-      frame = requestAnimationFrame(tick);
     };
 
     fit();

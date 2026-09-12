@@ -1,6 +1,6 @@
 export const MAX_LAMPS = 5;
 export const MAX_SLABS = 8;
-const SHADOW_SAMPLES = 12;
+const SHADOW_SAMPLES = 8;
 
 export const VERTEX_SOURCE = `
 attribute vec2 aPos;

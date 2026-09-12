@@ -12,10 +12,10 @@ export type Lamp = {
 
 export const CONVERSATION: Lamp[] = [
   { text: "what do you want?", speaker: "studio", rgb: [255, 241, 220], power: 0.95, scale: 1, top: 0.08 },
-  { text: "something beautiful?", speaker: "you", rgb: [63, 233, 207], power: 1.05, scale: 0.96, top: 0.26 },
-  { text: "oh.", speaker: "studio", rgb: [255, 172, 46], power: 0.9, scale: 1.3, top: 0.44 },
+  { text: "something beautiful?", speaker: "you", rgb: [255, 79, 160], power: 1.0, scale: 0.96, top: 0.26 },
+  { text: "oh.", speaker: "studio", rgb: [255, 241, 220], power: 0.9, scale: 1.3, top: 0.44 },
   { text: "oh?", speaker: "you", rgb: [255, 79, 160], power: 0.95, scale: 1.3, top: 0.585 },
-  { text: "I make that in my sleep.", speaker: "studio", rgb: [255, 58, 18], power: 1.35, scale: 1.02, top: 0.755 },
+  { text: "I make that in my sleep.", speaker: "studio", rgb: [255, 172, 46], power: 1.3, scale: 1.02, top: 0.755 },
 ];
 
 /** How much scroll the pinned stage consumes before the page ends. */

@@ -10,23 +10,26 @@ export function paperOpacity(progress: number): number {
   return FLICKER[Math.min(FLICKER.length - 1, Math.floor(span * FLICKER.length))];
 }
 
-function smoothstep(edge0: number, edge1: number, value: number): number {
-  const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
 const FIRST_REVEAL = 0.13;
 const CLOSING_TAIL = 0.08;
 
+/** The stutter of a tube catching, over the first instant of a line's slice. */
+const STRIKE = [0, 1, 0, 0, 1, 0.35, 1];
+
 /**
  * The lines never move, so each one owns an equal slice of the scroll instead.
- * A line comes up over the first half of its slice and then stays lit, so the
- * whole conversation is burning by the end of the page.
+ * Nothing fades: a line is simply not there, then it is on, the way a switch
+ * works. Once lit it stays lit, so the whole conversation burns by the end.
  */
 export function lampPower(progress: number, index: number, count: number): number {
   const slice = (1 - FIRST_REVEAL - CLOSING_TAIL) / count;
   const start = FIRST_REVEAL + index * slice;
-  return smoothstep(start, start + slice * 0.5, progress);
+  if (progress < start) return 0;
+
+  const strike = slice * 0.07;
+  const since = progress - start;
+  if (since >= strike) return 1;
+  return STRIKE[Math.min(STRIKE.length - 1, Math.floor((since / strike) * STRIKE.length))];
 }
 
 export function scrollProgress(): number {

@@ -21,12 +21,12 @@
 }
 
 :root {
-  --line-size: clamp(2.4rem, 7.2vw, 6.4rem);
+  --line-size: clamp(2.2rem, 6.4vw, 5.6rem);
 }
 
 @media (width < 40rem) {
   :root {
-    --line-size: clamp(1.75rem, 9.4vw, 3.4rem);
+    --line-size: clamp(1.6rem, 8.4vw, 3rem);
   }
 }
 
