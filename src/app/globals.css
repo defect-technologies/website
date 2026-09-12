@@ -1,51 +1,41 @@
 @import "tailwindcss";
 
-:root {
-  --background: #F5F1E8;
-  --surface: #f5f4f0;
-  --primary: #2C1810;
-  --secondary: #8B6F47;
-  --accent: #E07A5F;
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B6B6B;
-  --border: #D4C5B0;
-  --success: #6B8E23;
-  --error: #C1440E;
-  --foreground: #1A1A1A;
-  --surface-hover: #E8E3D8;
-  --surface-active: #DED8CB;
+@theme inline {
+  --color-void: #08080a;
+  --color-paper: #f4f1ea;
+  --color-ink: #0b0b0d;
+
+  --font-display: var(--font-big-shoulders), "Arial Narrow", system-ui, sans-serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+
+  --animate-trickle: trickle 2.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+
+  @keyframes trickle {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(400%);
+    }
+  }
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-surface: var(--surface);
-  --color-primary: var(--primary);
-  --color-secondary: var(--secondary);
-  --color-accent: var(--accent);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-border: var(--border);
-  --color-success: var(--success);
-  --color-error: var(--error);
-  --color-foreground: var(--foreground);
-  --color-surface-hover: var(--surface-hover);
-  --color-surface-active: var(--surface-active);
+:root {
+  --line-size: clamp(3.4rem, 8.6vw, 8.5rem);
+}
 
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-fraunces);
+@media (width < 40rem) {
+  :root {
+    --line-size: clamp(3.4rem, 13vw, 5.5rem);
+  }
+}
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-full: 9999px;
+html {
+  background: var(--color-void);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
-}
-
-* {
-  border-color: var(--border);
+  background: var(--color-void);
+  color: #f4f1ea;
+  font-family: var(--font-body);
 }

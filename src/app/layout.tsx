@@ -1,30 +1,29 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Big_Shoulders, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const display = Big_Shoulders({
   subsets: ["latin"],
+  axes: ["opsz"],
+  variable: "--font-big-shoulders",
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const body = Hanken_Grotesk({
   subsets: ["latin"],
+  variable: "--font-hanken",
 });
 
 export const metadata: Metadata = {
-  title: "Defect",
-  description: "Document your journey, compete with friends",
+  title: "defect.tech",
+  description: "A design studio.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${fraunces.variable} antialiased`}>
+      <body className={`${display.variable} ${body.variable} antialiased`}>
         {children}
       </body>
     </html>
