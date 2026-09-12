@@ -83,7 +83,7 @@ function measureLamp(
 function StillConversation() {
   return (
     <div className="px-[6vw] py-[12vh]">
-      <h1 className="font-display text-paper text-[clamp(3rem,9vw,6rem)] leading-none font-extrabold">
+      <h1 className="font-script text-paper text-[clamp(3rem,14vw,9rem)] leading-[1.25]">
         defect.tech
       </h1>
       <ol className="mt-[10vh] space-y-[7vh]">
@@ -215,7 +215,7 @@ export default function LitConversation() {
 
         <h1
           ref={titleRef}
-          className="font-display text-ink absolute inset-0 z-30 flex items-center justify-center text-[clamp(3.5rem,13vw,9rem)] leading-none font-extrabold"
+          className="font-script text-ink absolute inset-0 z-30 flex items-center justify-center pb-[2vh] text-[clamp(4.5rem,20vw,17rem)] leading-[1.25]"
         >
           defect.tech
         </h1>
@@ -223,7 +223,7 @@ export default function LitConversation() {
         <div
           ref={markRef}
           aria-hidden="true"
-          className="font-body absolute top-[3vh] left-[6vw] z-30 text-sm text-white/35 opacity-0"
+          className="font-script absolute top-[3vh] left-[6vw] z-30 text-2xl leading-[1.4] text-white/45 opacity-0"
         >
           defect.tech
         </div>

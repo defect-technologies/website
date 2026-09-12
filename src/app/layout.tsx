@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Big_Shoulders, Hanken_Grotesk } from "next/font/google";
+import { Big_Shoulders, Dr_Sugiyama, Geist } from "next/font/google";
 import "./globals.css";
 
 const display = Big_Shoulders({
@@ -8,9 +8,15 @@ const display = Big_Shoulders({
   variable: "--font-big-shoulders",
 });
 
-const body = Hanken_Grotesk({
+const script = Dr_Sugiyama({
   subsets: ["latin"],
-  variable: "--font-hanken",
+  weight: "400",
+  variable: "--font-dr-sugiyama",
+});
+
+const body = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +29,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${body.variable} antialiased`}>
+      <body
+        className={`${display.variable} ${script.variable} ${body.variable} font-body antialiased`}
+      >
         {children}
       </body>
     </html>

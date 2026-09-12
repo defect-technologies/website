@@ -6,7 +6,8 @@
   --color-ink: #0b0b0d;
 
   --font-display: var(--font-big-shoulders), "Arial Narrow", system-ui, sans-serif;
-  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-script: var(--font-dr-sugiyama), "Apple Chancery", cursive;
+  --font-body: var(--font-geist), system-ui, sans-serif;
 
   --animate-trickle: trickle 2.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 
@@ -34,8 +35,9 @@ html {
   background: var(--color-void);
 }
 
+/* The family comes from the font-body utility on <body>; a raw var() here
+   does not resolve against the theme token. */
 body {
   background: var(--color-void);
   color: #f4f1ea;
-  font-family: var(--font-body);
 }
