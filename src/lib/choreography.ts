@@ -1,35 +1,28 @@
-const FLICKER = [0, 1, 0, 0.7, 0, 0, 0.3, 0];
-const BLACKOUT_START = 0.05;
-const BLACKOUT_END = 0.086;
+/** A tube catching, and a tube giving up. Played on a clock, never scrubbed. */
+const ON_SEQUENCE = [0, 1, 0, 0, 1, 0.35, 1];
+const OFF_SEQUENCE = [1, 0, 1, 0, 0, 0.2, 0];
 
-/** Opacity of the white sheet that covers the room until the lights cut out. */
-export function paperOpacity(progress: number): number {
-  if (progress <= BLACKOUT_START) return 1;
-  if (progress >= BLACKOUT_END) return 0;
-  const span = (progress - BLACKOUT_START) / (BLACKOUT_END - BLACKOUT_START);
-  return FLICKER[Math.min(FLICKER.length - 1, Math.floor(span * FLICKER.length))];
+/** How long a strike takes, in milliseconds of real time. */
+export const FLICKER_MS = 280;
+
+export const BLACKOUT_AT = 0.2;
+export const REVEAL_AT = 0.29;
+export const REVEAL_STEP = 0.085;
+export const CLOSING_AT = 0.8;
+
+export function lineThreshold(index: number): number {
+  return REVEAL_AT + index * REVEAL_STEP;
 }
 
-const FIRST_REVEAL = 0.13;
-const CLOSING_TAIL = 0.08;
-
-/** The stutter of a tube catching, over the first instant of a line's slice. */
-const STRIKE = [0, 1, 0, 0, 1, 0.35, 1];
-
 /**
- * The lines never move, so each one owns an equal slice of the scroll instead.
- * Nothing fades: a line is simply not there, then it is on, the way a switch
- * works. Once lit it stays lit, so the whole conversation burns by the end.
+ * Scroll decides whether a light is on. The clock decides what the switching
+ * looks like, so scrolling slowly cannot play the flicker in slow motion.
  */
-export function lampPower(progress: number, index: number, count: number): number {
-  const slice = (1 - FIRST_REVEAL - CLOSING_TAIL) / count;
-  const start = FIRST_REVEAL + index * slice;
-  if (progress < start) return 0;
-
-  const strike = slice * 0.07;
-  const since = progress - start;
-  if (since >= strike) return 1;
-  return STRIKE[Math.min(STRIKE.length - 1, Math.floor((since / strike) * STRIKE.length))];
+export function flicker(target: 0 | 1, elapsed: number): number {
+  if (elapsed >= FLICKER_MS) return target;
+  const sequence = target === 1 ? ON_SEQUENCE : OFF_SEQUENCE;
+  const step = Math.floor((elapsed / FLICKER_MS) * sequence.length);
+  return sequence[Math.min(sequence.length - 1, step)];
 }
 
 export function scrollProgress(): number {
@@ -38,7 +31,7 @@ export function scrollProgress(): number {
   return Math.min(1, Math.max(0, window.scrollY / scrollable));
 }
 
-export function glow(rgb: [number, number, number], power: number): string {
+export function glow(rgb: readonly [number, number, number], power: number): string {
   const [r, g, b] = rgb;
   const near = `0 0 ${(0.14 * power).toFixed(3)}em rgb(${r} ${g} ${b} / ${(0.5 * power).toFixed(3)})`;
   const far = `0 0 ${(0.62 * power).toFixed(3)}em rgb(${r} ${g} ${b} / ${(0.32 * power).toFixed(3)})`;

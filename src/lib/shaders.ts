@@ -1,4 +1,4 @@
-export const MAX_LAMPS = 5;
+export const MAX_LAMPS = 8;
 export const MAX_SLABS = 8;
 const SHADOW_SAMPLES = 8;
 
