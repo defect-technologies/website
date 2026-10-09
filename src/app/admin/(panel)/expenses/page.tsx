@@ -6,11 +6,11 @@ import DeleteExpenseButton from "@/components/admin/DeleteExpenseButton";
 import EmptyState from "@/components/admin/EmptyState";
 import KnifeStroke from "@/components/admin/KnifeStroke";
 import SubmitButton from "@/components/admin/SubmitButton";
-import { Card, KeyValue, Notice, PageHeader } from "@/components/admin/ui";
-import { formatCents, founderName, monthName, monthOf, todayInPacific, type MonthBalance } from "@/lib/settleUp";
+import { Card, KeyValue, PageHeader } from "@/components/admin/ui";
+import { FOUNDER_EMAILS, FOUNDERS, founderName } from "@/lib/founders";
+import { formatCents, monthName, monthOf, todayInPacific, type MonthBalance } from "@/lib/settleUp";
 import { requireFounder } from "@/server/auth/session";
 import type { Expense } from "@/server/db/schema";
-import { env } from "@/server/env";
 import { balances } from "@/server/expenses/expenses";
 import { settleMonthAction } from "./actions";
 
@@ -24,7 +24,7 @@ function lastDayOf(month: string) {
   return shortDate.format(new Date(Date.UTC(year, monthIndex, 0)));
 }
 
-function SettleCard({ balance, founders, isDue }: { balance: MonthBalance; founders: string[]; isDue: boolean }) {
+function SettleCard({ balance, isDue }: { balance: MonthBalance; isDue: boolean }) {
   const owed = balance.owed!;
   return (
     <Card className="flex flex-col gap-6 p-6 sm:flex-row sm:items-end sm:justify-between">
@@ -43,7 +43,7 @@ function SettleCard({ balance, founders, isDue }: { balance: MonthBalance; found
         </div>
         <KeyValue
           rows={[
-            ...founders.map((email): [string, string] => [`${founderName(email)} paid`, formatCents(balance.paidCents[email] ?? 0)]),
+            ...FOUNDER_EMAILS.map((email): [string, string] => [`${founderName(email)} paid`, formatCents(balance.paidCents[email] ?? 0)]),
             ["Total", formatCents(balance.totalCents)],
           ]}
         />
@@ -119,14 +119,13 @@ function MonthTable({ balance, expenses }: { balance: MonthBalance; expenses: Ex
   );
 }
 
-function SettleUp({ months, founders, thisMonth }: { months: MonthBalance[]; founders: string[]; thisMonth: string }) {
-  if (founders.length !== 2) return <Notice tone="warn">Settling up needs exactly two founder emails in ADMIN_EMAILS.</Notice>;
+function SettleUp({ months, thisMonth }: { months: MonthBalance[]; thisMonth: string }) {
   const open = months.filter((balance) => balance.owed);
   if (open.length === 0) return null;
   return (
     <div className="flex flex-col gap-4">
       {open.map((balance) => (
-        <SettleCard key={balance.month} balance={balance} founders={founders} isDue={balance.month < thisMonth} />
+        <SettleCard key={balance.month} balance={balance} isDue={balance.month < thisMonth} />
       ))}
     </div>
   );
@@ -135,7 +134,6 @@ function SettleUp({ months, founders, thisMonth }: { months: MonthBalance[]; fou
 export default async function ExpensesPage() {
   const founder = await requireFounder();
   const { expenses, months } = await balances();
-  const founders = env.founderEmails();
   const today = todayInPacific();
   const csvLink = (
     <a href="/admin/expenses/export" className={buttonClasses("ghost", "sm")}>
@@ -147,8 +145,8 @@ export default async function ExpensesPage() {
   return (
     <>
       <PageHeader title="Expenses">{expenses.length > 0 && csvLink}</PageHeader>
-      <SettleUp months={months} founders={founders} thisMonth={monthOf(today)} />
-      <AddExpenseForm founders={founders.map((email) => ({ email, name: founderName(email) }))} signedIn={founder.email} today={today} />
+      <SettleUp months={months} thisMonth={monthOf(today)} />
+      <AddExpenseForm founders={[...FOUNDERS]} signedIn={founder.email} today={today} />
       {months.length === 0 ? (
         <EmptyState title="No expenses yet">Add anything one of you paid for the business. Each month&apos;s total is split evenly, and whoever paid less sends the difference by Zelle.</EmptyState>
       ) : (

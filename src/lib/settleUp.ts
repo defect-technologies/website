@@ -33,10 +33,9 @@ export function remainingTransfer([first, second]: [string, string], paidCents: 
   return remaining > 0 ? { from: second, to: first, amountCents: remaining } : { from: first, to: second, amountCents: -remaining };
 }
 
-/** Newest month first. `owed` is null when the month is even, or when there aren't exactly two founders. */
-export function monthlyBalances(founders: string[], expenses: ExpenseLine[], sent: SentTransfer[]): MonthBalance[] {
+/** Newest month first. `owed` is null when the month is even. */
+export function monthlyBalances(founders: [string, string], expenses: ExpenseLine[], sent: SentTransfer[]): MonthBalance[] {
   const months = [...new Set([...expenses.map((expense) => monthOf(expense.spentOn)), ...sent.map((transfer) => transfer.month)])].sort().reverse();
-  const pair = founders.length === 2 ? (founders as [string, string]) : null;
   return months.map((month) => {
     const inMonth = expenses.filter((expense) => monthOf(expense.spentOn) === month);
     const sentInMonth = sent.filter((transfer) => transfer.month === month);
@@ -45,7 +44,7 @@ export function monthlyBalances(founders: string[], expenses: ExpenseLine[], sen
       month,
       totalCents: inMonth.reduce((total, expense) => total + expense.amountCents, 0),
       paidCents,
-      owed: pair ? remainingTransfer(pair, paidCents, sentInMonth) : null,
+      owed: remainingTransfer(founders, paidCents, sentInMonth),
       sent: sentInMonth,
     };
   });
@@ -54,12 +53,6 @@ export function monthlyBalances(founders: string[], expenses: ExpenseLine[], sen
 const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 export const formatCents = (cents: number) => dollars.format(cents / 100);
-
-/** "boris.nezlobin@example.com" reads as "Boris". */
-export function founderName(email: string) {
-  const first = email.split("@")[0].split(/[.+_-]/)[0];
-  return first.charAt(0).toUpperCase() + first.slice(1);
-}
 
 /** "2026-10" reads as "October 2026". */
 export function monthName(month: string) {

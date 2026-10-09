@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { formatCents, founderName, monthName } from "@/lib/settleUp";
+import { FOUNDER_EMAILS, founderName } from "@/lib/founders";
+import { formatCents, monthName } from "@/lib/settleUp";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { env } from "@/server/env";
 import { addExpense, deleteExpense, settleMonth } from "@/server/expenses/expenses";
 
 export type ExpenseValues = { spentOn: string; item: string; amount: string; paidBy: string };
@@ -21,7 +21,7 @@ const NewExpense = z.object({
     .regex(/^\s*\$?\s*[\d,]+(\.\d{1,2})?\s*$/, "The amount should be in dollars, like 20 or 8.40.")
     .transform(dollarsToCents)
     .refine((cents) => cents > 0, "The amount has to be more than $0."),
-  paidBy: z.string().refine((email) => env.founderEmails().includes(email), "Pick which founder paid."),
+  paidBy: z.string().refine((email) => FOUNDER_EMAILS.includes(email), "Pick which founder paid."),
 });
 
 function submittedValues(form: FormData): ExpenseValues {

@@ -1,7 +1,7 @@
 import "server-only";
 import { asc, desc, eq } from "drizzle-orm";
+import { FOUNDER_EMAILS } from "@/lib/founders";
 import { monthlyBalances } from "@/lib/settleUp";
-import { env } from "../env";
 import { db } from "../db/client";
 import { expenses, settlements } from "../db/schema";
 
@@ -26,7 +26,7 @@ async function allSettlements() {
 export async function balances() {
   const [expenseRows, settlementRows] = await Promise.all([allExpenses(), allSettlements()]);
   const sent = settlementRows.map((row) => ({ month: row.month, from: row.fromFounder, to: row.toFounder, amountCents: row.amountCents }));
-  return { expenses: expenseRows, months: monthlyBalances(env.founderEmails(), expenseRows, sent) };
+  return { expenses: expenseRows, months: monthlyBalances([FOUNDER_EMAILS[0], FOUNDER_EMAILS[1]], expenseRows, sent) };
 }
 
 /** Records the Zelle that evens out a month. Returns null when nothing was owed. */
