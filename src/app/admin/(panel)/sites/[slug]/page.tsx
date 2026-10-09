@@ -7,7 +7,7 @@ import { Card, Notice, When } from "@/components/admin/ui";
 import { siteStore } from "@/server/sites/editing";
 import { rollBackAction } from "../actions";
 
-type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ rolledBack?: string; rollBack?: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ added?: string; rolledBack?: string; rollBack?: string }> };
 
 export const metadata: Metadata = { title: "Site history" };
 
@@ -22,6 +22,11 @@ export default async function SiteHistoryPage({ params, searchParams }: Props) {
         <ArrowLeft size={16} aria-hidden="true" /> Sites
       </Link>
       <h1 className="font-display text-5xl leading-none font-black">{site.businessName}</h1>
+      {query.added && (
+        <Notice tone="good">
+          Added. {site.ownerEmail} can sign in at defect.tech/edit/sign-in and edit it now.
+        </Notice>
+      )}
       {query.rolledBack && <Notice tone="good">Version {query.rolledBack} is live again. The owner sees this as a new version from Defect Technologies.</Notice>}
       {query.rollBack === "failed" && <Notice tone="bad">The site changed while you were looking, so nothing was rolled back. Reload and try again.</Notice>}
       <p className="text-ink-soft max-w-prose text-pretty">

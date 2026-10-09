@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DAYS, LIMITS, SECTIONS, type EditableContent } from "./siteContent";
+import { DAYS, LIMITS, SECTIONS, editableFrom, type EditableContent, type SiteContent } from "./siteContent";
 
 const MARKUP = /[<>]|\{\{|\{%/;
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
@@ -83,4 +83,49 @@ export function checkEdit(input: unknown): EditCheck {
 
 function sortByWeekday(hours: EditableContent["hours"]) {
   return [...hours].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day));
+}
+
+const ImageShape = z.looseObject({ src: z.string(), alt: z.string() });
+
+/** The parts of content.json the renderer and editor rely on. Extra keys from the preview builder pass through. */
+const SiteContentShape = z.looseObject({
+  business: z.looseObject({ name: z.string().trim().min(1, "business.name is missing."), what_we_do: z.string() }),
+  hero: z.looseObject({ headline: z.string(), subheadline: z.string().optional(), image: ImageShape.nullish() }),
+  about: z.looseObject({ paragraphs: z.array(z.string()).optional() }).nullish(),
+  services: z.looseObject({ items: z.array(z.looseObject({ name: z.string() })).optional() }).nullish(),
+  gallery: z.array(ImageShape).nullish(),
+  hours: z.array(z.looseObject({ day: z.string(), open: z.string(), close: z.string() })).nullish(),
+  contact: z.looseObject({}),
+  style: z.looseObject({ preset: z.enum(["classic", "modern", "warm"]), accent: z.string() }),
+  outreach: z.looseObject({}),
+});
+
+export type SiteContentCheck = { ok: true; content: SiteContent } | { ok: false; problems: string[] };
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function describeShapeIssue(issue: z.core.$ZodIssue): string {
+  const field = issue.path.join(".") || "content.json";
+  if (issue.code === "invalid_type" && issue.input === undefined) return `content.json is missing ${field}.`;
+  if (issue.code === "invalid_type") return `${field} should be ${issue.expected === "object" ? "a group of fields in { }" : `a ${issue.expected}`}.`;
+  if (issue.code === "invalid_value") return `${field} has to be one of: ${issue.values.join(", ")}.`;
+  return `${field}: ${issue.message}`;
+}
+
+/** For a site added by hand: the JSON parses, has the shape the renderer needs, and opens cleanly in the editor. */
+export function checkSiteContent(text: string): SiteContentCheck {
+  const json = parseJson(text);
+  if (json === undefined) return { ok: false, problems: ["That isn't valid JSON. Paste the whole content.json the preview builder wrote."] };
+  const shaped = SiteContentShape.safeParse(json, { reportInput: true });
+  if (!shaped.success) return { ok: false, problems: shaped.error.issues.map(describeShapeIssue) };
+  const content = shaped.data as unknown as SiteContent;
+  const editable = checkEdit(editableFrom(content));
+  if (!editable.ok) return { ok: false, problems: editable.problems };
+  return { ok: true, content };
 }

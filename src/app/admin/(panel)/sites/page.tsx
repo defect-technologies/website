@@ -1,19 +1,29 @@
 import type { Metadata } from "next";
+import { Plus } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
 import { Card, PageHeader, When } from "@/components/admin/ui";
 import { siteStore } from "@/server/sites/editing";
 
 export const metadata: Metadata = { title: "Sites" };
 
+const addSiteLink = (
+  <ButtonLink href="/admin/sites/new" size="sm" icon={<Plus size={16} weight="bold" aria-hidden="true" />}>
+    Add a site
+  </ButtonLink>
+);
+
 export default async function SitesPage() {
   const sites = await siteStore.allSites();
 
   return (
     <>
-      <PageHeader title="Sites" />
+      <PageHeader title="Sites">{sites.length > 0 && addSiteLink}</PageHeader>
       {sites.length === 0 ? (
-        <EmptyState title="No live sites yet">Each client&apos;s content.json shows up here once their site is added, with every change owners and we make to it.</EmptyState>
+        <EmptyState title="No live sites yet" action={addSiteLink}>
+          Add a client&apos;s content.json once they sign. Their site shows up here with every change they and we make to it.
+        </EmptyState>
       ) : (
         <Card>
           <table className="w-full text-left text-sm">
