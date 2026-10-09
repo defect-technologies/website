@@ -12,7 +12,7 @@ export const BOT_LABEL: Record<Bot, string> = {
 };
 
 export const BOT_JOB: Record<Bot, string> = {
-  outreach: "Answers prospects, sends checkout links and picks which leads get previews.",
+  outreach: "Answers prospects and sends interested owners their checkout links.",
   onboarding: "Takes a paying client from checkout to a live site, then hands them to Client care.",
   client_care: "Handles every live client's email: changes, questions, billing, reports and cancellations.",
   overseer: "Reviews the other bots, flags what's uncertain and sends the evening digest.",
