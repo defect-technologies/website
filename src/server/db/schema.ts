@@ -136,60 +136,25 @@ export const settings = pgTable("settings", {
 });
 
 /**
- * A live client site's content.json and who may edit it. Stands in for the
- * client-sites Git repository until that exists; see server/sites/store.ts.
+ * A client's live site, built on site-kit in its own repo (site-<slug>). Its
+ * content lives with the site; this row records who may ask for sign-in links.
  */
-export const sites = pgTable(
-  "sites",
+export const clientSites = pgTable(
+  "client_sites",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull(),
-    businessId: uuid("business_id").references(() => businesses.id),
     ownerEmail: text("owner_email").notNull(),
-    content: jsonb("content").notNull(),
-    /** Where relative image paths in content.json resolve, usually the live site's URL. */
-    assetBaseUrl: text("asset_base_url").notNull().default(""),
-    liveUrl: text("live_url").notNull().default(""),
-    version: integer("version").notNull().default(1),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedBy: text("updated_by").notNull().default(""),
-  },
-  (table) => [uniqueIndex("sites_slug").on(table.slug), index("sites_owner_email").on(table.ownerEmail)],
-);
-
-/** Every saved content.json, append-only, so any earlier version can be restored. */
-export const siteVersions = pgTable(
-  "site_versions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    siteId: uuid("site_id")
-      .notNull()
-      .references(() => sites.id),
-    version: integer("version").notNull(),
-    content: jsonb("content").notNull(),
-    summary: text("summary").notNull().default(""),
-    savedBy: text("saved_by").notNull(),
-    savedAt: timestamp("saved_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [uniqueIndex("site_versions_site_version").on(table.siteId, table.version)],
-);
-
-/** One-time sign-in links for site owners. Only a hash of the token is stored. */
-export const signInLinks = pgTable(
-  "sign_in_links",
-  {
-    tokenHash: text("token_hash").primaryKey(),
-    email: text("email").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    usedAt: timestamp("used_at", { withTimezone: true }),
+    url: text("url").notNull(),
+    businessId: uuid("business_id").references(() => businesses.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text("created_by").notNull(),
   },
-  (table) => [index("sign_in_links_email").on(table.email)],
+  (table) => [uniqueIndex("client_sites_slug").on(table.slug), index("client_sites_owner_email").on(table.ownerEmail)],
 );
 
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
-export type Site = typeof sites.$inferSelect;
-export type SiteVersion = typeof siteVersions.$inferSelect;
+export type ClientSite = typeof clientSites.$inferSelect;

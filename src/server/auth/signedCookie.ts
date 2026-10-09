@@ -3,7 +3,7 @@ import { jwtVerify, SignJWT, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { env } from "../env";
 
-/** A signed, http-only session cookie. Founders and site owners each get their own cookie name. */
+/** A signed, http-only session cookie. */
 export type CookieSession = { cookie: string; days: number };
 
 function secretKey() {

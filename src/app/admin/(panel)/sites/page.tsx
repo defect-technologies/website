@@ -3,8 +3,8 @@ import { Plus } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
-import { Card, PageHeader, When } from "@/components/admin/ui";
-import { siteStore } from "@/server/sites/editing";
+import { Card, PageHeader } from "@/components/admin/ui";
+import { allClientSites } from "@/server/sites/clientSites";
 
 export const metadata: Metadata = { title: "Sites" };
 
@@ -14,15 +14,17 @@ const addSiteLink = (
   </ButtonLink>
 );
 
+const hostOf = (url: string) => url.replace(/^https:\/\//, "");
+
 export default async function SitesPage() {
-  const sites = await siteStore.allSites();
+  const sites = await allClientSites();
 
   return (
     <>
       <PageHeader title="Sites">{sites.length > 0 && addSiteLink}</PageHeader>
       {sites.length === 0 ? (
         <EmptyState title="No live sites yet" action={addSiteLink}>
-          Add a client&apos;s content.json once they sign. Their site shows up here with every change they and we make to it.
+          Add a client&apos;s site once it&apos;s live on site-kit, so its owner can get sign-in links to edit it.
         </EmptyState>
       ) : (
         <Card>
@@ -31,8 +33,7 @@ export default async function SitesPage() {
               <tr>
                 <th scope="col" className="px-5 py-3 font-medium">Site</th>
                 <th scope="col" className="px-5 py-3 font-medium">Owner</th>
-                <th scope="col" className="px-5 py-3 text-right font-medium">Version</th>
-                <th scope="col" className="px-5 py-3 font-medium">Last change</th>
+                <th scope="col" className="px-5 py-3 font-medium">Client</th>
               </tr>
             </thead>
             <tbody className="divide-ink/8 divide-y">
@@ -40,14 +41,11 @@ export default async function SitesPage() {
                 <tr key={site.slug}>
                   <td className="px-5 py-3">
                     <Link href={`/admin/sites/${site.slug}`} className="font-medium hover:underline">
-                      {site.businessName}
+                      {hostOf(site.url)}
                     </Link>
                   </td>
                   <td className="text-ink-soft px-5 py-3">{site.ownerEmail}</td>
-                  <td className="px-5 py-3 text-right tabular-nums">{site.version}</td>
-                  <td className="text-ink-soft px-5 py-3">
-                    {site.updatedBy}, <When date={site.updatedAt} />
-                  </td>
+                  <td className="text-ink-soft px-5 py-3">{site.businessName ?? "Not linked"}</td>
                 </tr>
               ))}
             </tbody>
