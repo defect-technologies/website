@@ -9,6 +9,7 @@ import { db } from "../db/client";
 import { activity, businesses, messages, type Business, type BotKey } from "../db/schema";
 import { businessById, optOut, updateBusiness } from "../leads/businesses";
 import { checkoutLink } from "../leads/buildCommand";
+import { previewLink } from "../outreach/compose";
 import { outreachSettings } from "../settings";
 import { actorOf, BotError } from "./http";
 
@@ -27,6 +28,8 @@ function leadView(lead: Business, settings: OutreachSettings) {
     stage: lead.stage,
     priceArm: lead.priceArm,
     plan: lead.plan,
+    /** The link to put in emails: counts the click and forwards to previewUrl. */
+    previewLink: lead.previewUrl ? previewLink(lead) : "",
     previewUrl: lead.previewUrl,
     checkoutUrl: checkoutLink(lead, settings),
     siteUrl: lead.siteUrl,
