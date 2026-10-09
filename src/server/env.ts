@@ -12,7 +12,7 @@ function required(name: string): string {
 
 export const isDevelopment = process.env.NODE_ENV === "development";
 
-/** A shortcut past Google sign-in and Gmail, for running the admin on a laptop. Never on in a production build. */
+/** A shortcut past Google sign-in, Gmail, and the editor's email links, for running locally. Never on in a production build. */
 export const devShortcutsEnabled = isDevelopment && optional("ADMIN_DEV_SIGN_IN") === "1";
 
 export const env = {
@@ -35,4 +35,5 @@ export const env = {
     previewProject: optional("VERCEL_PREVIEW_PROJECT"),
   }),
   healthchecksKey: () => optional("HEALTHCHECKS_API_KEY"),
+  signInEmail: () => ({ apiKey: optional("SIGN_IN_EMAIL_API_KEY"), from: optional("SIGN_IN_EMAIL_FROM") }),
 };

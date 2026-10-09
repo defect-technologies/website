@@ -1,0 +1,63 @@
+{
+  "business": {
+    "name": "Sunrise Florist",
+    "what_we_do": "Family-run florist in Pasadena making arrangements for weddings, sympathy, and everyday gifts.",
+    "category": "Florist in Pasadena"
+  },
+  "hero": {
+    "headline": "Sunrise Florist",
+    "subheadline": "Family-run florist in Pasadena making arrangements for weddings, sympathy, and everyday gifts since 1998.",
+    "image": {"src": "hero.jpg", "alt": "A wrapped bouquet of pink roses and yellow ranunculus on the shop counter"}
+  },
+  "about": {
+    "heading": "A neighborhood florist since 1998",
+    "paragraphs": [
+      "Maria and Luis Ortega opened Sunrise Florist on Lake Avenue in 1998. Their daughter Ana runs the shop today, and most arrangements are still made by family.",
+      "Flowers come from the Los Angeles Flower Market three mornings a week, so what you see in the cooler changes with the season.",
+      "Same-day delivery is available across Pasadena, Altadena, and South Pasadena for orders placed before noon."
+    ]
+  },
+  "services": {
+    "heading": "Arrangements",
+    "intro": "Prices are starting points. Every arrangement is made to order.",
+    "items": [
+      {"name": "Everyday bouquet", "description": "Seasonal flowers, hand-tied and wrapped.", "price": "from $45"},
+      {"name": "Vase arrangement", "description": "Arranged in a glass vase you keep.", "price": "from $65"},
+      {"name": "Sympathy flowers", "description": "Standing sprays, wreaths, and casket pieces.", "price": "from $120"},
+      {"name": "Wedding consultation", "description": "Bouquets, boutonnieres, and ceremony flowers, planned together.", "price": "Free"},
+      {"name": "Weekly office flowers", "description": "A fresh arrangement delivered every Monday.", "price": "$60 a week"},
+      {"name": "Same-day delivery", "description": "Pasadena, Altadena, and South Pasadena. Order by noon.", "price": "$15"}
+    ]
+  },
+  "gallery": [
+    {"src": "photo-1.jpg", "alt": "Pale peonies and garden roses in a low bowl"},
+    {"src": "photo-2.jpg", "alt": "A bridal bouquet with trailing greenery"},
+    {"src": "photo-3.jpg", "alt": "White lilies in a tall vase"},
+    {"src": "photo-4.jpg", "alt": "Deep red roses wrapped in brown paper"},
+    {"src": "photo-5.jpg", "alt": "Sunflowers and eucalyptus in a jar"},
+    {"src": "photo-6.jpg", "alt": "A sympathy wreath of white chrysanthemums"}
+  ],
+  "hours": [
+    {"day": "monday", "open": "09:00", "close": "18:00"},
+    {"day": "tuesday", "open": "09:00", "close": "18:00"},
+    {"day": "wednesday", "open": "09:00", "close": "18:00"},
+    {"day": "thursday", "open": "09:00", "close": "18:00"},
+    {"day": "friday", "open": "09:00", "close": "19:00"},
+    {"day": "saturday", "open": "10:00", "close": "16:00"}
+  ],
+  "hours_note": "Closed Sundays. Wedding consultations by appointment.",
+  "contact": {
+    "phone": "(626) 555-0142",
+    "email": "hello@sunriseflorist.example",
+    "address_lines": ["1180 N Lake Ave", "Pasadena, CA 91104"],
+    "booking_url": "https://sunriseflorist.example/order",
+    "booking_label": "Order flowers"
+  },
+  "social": {"instagram": "https://www.instagram.com/sunriseflorist.example/"},
+  "logo": null,
+  "style": {"preset": "warm", "accent": "#C2456B"},
+  "outreach": {
+    "problem": "the footer still says © 2019 and the site doesn't adjust for phones",
+    "email_opener": "I noticed your site still says © 2019 and doesn't adjust for phones, so I made a fresh version from your current content."
+  }
+}

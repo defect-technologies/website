@@ -122,6 +122,8 @@ export const activity = pgTable(
     businessId: uuid("business_id").references(() => businesses.id),
     action: text("action").notNull(),
     detail: text("detail").notNull().default(""),
+    /** Review-queue priority, when the entry needs a founder's eyes: "fyi", "review", or "urgent". */
+    priority: text("priority").notNull().default(""),
   },
   (table) => [index("activity_business").on(table.businessId), index("activity_at").on(table.at)],
 );
@@ -133,7 +135,61 @@ export const settings = pgTable("settings", {
   updatedBy: text("updated_by").notNull().default(""),
 });
 
+/**
+ * A live client site's content.json and who may edit it. Stands in for the
+ * client-sites Git repository until that exists; see server/sites/store.ts.
+ */
+export const sites = pgTable(
+  "sites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    businessId: uuid("business_id").references(() => businesses.id),
+    ownerEmail: text("owner_email").notNull(),
+    content: jsonb("content").notNull(),
+    /** Where relative image paths in content.json resolve, usually the live site's URL. */
+    assetBaseUrl: text("asset_base_url").notNull().default(""),
+    liveUrl: text("live_url").notNull().default(""),
+    version: integer("version").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: text("updated_by").notNull().default(""),
+  },
+  (table) => [uniqueIndex("sites_slug").on(table.slug), index("sites_owner_email").on(table.ownerEmail)],
+);
+
+/** Every saved content.json, append-only, so any earlier version can be restored. */
+export const siteVersions = pgTable(
+  "site_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id),
+    version: integer("version").notNull(),
+    content: jsonb("content").notNull(),
+    summary: text("summary").notNull().default(""),
+    savedBy: text("saved_by").notNull(),
+    savedAt: timestamp("saved_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("site_versions_site_version").on(table.siteId, table.version)],
+);
+
+/** One-time sign-in links for site owners. Only a hash of the token is stored. */
+export const signInLinks = pgTable(
+  "sign_in_links",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    email: text("email").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("sign_in_links_email").on(table.email)],
+);
+
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
+export type Site = typeof sites.$inferSelect;
+export type SiteVersion = typeof siteVersions.$inferSelect;
