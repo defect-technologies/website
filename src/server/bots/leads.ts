@@ -8,6 +8,7 @@ import { record } from "../activity";
 import { db } from "../db/client";
 import { activity, businesses, messages, type Business, type BotKey } from "../db/schema";
 import { businessById, optOut, updateBusiness } from "../leads/businesses";
+import { domainFacts } from "../integrations/domain";
 import { checkoutLink } from "../leads/buildCommand";
 import { previewLink } from "../outreach/compose";
 import { outreachSettings } from "../settings";
@@ -86,7 +87,7 @@ export async function ownedLead(key: BotKey, id: string): Promise<Business> {
 export async function leadDetail(key: BotKey, id: string) {
   const lead = await ownedLead(key, id);
   const database = await db();
-  const [thread, history, settings] = await Promise.all([
+  const [thread, history, settings, domain] = await Promise.all([
     database
       .select({ direction: messages.direction, from: messages.fromAddress, to: messages.toAddress, subject: messages.subject, body: messages.body, at: messages.at })
       .from(messages)
@@ -94,9 +95,10 @@ export async function leadDetail(key: BotKey, id: string) {
       .orderBy(asc(messages.at)),
     database.select().from(activity).where(eq(activity.businessId, id)).orderBy(desc(activity.at)).limit(50),
     outreachSettings(),
+    domainFacts(lead.website),
   ]);
   const notes = history.filter((entry) => NOTE_ACTIONS.includes(entry.action)).map(({ at, actor, action, detail }) => ({ at, by: actor, handoff: action === "handoff note", text: detail }));
-  return { lead: leadView(lead, settings), messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
+  return { lead: leadView(lead, settings), domain, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
 }
 
 export const NoteBody = z.object({ text: z.string().trim().min(1).max(4000), handoff: z.boolean().default(false) });

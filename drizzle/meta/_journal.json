@@ -43,6 +43,13 @@
       "when": 1791586003343,
       "tag": "0005_preview_runner",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791588440795,
+      "tag": "0006_welcome_email",
+      "breakpoints": true
     }
   ]
 }
