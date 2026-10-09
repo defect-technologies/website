@@ -1,4 +1,5 @@
 import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
+import { BOTS, FLAG_STATUSES } from "../../lib/bots";
 import { STAGES, type Stage } from "../../lib/stages";
 
 export { STAGES, type Stage };
@@ -169,8 +170,68 @@ export const editorLinks = pgTable("editor_links", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const botName = pgEnum("bot_name", BOTS);
+export const flagStatus = pgEnum("flag_status", FLAG_STATUSES);
+
+/** API keys for the Grok Bots. Only a SHA-256 hash of each key is stored; the key is shown once. */
+export const botKeys = pgTable(
+  "bot_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bot: botName("bot").notNull(),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull(),
+    stages: stage("stages").array().notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+    lastRoutine: text("last_routine").notNull().default(""),
+  },
+  (table) => [uniqueIndex("bot_keys_key_hash").on(table.keyHash)],
+);
+
+/** Every bot API call, kept apart from the activity log so reads don't crowd a lead's history. */
+export const botCalls = pgTable(
+  "bot_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    keyId: uuid("key_id").references(() => botKeys.id),
+    bot: botName("bot"),
+    method: text("method").notNull(),
+    path: text("path").notNull(),
+    status: integer("status").notNull(),
+  },
+  (table) => [index("bot_calls_at").on(table.at)],
+);
+
+/** The review queue: things a bot or the Overseer wants a founder to look at. */
+export const flags = pgTable(
+  "flags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    bot: botName("bot").notNull(),
+    businessId: uuid("business_id").references(() => businesses.id),
+    priority: text("priority").notNull(),
+    whatHappened: text("what_happened").notNull(),
+    whatBotDid: text("what_bot_did").notNull(),
+    why: text("why").notNull(),
+    link: text("link").notNull().default(""),
+    status: flagStatus("status").notNull().default("open"),
+    reviewer: text("reviewer").notNull().default(""),
+    note: text("note").notNull().default(""),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [index("flags_status").on(table.status), index("flags_at").on(table.at)],
+);
+
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
 export type ClientSite = typeof clientSites.$inferSelect;
+export type BotKey = typeof botKeys.$inferSelect;
+export type Flag = typeof flags.$inferSelect;
