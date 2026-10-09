@@ -8,7 +8,7 @@ export { STAGES, type Stage };
 
 export const stage = pgEnum("stage", STAGES);
 export const direction = pgEnum("direction", ["out", "in"]);
-export const messageKind = pgEnum("message_kind", ["first", "follow_up", "reply", "inbound"]);
+export const messageKind = pgEnum("message_kind", ["first", "follow_up", "reply", "inbound", "welcome"]);
 
 /** One row per business, from the lead finder's CSV through to a paying client. */
 export const businesses = pgTable(

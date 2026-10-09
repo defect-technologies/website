@@ -5,6 +5,7 @@ import { db } from "../db/client";
 import { businesses, settings, type Business } from "../db/schema";
 import { env } from "../env";
 import { advanceStage, businessById, updateBusiness } from "../leads/businesses";
+import { sendWelcome } from "../onboarding/welcome";
 import { getJson, integration } from "./result";
 
 const API = "https://api.stripe.com/v1";
@@ -58,15 +59,17 @@ async function businessForSession(session: CheckoutSession, all: Business[]): Pr
 }
 
 async function markPaid(session: CheckoutSession, business: Business) {
+  const payerEmail = (session.customer_details?.email ?? "").toLowerCase();
   await updateBusiness(business.id, {
     paidAt: new Date(session.created * 1000),
     plan: planFor(session.amount_total),
     stripeCustomerId: session.customer,
     stripeSubscriptionId: session.subscription,
-    ownerEmail: business.ownerEmail || (session.customer_details?.email ?? "").toLowerCase(),
+    ownerEmail: business.ownerEmail || payerEmail,
   });
   await advanceStage(business.id, "paid");
   await record("stripe sync", "paid", { businessId: business.id, detail: planFor(session.amount_total) });
+  await sendWelcome(business, payerEmail || business.ownerEmail || business.email);
 }
 
 async function lastSync(): Promise<number> {
