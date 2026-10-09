@@ -89,8 +89,9 @@ const SECTIONS: LegalSection[] = [
         <p>We use these companies to run the business, and each one handles data only to provide its service to us:</p>
         <ul>
           <li><strong>Vercel</strong> hosts this site, the previews, and our clients&apos; sites, and counts clicks on client sites</li>
-          <li><strong>Neon</strong> stores our records of businesses and emails</li>
+          <li><strong>Neon</strong> stores our records of businesses and emails, and the content of our clients&apos; sites</li>
           <li><strong>Google Workspace</strong> carries our email</li>
+          <li><strong>Resend</strong> sends the sign-in links clients use to edit their sites</li>
           <li><strong>Stripe</strong> takes payments</li>
           <li><strong>Anthropic</strong> provides the AI model that turns a business&apos;s website text into the words for its preview</li>
         </ul>
