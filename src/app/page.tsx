@@ -1,5 +1,6 @@
 import { Closing, SavingsSection, WebsitesSection } from "@/components/LandingSections";
 import PaintedStage from "@/components/PaintedStage";
+import SiteFooter from "@/components/SiteFooter";
 import SiteNav from "@/components/SiteNav";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
         <SavingsSection />
         <Closing />
       </main>
+      <SiteFooter />
     </>
   );
 }

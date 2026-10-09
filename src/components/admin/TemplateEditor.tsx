@@ -9,15 +9,23 @@ import Letter from "./Letter";
 import SubmitButton from "./SubmitButton";
 import { Card, Notice } from "./ui";
 
-const TARGET_LINES = 4;
+const TARGET_LINES = 6;
+const SIGN_OFF = /^(warmly|best|thanks|thank you|cheers|sincerely)[,!.]?$/i;
+
+/** Lines of message above the sign-off. The name, address, and opt-out line under it don't count. */
+function messageLines(text: string) {
+  const lines = text.split("\n").map((line) => line.trim());
+  const signOff = lines.findIndex((line) => SIGN_OFF.test(line));
+  return (signOff === -1 ? lines : lines.slice(0, signOff)).filter(Boolean).length;
+}
 
 function LineCount({ text }: { text: string }) {
-  const lines = text.split("\n").filter((line) => line.trim()).length;
+  const lines = messageLines(text);
   const over = lines > TARGET_LINES;
   return (
     <span className={`text-sm tabular-nums ${over ? "text-warn font-medium" : "text-ink-faint"}`}>
-      {lines} {lines === 1 ? "line" : "lines"}
-      {over ? `, ${lines - TARGET_LINES} over the four we aim for` : ""}
+      {lines} {lines === 1 ? "line" : "lines"} before the sign-off
+      {over ? `, ${lines - TARGET_LINES} over the ${TARGET_LINES} we aim for` : ""}
     </span>
   );
 }

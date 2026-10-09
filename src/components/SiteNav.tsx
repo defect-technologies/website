@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type Page = "home" | "team";
+type Page = "home" | "team" | "other";
 
 const LINK = "text-ink rounded-md px-2 py-1 text-base font-medium hover:bg-paper-shade focus-visible:outline-2 focus-visible:outline-ink";
 

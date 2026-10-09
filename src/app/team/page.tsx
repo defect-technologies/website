@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PaintedHeadline from "@/components/PaintedHeadline";
 import PaintedPortrait from "@/components/PaintedPortrait";
+import SiteFooter from "@/components/SiteFooter";
 import SiteNav from "@/components/SiteNav";
 import { TEAM_NAMES, TEAM_TITLE } from "@/content/headlines";
 
@@ -33,6 +34,7 @@ export default function TeamPage() {
           ))}
         </div>
       </main>
+      <SiteFooter />
     </>
   );
 }
