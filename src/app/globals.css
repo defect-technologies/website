@@ -7,6 +7,17 @@
   --color-ink-soft: #4b4852;
   --color-vermilion: #e2421b;
 
+  /* Admin */
+  --color-surface: #fbfaf6;
+  --color-ink-faint: #6b6771;
+  --color-good: #2d6e46;
+  --color-warn: #85570c;
+  --color-bad: #b42318;
+  --color-arm-59: #2f5f9e;
+  --color-arm-79: #c47a1c;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --shadow-card: 0 0 0 1px rgb(23 22 26 / 0.06), 0 1px 2px rgb(23 22 26 / 0.05), 0 4px 12px -4px rgb(23 22 26 / 0.08);
+
   --font-display: var(--font-big-shoulders), "Arial Narrow", system-ui, sans-serif;
   --font-script: var(--font-dr-sugiyama), "Apple Chancery", cursive;
   --font-body: var(--font-geist), system-ui, sans-serif;
