@@ -2,10 +2,18 @@ import "server-only";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { messages, type Business } from "../db/schema";
-import { deliver } from "../mail/outbox";
+import { connectedMailboxes, deliver } from "../mail/outbox";
 import { outreachSettings } from "../settings";
 
 const SUBJECT = "Welcome to Defect Technologies";
+/** Clients hear from the studio inbox, never from a cold-email domain. */
+const STUDIO_INBOX = "hello@defect.tech";
+
+async function studioMailboxId() {
+  const studio = (await connectedMailboxes()).find((mailbox) => mailbox.email.toLowerCase() === STUDIO_INBOX);
+  if (!studio) throw new Error(`${STUDIO_INBOX} isn't connected on the Projects page.`);
+  return studio.id;
+}
 
 function welcomeBody(business: Business) {
   return [
@@ -22,13 +30,13 @@ function welcomeBody(business: Business) {
   ].join("\n");
 }
 
-/** Sent once, right after Stripe reports the checkout. The Onboarding bot follows up from the same inbox. */
+/** Sent once, right after Stripe reports the checkout. It always comes from the studio inbox, where the Onboarding bot follows up. */
 export async function sendWelcome(business: Business, to: string) {
   const { senderName } = await outreachSettings();
   try {
     const delivery = await deliver(
       (from) => ({ from: { name: senderName, email: from?.email ?? "outbox@dev.localhost" }, to, subject: SUBJECT, body: welcomeBody(business) }),
-      business.mailboxId,
+      await studioMailboxId(),
     );
     await (await db()).insert(messages).values({
       businessId: business.id,
