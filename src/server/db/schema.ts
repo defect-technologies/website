@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
 import { STAGES, type Stage } from "../../lib/stages";
@@ -271,6 +271,36 @@ export const previewJobs = pgTable(
   ],
 );
 
+/** A business cost one founder paid. The founders split each month's total evenly. */
+export const expenses = pgTable(
+  "expenses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    spentOn: date("spent_on", { mode: "string" }).notNull(),
+    item: text("item").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    paidBy: text("paid_by").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("expenses_spent_on").on(table.spentOn)],
+);
+
+/** One Zelle from a founder to the other, evening out a month's expenses. */
+export const settlements = pgTable(
+  "settlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    month: text("month").notNull(),
+    fromFounder: text("from_founder").notNull(),
+    toFounder: text("to_founder").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    recordedBy: text("recorded_by").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("settlements_month").on(table.month)],
+);
+
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
@@ -279,3 +309,5 @@ export type ClientSite = typeof clientSites.$inferSelect;
 export type BotKey = typeof botKeys.$inferSelect;
 export type Flag = typeof flags.$inferSelect;
 export type PreviewJob = typeof previewJobs.$inferSelect;
+export type Expense = typeof expenses.$inferSelect;
+export type Settlement = typeof settlements.$inferSelect;
