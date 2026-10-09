@@ -23,7 +23,7 @@ function signInEmailText({ siteAddress, url, expiresInMinutes }: SignInEmail): s
   return [
     "Hi,",
     "",
-    `Here's your link to edit ${siteAddress}. It works for the next ${expiresInMinutes} minutes:`,
+    `Here's your link to edit ${siteAddress}. It works once, within the next ${expiresInMinutes} minutes:`,
     url,
     "",
     "If it expires, ask for a new one at https://defect.tech/edit/sign-in.",
