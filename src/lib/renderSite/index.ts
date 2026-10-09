@@ -12,7 +12,10 @@ export type RenderOptions = {
   /** Where relative image paths in content.json resolve. Without one, photos render as plain placeholders. */
   assetBaseUrl?: string;
   studio?: string;
-  /** For the editor's preview frame: links stay put, and scroll position survives a re-render. */
+  /**
+   * For the editor's preview frame: links stay put, and scroll position survives a re-render.
+   * A srcdoc frame resolves "#visit" against the editor's URL, so even in-page links are scrolled by hand.
+   */
   editorPreview?: boolean;
 };
 
@@ -20,9 +23,11 @@ const PREVIEW_BRIDGE = `(function () {
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("a[href]");
     if (!a) return;
-    var href = a.getAttribute("href");
-    if (href.charAt(0) === "#") return;
     e.preventDefault();
+    var href = a.getAttribute("href");
+    if (href.charAt(0) !== "#") return;
+    var target = href.length > 1 && document.getElementById(href.slice(1));
+    if (target) target.scrollIntoView({ behavior: "smooth" });
   });
   var queued = false;
   addEventListener("scroll", function () {
