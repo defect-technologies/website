@@ -1,6 +1,6 @@
 "use client";
 
-import { Browsers, ChatsCircle, Flag, Funnel, Gauge, PaperPlaneTilt, PencilSimpleLine, Robot, type Icon } from "@phosphor-icons/react";
+import { Browsers, ChatsCircle, Flag, Funnel, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
@@ -20,6 +20,7 @@ export default function AdminNav({ counts }: { counts: { outreach: number; messa
     { href: "/admin/pipeline", label: "Pipeline", icon: Funnel },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/projects", label: "Projects", icon: Gauge },
+    { href: "/admin/expenses", label: "Expenses", icon: Receipt },
     { href: "/admin/bots", label: "Bots", icon: Robot },
     { href: "/admin/template", label: "Template", icon: PencilSimpleLine },
   ];
