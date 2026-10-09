@@ -8,11 +8,11 @@ import IntegrationPanel from "@/components/admin/IntegrationPanel";
 import PreviewList from "@/components/admin/PreviewList";
 import { DisconnectButton, MakeSenderButton, SyncPaymentsButton } from "@/components/admin/ProjectControls";
 import { Card, Notice, PageHeader, SectionHeading, StageChip, When } from "@/components/admin/ui";
-import { flaggedActivity } from "@/server/activity";
 import { db } from "@/server/db/client";
-import { businesses, type Activity, type Business, type Mailbox } from "@/server/db/schema";
+import { businesses, type Business, type Mailbox } from "@/server/db/schema";
 import { healthChecks, type CheckStatus, type HealthCheck } from "@/server/integrations/healthchecks";
 import { stripeSummary } from "@/server/integrations/stripe";
+import { recentSiteChanges, type SiteChange } from "@/server/integrations/siteChanges";
 import { previewDeployments } from "@/server/integrations/vercel";
 import { connectedMailboxes } from "@/server/mail/outbox";
 
@@ -118,15 +118,28 @@ function Clients({ clients }: { clients: Business[] }) {
   );
 }
 
-function OwnerEdits({ edits }: { edits: Activity[] }) {
-  if (edits.length === 0) return <p className="text-ink-soft text-sm">No owner has used the editor yet. Their saves go live right away and show up here.</p>;
+/** "page:/about" reads as "the /about page". */
+function documentName(key: string) {
+  if (key === "theme") return "the theme";
+  if (key === "modules") return "business details";
+  return key.startsWith("page:") ? `the ${key.slice("page:".length)} page` : key;
+}
+
+function whoChanged(actor: string) {
+  return actor.startsWith("bot:") ? `${actor.slice("bot:".length).replaceAll("-", " ")} bot` : actor;
+}
+
+function SiteChanges({ changes }: { changes: SiteChange[] }) {
+  if (changes.length === 0) return <p className="text-ink-soft text-sm">No site has been edited yet. Every save by an owner or a bot shows up here.</p>;
   return (
     <ul className="flex flex-col gap-3">
-      {edits.map((edit) => (
-        <li key={edit.id} className="flex flex-col gap-0.5 text-sm">
-          <span className="text-pretty">{edit.detail || edit.action}</span>
+      {changes.map((change) => (
+        <li key={change.id} className="flex flex-col gap-0.5 text-sm">
+          <span className="text-pretty">
+            <span className="font-medium">{change.site}</span>: {change.action} {documentName(change.key)}
+          </span>
           <span className="text-ink-faint">
-            {edit.actor}, <When date={edit.at} />
+            {whoChanged(change.actor)}, <When date={change.at} />
           </span>
         </li>
       ))}
@@ -139,14 +152,14 @@ const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "U
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ mailbox?: string }> }) {
   const { mailbox } = await searchParams;
   const database = await db();
-  const [inboxes, checks, previews, money, clients, withPreviews, ownerEdits] = await Promise.all([
+  const [inboxes, checks, previews, money, clients, withPreviews, siteChanges] = await Promise.all([
     connectedMailboxes(),
     healthChecks(),
     previewDeployments(),
     stripeSummary(),
     database.select().from(businesses).where(inArray(businesses.stage, ["paid", "live"])),
     database.select().from(businesses).where(inArray(businesses.stage, ["preview_built", "sent", "clicked", "replied", "lost"])),
-    flaggedActivity("fyi"),
+    recentSiteChanges(),
   ]);
   const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;
 
@@ -183,8 +196,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <IntegrationPanel result={previews}>{(data) => <PreviewList previews={data} leads={withPreviews} />}</IntegrationPanel>
         </Card>
         <Card className="flex flex-col gap-4 p-5">
-          <SectionHeading>Edits by owners</SectionHeading>
-          <OwnerEdits edits={ownerEdits} />
+          <SectionHeading>Site changes</SectionHeading>
+          <IntegrationPanel result={siteChanges}>{(data) => <SiteChanges changes={data} />}</IntegrationPanel>
         </Card>
       </div>
     </>

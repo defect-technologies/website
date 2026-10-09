@@ -35,6 +35,7 @@ export const env = {
     previewProject: optional("VERCEL_PREVIEW_PROJECT"),
   }),
   healthchecksKey: () => optional("HEALTHCHECKS_API_KEY"),
+  sitesDatabaseUrl: () => optional("SITES_DATABASE_URL"),
   signInEmail: () => ({ apiKey: optional("SIGN_IN_EMAIL_API_KEY"), from: optional("SIGN_IN_EMAIL_FROM") }),
   /** Shared with every client site on site-kit, which checks the sign-in links we mint with it. */
   editorSecret: () => optional("EDITOR_SECRET"),
