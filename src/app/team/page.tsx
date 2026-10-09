@@ -26,7 +26,7 @@ export default function TeamPage() {
           {PEOPLE.map((person) => (
             <figure key={person.key} className="flex flex-col gap-8">
               <PaintedPortrait src={`/team/${person.key}.webp`} alt={`Painted portrait of ${person.name}`} />
-              <figcaption>
+              <figcaption className="flex justify-center">
                 <PaintedHeadline as="h2" headline={TEAM_NAMES[person.key]} style={NAME_SIZE} />
               </figcaption>
             </figure>
