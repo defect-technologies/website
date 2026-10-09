@@ -49,7 +49,7 @@ async function respond(handler: Handler, context: BotContext): Promise<Response>
 }
 
 /** Wraps a bot API route: checks the key, runs the handler, logs the call. A handler may return its own Response. */
-export function botRoute(handler: Handler, missingKeyHint = "Authorization: Bearer <DEFECT_BOT_KEY>") {
+export function botRoute(handler: Handler, missingKeyHint = "Authorization: Bearer <your bot's key>") {
   return async (request: Request, context: RouteContext) => {
     const key = await keyFromRequest(request);
     if (!key) {
