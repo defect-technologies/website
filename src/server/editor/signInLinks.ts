@@ -29,7 +29,12 @@ export async function requestSignInLink(rawEmail: string): Promise<LinkRequest> 
   await (await db()).insert(signInLinks).values({ tokenHash: hash(token), email, expiresAt });
   const url = new URL("/edit/link", env.siteUrl());
   url.searchParams.set("token", token);
-  await sender.send({ to: email, url: url.toString(), expiresInMinutes: LINK_MINUTES });
+  try {
+    await sender.send({ to: email, url: url.toString(), expiresInMinutes: LINK_MINUTES });
+  } catch (error) {
+    // A different answer here would tell a stranger this address owns a site.
+    console.error("[editor] Sign-in email failed to send", error);
+  }
   return "sent";
 }
 
