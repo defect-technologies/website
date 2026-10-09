@@ -62,11 +62,19 @@ export type FlagPriority = (typeof FLAG_PRIORITIES)[number];
 export const FLAG_STATUSES = ["open", "answered", "approved", "reversed"] as const;
 export type FlagStatus = (typeof FLAG_STATUSES)[number];
 
-/** Grok Bot stores each bot's key as a Secret under this name. */
-export const BOT_KEY_ENV = "DEFECT_BOT_KEY";
+/**
+ * Each bot's key gets its own Secret name: Grok Bot secrets are usable by every
+ * Bot on the shared computer, so a shared name would let bots overwrite each other's.
+ */
+export const BOT_KEY_ENV: Record<Exclude<Bot, "runner">, string> = {
+  outreach: "DEFECT_OUTREACH_KEY",
+  onboarding: "DEFECT_ONBOARDING_KEY",
+  client_care: "DEFECT_CLIENT_CARE_KEY",
+  overseer: "DEFECT_OVERSEER_KEY",
+};
 
 /** Where each key goes once it's created: a Grok Bot Secret, or the runner machine's env file. */
 export function keyHome(bot: Bot): { env: string; where: string } {
   if (bot === "runner") return { env: RUNNER_KEY_ENV, where: "/etc/defect-runner.env on the runner machine" };
-  return { env: BOT_KEY_ENV, where: "the bot's Secrets in Grok Bot" };
+  return { env: BOT_KEY_ENV[bot], where: "the bot's Secrets in Grok Bot" };
 }

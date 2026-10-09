@@ -13,12 +13,12 @@ const ENDPOINTS = [
   "POST /heartbeat",
 ];
 
-/** Lets a bot confirm the API is up before it has a key. Every endpoint below it needs Authorization: Bearer <DEFECT_BOT_KEY>. */
+/** Lets a bot confirm the API is up before it has a key. Every endpoint below it needs Authorization: Bearer <your bot's key, e.g. DEFECT_OUTREACH_KEY>. */
 export function GET() {
   return NextResponse.json({
     ok: true,
     api: "Defect Technologies bot API",
-    auth: "Send Authorization: Bearer <DEFECT_BOT_KEY> on every call below. Start with GET /me.",
+    auth: "Send Authorization: Bearer <your bot's key, e.g. DEFECT_OUTREACH_KEY> on every call below. Start with GET /me.",
     base: "https://defect.tech/api/bot",
     endpoints: ENDPOINTS,
   });
