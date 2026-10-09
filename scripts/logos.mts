@@ -7,9 +7,11 @@
  * Writes public/brand/<name>-<background>.svg and .png, on paper, white and
  * transparent grounds. The "d" also becomes the site's favicon.
  *
- * Each logo is centred by its optical box, not its bounding box. See
- * `opticalBox` below, and DESIGN.md in site-kit's starter for the same method
- * applied to pages.
+ * Nothing is centred by its bounding box. Across, each logo is centred by its
+ * optical box (see `opticalBox`, and DESIGN.md in site-kit's starter for the
+ * same method applied to pages). Up and down, a wordmark is centred on the
+ * block from the top of its tall letters to the baseline, and its descenders
+ * hang below (see `wordmarkFrame`).
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import opentype from "opentype.js";
@@ -37,9 +39,9 @@ const LAYOUTS: Layout[] = [
 const OPTICAL_BLUR = 0.08;
 /** What share of the blurred ink's peak still counts as part of the shape. */
 const OPTICAL_THRESHOLD = 0.3;
-/** Room around a wordmark's optical box, as a share of that box's height. */
+/** Room around a wordmark, as a share of its height from the top of the tall letters to the baseline. */
 const WORDMARK_MARGIN = 0.45;
-/** No ink may come closer to the edge than this, as a share of the optical box's height. */
+/** No ink may come closer to the edge than this, as a share of the same height. */
 const MIN_CLEARANCE = 0.12;
 /** How much of the square the "d"'s optical box fills along its longer side. */
 const MARK_FILL = 0.62;
@@ -89,22 +91,33 @@ function halfSpan(opticalLow: number, opticalHigh: number, inkLow: number, inkHi
   return Math.max((opticalHigh - opticalLow) / 2 + margin, centre - inkLow + clearance, inkHigh - centre + clearance);
 }
 
-function frameAround(optical: Box, ink: Box, square: boolean): Frame {
+/**
+ * Centring a wordmark's ink, or even its blurred mass, top to bottom leaves it
+ * looking high: one descender hangs into an otherwise empty bottom half, and
+ * the tall letters fill the top. The eye reads a line of type by the block
+ * from the tops of its tall letters to the baseline, so that block is centred
+ * and the descenders hang into the bottom margin. The margin below the
+ * lowest descender matches the margins at the sides.
+ */
+function wordmarkFrame(optical: Box, ink: Box, baseline: number): Frame {
+  const body = baseline - ink.y1;
+  const margin = body * WORDMARK_MARGIN;
+  const halfWidth = halfSpan(optical.x1, optical.x2, ink.x1, ink.x2, margin, body * MIN_CLEARANCE);
+  const centreY = (ink.y1 + baseline) / 2;
+  const halfHeight = Math.max(centreY - ink.y1, ink.y2 - centreY) + margin;
+  return { width: 2 * halfWidth, height: 2 * halfHeight, offsetX: halfWidth - (optical.x1 + optical.x2) / 2, offsetY: halfHeight - centreY };
+}
+
+/** The "d" stands alone in a square, centred by its optical box both ways. */
+function markFrame(optical: Box, ink: Box): Frame {
   const opticalHeight = optical.y2 - optical.y1;
-  const margin = square ? 0 : opticalHeight * WORDMARK_MARGIN;
   const clearance = opticalHeight * MIN_CLEARANCE;
-  let halfWidth = halfSpan(optical.x1, optical.x2, ink.x1, ink.x2, margin, clearance);
-  let halfHeight = halfSpan(optical.y1, optical.y2, ink.y1, ink.y2, margin, clearance);
-  if (square) {
-    const opticalSide = Math.max(optical.x2 - optical.x1, opticalHeight) / MARK_FILL / 2;
-    halfWidth = halfHeight = Math.max(halfWidth, halfHeight, opticalSide);
-  }
-  return {
-    width: 2 * halfWidth,
-    height: 2 * halfHeight,
-    offsetX: halfWidth - (optical.x1 + optical.x2) / 2,
-    offsetY: halfHeight - (optical.y1 + optical.y2) / 2,
-  };
+  const half = Math.max(
+    halfSpan(optical.x1, optical.x2, ink.x1, ink.x2, 0, clearance),
+    halfSpan(optical.y1, optical.y2, ink.y1, ink.y2, 0, clearance),
+    Math.max(optical.x2 - optical.x1, opticalHeight) / MARK_FILL / 2,
+  );
+  return { width: 2 * half, height: 2 * half, offsetX: half - (optical.x1 + optical.x2) / 2, offsetY: half - (optical.y1 + optical.y2) / 2 };
 }
 
 function svgFor(pathData: string, frame: Frame, ground: string | null, thickening = 0): string {
@@ -131,13 +144,14 @@ function placedGlyphs(font: opentype.Font, text: string) {
   const pad = (raw.y2 - raw.y1) * 0.5;
   const path = font.getPath(text, pad - raw.x1, pad - raw.y1, FONT_SIZE);
   const ink: Box = { x1: pad, y1: pad, x2: pad + raw.x2 - raw.x1, y2: pad + raw.y2 - raw.y1 };
-  return { pathData: path.toPathData(2), ink, canvas: { width: ink.x2 + pad, height: ink.y2 + pad } };
+  return { pathData: path.toPathData(2), ink, baseline: pad - raw.y1, canvas: { width: ink.x2 + pad, height: ink.y2 + pad } };
 }
 
 async function drawLogo(font: opentype.Font, layout: Layout) {
-  const { pathData, ink, canvas } = placedGlyphs(font, layout.text);
+  const { pathData, ink, baseline, canvas } = placedGlyphs(font, layout.text);
   const measuring = svgFor(pathData, { ...canvas, offsetX: 0, offsetY: 0 }, null);
-  const frame = frameAround(await opticalBox(measuring, ink), ink, layout.square);
+  const optical = await opticalBox(measuring, ink);
+  const frame = layout.square ? markFrame(optical, ink) : wordmarkFrame(optical, ink, baseline);
   for (const [ground, colour] of Object.entries(GROUNDS) as [Ground, string | null][]) {
     const name = `${layout.name}-${ground}`;
     const svg = svgFor(pathData, frame, colour);
