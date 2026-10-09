@@ -37,7 +37,7 @@ function notices(site: ClientSiteRow, query: Query) {
   const host = new URL(site.url).host;
   const shown: [boolean, "good" | "bad" | "warn", string][] = [
     [Boolean(query.added), "good", `Added. ${site.ownerEmail} can now ask for a sign-in link at defect.tech/edit/sign-in, or you can email one below.`],
-    [query.link === "sent", "good", `Emailed ${site.ownerEmail} a link to edit ${host}. It works for ${LINK_MINUTES} minutes.`],
+    [query.link === "sent", "good", `Emailed ${site.ownerEmail} a link to edit ${host}. It works once, within ${LINK_MINUTES} minutes.`],
     [query.link === "failed", "bad", "The email service refused the link, so nothing was sent. Check Resend's logs, then try again."],
     [query.owner === "changed", "good", `Sign-in links for ${host} now go to ${site.ownerEmail}.`],
     [query.owner === "invalid", "bad", "That email address doesn't look right, so the owner didn't change. Check it and try again."],
@@ -69,7 +69,7 @@ export default async function SitePage({ params, searchParams }: Props) {
       <section className="flex flex-col gap-3">
         <SectionHeading>Owner</SectionHeading>
         <p className="text-ink-soft max-w-prose text-pretty">
-          The editor is at {new URL("/edit", site.url).toString()}. It opens only from a sign-in link sent to {site.ownerEmail}, and each link works for {LINK_MINUTES} minutes.
+          The editor is at {new URL("/edit", site.url).toString()}. It opens only from a sign-in link sent to {site.ownerEmail}, and each link works once, within {LINK_MINUTES} minutes.
         </p>
         {!ready && <Notice tone="warn">Sign-in links need SIGN_IN_EMAIL_API_KEY, SIGN_IN_EMAIL_FROM and EDITOR_SECRET set on this Vercel project.</Notice>}
         <form action={sendLinkAction}>

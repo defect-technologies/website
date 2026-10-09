@@ -153,6 +153,22 @@ export const clientSites = pgTable(
   (table) => [uniqueIndex("client_sites_slug").on(table.slug), index("client_sites_owner_email").on(table.ownerEmail)],
 );
 
+/**
+ * Emailed editor links. Each works once: opening it on defect.tech and pressing
+ * the button marks it used and hands the owner a short-lived site-kit token.
+ * Only a hash of the code is stored.
+ */
+export const editorLinks = pgTable("editor_links", {
+  codeHash: text("code_hash").primaryKey(),
+  siteId: uuid("site_id")
+    .notNull()
+    .references(() => clientSites.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;

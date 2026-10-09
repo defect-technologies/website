@@ -13,7 +13,7 @@ function SentNotice({ email }: { email: string }) {
       <EnvelopeSimple size={32} className="text-ink" aria-hidden="true" />
       <p className="text-lg font-semibold text-balance">Check your email</p>
       <p className="text-ink-soft text-pretty">
-        If <span className="text-ink font-medium break-all">{email}</span> is the address on your account, a sign-in link is on its way. It opens the editor on your site and works for 10 minutes.
+        If <span className="text-ink font-medium break-all">{email}</span> is the address on your account, a sign-in link is on its way. It opens the editor on your site once, within 10 minutes.
       </p>
     </div>
   );
