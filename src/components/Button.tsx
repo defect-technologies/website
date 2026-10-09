@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
 
 type Variant = "solid" | "soft" | "ghost" | "danger";
-type Size = "md" | "sm";
+type Size = "md" | "sm" | "icon";
 
 const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[scale,background-color,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:pointer-events-none disabled:opacity-45";
@@ -10,6 +10,7 @@ const BASE =
 const SIZES: Record<Size, string> = {
   md: "min-h-11 px-5 text-base",
   sm: "min-h-9 px-3.5 text-sm",
+  icon: "size-10 shrink-0",
 };
 
 const VARIANTS: Record<Variant, string> = {
