@@ -5,10 +5,11 @@ import { getJson, integration } from "./result";
 const API = "https://api.vercel.com";
 export const PREVIEW_LIFETIME_DAYS = 30;
 
-type Deployment = { uid: string; url: string | null; created: number; readyState: string; target: string | null };
+type Deployment = { uid: string; url: string | null; created: number; readyState: string; target: string | null; meta?: Record<string, string> };
 type Project = { id: string; name: string; updatedAt: number };
 
-export type PreviewDeployment = { id: string; url: string; title: string; createdAt: Date; state: string };
+/** `site` groups versions of one business's preview: the lead slug the builder tags deployments with, or the page title for older ones. */
+export type PreviewDeployment = { id: string; url: string; title: string; site: string; createdAt: Date; state: string };
 
 function vercel<T>(path: string) {
   const { token, teamId } = env.vercel();
@@ -53,10 +54,12 @@ export function previewDeployments() {
     return Promise.all(
       previews.map(async (deployment): Promise<PreviewDeployment> => {
         const url = `https://${deployment.url}`;
+        const title = await pageTitle(url);
         return {
           id: deployment.uid,
           url,
-          title: await pageTitle(url),
+          title,
+          site: deployment.meta?.lead || title,
           createdAt: new Date(deployment.created),
           state: deployment.readyState,
         };

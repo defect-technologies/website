@@ -148,7 +148,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     database.select().from(businesses).where(inArray(businesses.stage, ["preview_built", "sent", "clicked", "replied", "lost"])),
     flaggedActivity("fyi"),
   ]);
-  const owners = new Map(withPreviews.filter((b) => b.previewUrl).map((b) => [b.previewUrl.replace(/\/$/, ""), b]));
   const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;
 
   return (
@@ -181,7 +180,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </Card>
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Previews</SectionHeading>
-          <IntegrationPanel result={previews}>{(data) => <PreviewList previews={data} owners={owners} />}</IntegrationPanel>
+          <IntegrationPanel result={previews}>{(data) => <PreviewList previews={data} leads={withPreviews} />}</IntegrationPanel>
         </Card>
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Edits by owners</SectionHeading>
