@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import PaintedHeadline from "@/components/PaintedHeadline";
-import ScrapeReveal from "@/components/ScrapeReveal";
+import PaintedPortrait from "@/components/PaintedPortrait";
 import SiteNav from "@/components/SiteNav";
 import { TEAM_NAMES, TEAM_TITLE } from "@/content/headlines";
 
 export const metadata: Metadata = {
   title: "Team",
-  description: "Brendan Giang and Boris Nezlobin, the two people behind defect.tech.",
+  description: "Brendan Giang and Boris Nezlobin.",
 };
 
 const PEOPLE = [
@@ -25,13 +25,7 @@ export default function TeamPage() {
         <div className="grid gap-x-12 gap-y-20 md:grid-cols-2">
           {PEOPLE.map((person) => (
             <figure key={person.key} className="flex flex-col gap-8">
-              <ScrapeReveal
-                painted={`/team/${person.key}-painted.webp`}
-                revealed={`/team/${person.key}-photo.webp`}
-                width={1200}
-                height={1200}
-                alt={`Photo of ${person.name}`}
-              />
+              <PaintedPortrait src={`/team/${person.key}.webp`} alt={`Painted portrait of ${person.name}`} />
               <figcaption>
                 <PaintedHeadline as="h2" headline={TEAM_NAMES[person.key]} style={NAME_SIZE} />
               </figcaption>

@@ -6,7 +6,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { useMotionAllowed } from "@/hooks/useMotionAllowed";
 import { useSeenOnce } from "@/hooks/useSeenOnce";
 import { fitToDisplay, pointIn } from "@/paint/canvas";
-import { KnifePass, playPass, scrapeAlong, type Point } from "@/paint/knifePass";
+import { KnifePass, play, scrapeAlong, type Point } from "@/paint/knifePass";
 import { Button } from "./Button";
 
 type ScrapeRevealProps = {
@@ -30,12 +30,12 @@ function loadedImage(source: string): Promise<HTMLImageElement> {
 async function layPainting(canvas: HTMLCanvasElement, painting: HTMLImageElement, animate: boolean) {
   const context = fitToDisplay(canvas);
   if (!animate) return context?.drawImage(painting, 0, 0, canvas.width, canvas.height);
-  await playPass(new KnifePass(canvas, "lay", painting, -0.5)).done;
+  await play(new KnifePass(canvas, "lay", painting, -0.5)).done;
   context?.drawImage(painting, 0, 0, canvas.width, canvas.height);
 }
 
 async function scrapeAll(canvas: HTMLCanvasElement, animate: boolean) {
-  if (animate) await playPass(new KnifePass(canvas, "scrape", null, -0.5)).done;
+  if (animate) await play(new KnifePass(canvas, "scrape", null, -0.5)).done;
   canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
 }
 

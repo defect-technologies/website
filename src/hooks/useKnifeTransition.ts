@@ -1,9 +1,48 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { KnifePass, playPass } from "@/paint/knifePass";
 import { fitToDisplay } from "@/paint/canvas";
+import { DripFlow } from "@/paint/dripFlow";
+import { KnifePass, play } from "@/paint/knifePass";
+
+/** A painting baked in two parts, so its drips can run after the knife has laid it. */
+export type DripLayers = { dry: string; drips: string };
+
+type Options = { ready: boolean; animate: boolean; drips?: DripLayers };
+
+type Run = { cancelled: boolean; stop: () => void };
 
 function showImage(image: HTMLImageElement, visible: boolean) {
   image.style.opacity = visible ? "1" : "0";
+}
+
+const loading = new Map<string, Promise<HTMLImageElement>>();
+
+function loaded(source: string): Promise<HTMLImageElement> {
+  const existing = loading.get(source);
+  if (existing) return existing;
+  const image = new Image();
+  image.src = source;
+  const ready = image.decode().then(() => image);
+  loading.set(source, ready);
+  return ready;
+}
+
+async function playUnlessCancelled(run: Run, animation: KnifePass | DripFlow) {
+  if (run.cancelled) return;
+  const playing = play(animation);
+  run.stop = playing.cancel;
+  await playing.done;
+}
+
+async function lay(canvas: HTMLCanvasElement, painting: HTMLImageElement, drips: DripLayers | undefined, run: Run) {
+  if (!drips) return playUnlessCancelled(run, new KnifePass(canvas, "lay", painting));
+  const [dry, layer] = await Promise.all([loaded(drips.dry), loaded(drips.drips)]);
+  await playUnlessCancelled(run, new KnifePass(canvas, "lay", dry));
+  await playUnlessCancelled(run, new DripFlow(canvas, dry, layer));
+}
+
+async function scrape(canvas: HTMLCanvasElement, painting: HTMLImageElement, run: Run) {
+  canvas.getContext("2d")?.drawImage(painting, 0, 0, canvas.width, canvas.height);
+  await playUnlessCancelled(run, new KnifePass(canvas, "scrape", painting));
 }
 
 /**
@@ -15,10 +54,9 @@ export function useKnifeTransition(
   shown: boolean,
   image: RefObject<HTMLImageElement | null>,
   surface: RefObject<HTMLCanvasElement | null>,
-  options: { ready: boolean; animate: boolean },
+  { ready, animate, drips }: Options,
 ) {
   const displayed = useRef(false);
-  const { ready, animate } = options;
 
   useEffect(() => {
     const painting = image.current;
@@ -28,34 +66,30 @@ export function useKnifeTransition(
     displayed.current = shown;
     if (!animate) return showImage(painting, shown);
 
-    let cancelled = false;
+    const run: Run = { cancelled: false, stop: () => {} };
     let finished = false;
-    let stop = () => {};
-    const run = async () => {
+    const go = async () => {
       await painting.decode().catch(() => undefined);
-      if (cancelled) return;
-      const context = fitToDisplay(canvas);
-      if (!shown) context?.drawImage(painting, 0, 0, canvas.width, canvas.height);
+      if (run.cancelled) return;
+      fitToDisplay(canvas);
       showImage(painting, false);
-      const pass = playPass(new KnifePass(canvas, shown ? "lay" : "scrape", painting));
-      stop = pass.cancel;
-      await pass.done;
-      if (cancelled) return;
+      await (shown ? lay(canvas, painting, drips, run) : scrape(canvas, painting, run));
+      if (run.cancelled) return;
       finished = true;
-      context?.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       showImage(painting, shown);
     };
-    void run();
+    void go();
 
     // An interrupted knife puts things back as they were, so the next run
     // (a scroll the other way, or React re-running the effect) starts clean.
     return () => {
-      cancelled = true;
-      stop();
+      run.cancelled = true;
+      run.stop();
       if (finished) return;
       canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       displayed.current = previous;
       showImage(painting, previous);
     };
-  }, [shown, ready, animate, image, surface]);
+  }, [shown, ready, animate, drips, image, surface]);
 }

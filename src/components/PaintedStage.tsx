@@ -99,7 +99,7 @@ function PaintHint({ visible }: { visible: boolean }) {
       className="text-ink-soft pointer-coarse:hidden absolute bottom-[5vh] left-1/2 z-20 -translate-x-1/2 text-sm transition-opacity duration-300"
       style={{ opacity: visible ? 1 : 0 }}
     >
-      Drag anywhere to paint
+      Drag to paint
     </p>
   );
 }

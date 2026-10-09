@@ -8,10 +8,8 @@ export type PriceRow = {
 export const FREELANCER: PriceRow = { who: "A freelancer", upFront: [1500, 8000], monthly: [50, 200] };
 export const DEFECT: PriceRow = { who: "defect.tech", upFront: [0, 0], monthly: [59, 59] };
 
-export const YEARLY_PRICE = 590;
-
 export const FREELANCER_SOURCE = {
-  label: "Surmado's 2026 small-business website cost guide",
+  label: "Surmado",
   href: "https://www.surmado.com/blog/how-much-does-a-small-business-website-cost-2026",
 };
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { Fragment, useRef, type CSSProperties } from "react";
+import { Fragment, useMemo, useRef, type CSSProperties } from "react";
 import { TYPEFACES, paintReach, type Headline } from "@/content/headlines";
 import paintings from "@/content/paintings.json";
 import { useHydrated } from "@/hooks/useHydrated";
-import { useKnifeTransition } from "@/hooks/useKnifeTransition";
+import { useKnifeTransition, type DripLayers } from "@/hooks/useKnifeTransition";
 import { useMotionAllowed } from "@/hooks/useMotionAllowed";
 import { useSeenOnce } from "@/hooks/useSeenOnce";
 
@@ -20,6 +20,11 @@ type PaintedHeadlineProps = {
 };
 
 const FAMILY_CLASS = { display: "font-display", script: "font-script" } as const;
+
+/** Paintings with a band of strokes are baked with their drips apart, so the drips can run once laid. */
+function dripLayersFor(id: string): DripLayers {
+  return { dry: `/paint/${id}-dry.webp`, drips: `/paint/${id}-drips.webp` };
+}
 
 /**
  * The words are real, selectable text set in the same face the painting was
@@ -37,7 +42,9 @@ export default function PaintedHeadline({ headline, as: Element = "p", className
   const size = paintings[headline.id as keyof typeof paintings];
   const reach = paintReach(headline);
 
-  useKnifeTransition(shown ?? seen, image, surface, { ready, animate });
+  const drips = useMemo(() => (headline.band ? dripLayersFor(headline.id) : undefined), [headline]);
+
+  useKnifeTransition(shown ?? seen, image, surface, { ready, animate, drips });
 
   return (
     <Element

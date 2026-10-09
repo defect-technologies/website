@@ -2,6 +2,11 @@
  * A palette knife dragged across a canvas in staggered bands. Laying draws a
  * painting in under the knife; scraping takes whatever is there back off.
  * Adapted from the Wet Paint studio's KnifeReveal.
+ *
+ * Laying grows a mask and draws the painting through it once per frame. Drawing
+ * the painting straight into each lane instead would stack its translucent
+ * edges where lanes overlap, so it would darken and then lighten again when the
+ * finished image replaced the canvas.
  */
 const LANES = 7;
 const BANDS = 5;
@@ -79,6 +84,7 @@ export class KnifePass {
   private readonly bandWidth: number;
   private readonly bands: Band[];
   private readonly started = performance.now();
+  private readonly mask: HTMLCanvasElement | null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -87,6 +93,7 @@ export class KnifePass {
     angle = sidewaysAngle(),
   ) {
     this.context = canvas.getContext("2d");
+    this.mask = mode === "lay" ? blankLike(canvas) : null;
     this.dir = { x: Math.cos(angle), y: Math.sin(angle) };
     this.normal = { x: -this.dir.y, y: this.dir.x };
     this.reach = Math.hypot(canvas.width, canvas.height);
@@ -106,7 +113,20 @@ export class KnifePass {
   frame(): void {
     if (!this.context) return;
     const elapsed = performance.now() - this.started;
-    for (const band of this.bands) this.advance(this.context, band, elapsed);
+    const target = this.mask?.getContext("2d") ?? this.context;
+    if (!target) return;
+    for (const band of this.bands) this.advance(target, band, elapsed);
+    if (this.mask) this.showThroughMask(this.context, this.mask);
+  }
+
+  private showThroughMask(context: CanvasRenderingContext2D, mask: HTMLCanvasElement): void {
+    if (!this.painting) return;
+    context.save();
+    context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    context.drawImage(this.painting, 0, 0, this.canvas.width, this.canvas.height);
+    context.globalCompositeOperation = "destination-in";
+    context.drawImage(mask, 0, 0);
+    context.restore();
   }
 
   private advance(context: CanvasRenderingContext2D, band: Band, elapsed: number): void {
@@ -124,11 +144,8 @@ export class KnifePass {
     if (this.mode === "scrape") {
       context.globalCompositeOperation = "destination-out";
       context.globalAlpha = lane.strength;
-      context.fill();
-    } else if (this.painting) {
-      context.clip();
-      context.drawImage(this.painting, 0, 0, this.canvas.width, this.canvas.height);
     }
+    context.fill();
     context.restore();
   }
 
@@ -141,7 +158,14 @@ export class KnifePass {
   }
 }
 
-/** Scrapes a knife-wide path between two points, for dragging by hand. */
+function blankLike(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const blank = document.createElement("canvas");
+  blank.width = canvas.width;
+  blank.height = canvas.height;
+  return blank;
+}
+
+/** Scrapes a knife-wide path between two points, for dragging by hand. Round ends let consecutive drags join without gaps at the turns. */
 export function scrapeAlong(canvas: HTMLCanvasElement, from: Point, to: Point, width: number): void {
   const context = canvas.getContext("2d");
   const length = Math.hypot(to.x - from.x, to.y - from.y);
@@ -149,16 +173,22 @@ export function scrapeAlong(canvas: HTMLCanvasElement, from: Point, to: Point, w
   const across = { x: -(to.y - from.y) / length, y: (to.x - from.x) / length };
   context.save();
   context.globalCompositeOperation = "destination-out";
+  context.lineCap = "round";
+  context.lineWidth = width / LANES + 0.6;
   for (const lane of laneSet(width)) {
     context.globalAlpha = lane.strength;
-    quadPath(context, from, to, across, lane.offset, width / LANES + 0.6);
-    context.fill();
+    context.beginPath();
+    context.moveTo(from.x + across.x * lane.offset, from.y + across.y * lane.offset);
+    context.lineTo(to.x + across.x * lane.offset, to.y + across.y * lane.offset);
+    context.stroke();
   }
   context.restore();
 }
 
-/** Plays a pass to the end, then resolves. Cancelling stops it where it is. */
-export function playPass(pass: KnifePass): { done: Promise<void>; cancel: () => void } {
+export type Animation = { frame(): void; readonly finished: boolean };
+
+/** Plays an animation to the end, then resolves. Cancelling stops it where it is. */
+export function play(pass: Animation): { done: Promise<void>; cancel: () => void } {
   let frame = 0;
   let cancelled = false;
   const done = new Promise<void>((resolve) => {

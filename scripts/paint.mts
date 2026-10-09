@@ -14,12 +14,12 @@ import { chromium, type Page } from "playwright";
 import sharp from "sharp";
 import { ALL_HEADLINES, TYPEFACES, paintReach, type Headline } from "../src/content/headlines";
 import { paintLetters, type PaintedLetters } from "./letterPainter";
+import { PAPER, keyOutPaper } from "./paper";
 import { SKETCH_HTML, SKETCH_SIZE } from "./sketch";
-import { hexToRgb, type Rgb } from "../src/paint/engine/color";
+import { hexToRgb } from "../src/paint/engine/color";
 import { defaultKnifeSettings, renderKnife, type KnifeSettings } from "../src/paint/engine/knife";
 import { createField, createImage, imageToRgba, type Field, type RgbImage } from "../src/paint/engine/raster";
 
-const PAPER = hexToRgb("#f4f1ea");
 const FONT_SIZE = { display: 220, script: 300 };
 const FONTS_CSS =
   "https://fonts.googleapis.com/css2?family=Big+Shoulders:opsz,wght@10..72,100..900&family=Dr+Sugiyama&display=block";
@@ -94,30 +94,6 @@ function onPaper(raster: Raster): { image: RgbImage; coverage: Field } {
   return { image, coverage };
 }
 
-/**
- * How opaque paint must be to darken the paper to this colour. Anything lighter
- * than the paper counts as bare canvas: the engine brightens its canvas with a
- * vignette, and keying that in would leave a pale box around every painting.
- */
-function alphaOverPaper(colour: Rgb): number {
-  return Math.max(...colour.map((value, c) => (value < PAPER[c] ? (PAPER[c] - value) / PAPER[c] : 0)));
-}
-
-function keyOutPaper(painted: RgbImage): Uint8ClampedArray {
-  const rgba = imageToRgba(painted);
-  for (let p = 0; p < painted.width * painted.height; p++) {
-    const colour = [0, 1, 2].map((c) => painted.data[p * 3 + c]) as Rgb;
-    const alpha = alphaOverPaper(colour);
-    const solid = alpha < 0.03 ? 0 : Math.min(1, alpha);
-    for (let c = 0; c < 3; c++) {
-      const unmixed = solid > 0 ? PAPER[c] + (colour[c] - PAPER[c]) / solid : PAPER[c];
-      rgba[p * 4 + c] = Math.round(Math.min(1, Math.max(0, unmixed)) * 255);
-    }
-    rgba[p * 4 + 3] = Math.round(solid * 255);
-  }
-  return rgba;
-}
-
 function lettersToRgba(letters: PaintedLetters): Uint8ClampedArray {
   const rgba = imageToRgba(letters.color);
   for (let p = 0; p < letters.alpha.data.length; p++) rgba[p * 4 + 3] = Math.round(Math.min(1, letters.alpha.data[p]) * 255);
@@ -137,7 +113,7 @@ function haloSpreadFor(headline: Headline, rasterWidth: number): number {
   return (BAND_REACH_EM * size) / textWidth;
 }
 
-function paintBand(headline: Headline, band: string[], raster: Raster): Uint8ClampedArray {
+function paintBand(headline: Headline, band: string[], raster: Raster, overrides: Partial<KnifeSettings> = {}): Uint8ClampedArray {
   const { image, coverage } = onPaper(raster);
   const settings = {
     ...defaultKnifeSettings,
@@ -145,6 +121,7 @@ function paintBand(headline: Headline, band: string[], raster: Raster): Uint8Cla
     haloSpread: haloSpreadFor(headline, raster.width),
     haloPalette: band.map(hexToRgb),
     seed: headline.seed,
+    ...overrides,
   };
   return keyOutPaper(renderKnife(image, coverage, settings));
 }
@@ -154,11 +131,45 @@ function paintBareLetters(headline: Headline, raster: Raster): Uint8ClampedArray
   return lettersToRgba(paintLetters(coverage, hexToRgb(headline.ink), headline.seed));
 }
 
+const DRIP_CHANGE = 3;
+
+function differs(wet: Uint8ClampedArray, dry: Uint8ClampedArray, pixel: number): boolean {
+  for (let c = 0; c < 4; c++) if (Math.abs(wet[pixel * 4 + c] - dry[pixel * 4 + c]) > DRIP_CHANGE) return true;
+  return false;
+}
+
+/**
+ * Drips run on their own random stream and are painted last, so a render with
+ * them turned off matches the real one everywhere except the drips. Where the
+ * two differ, plus a pixel of edge, is the drip layer the page lets run.
+ */
+function dripLayer(wet: Uint8ClampedArray, dry: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
+  const layer = new Uint8ClampedArray(wet.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const near = [0, -1, 1].some((dy) => [0, -1, 1].some((dx) => inside(x + dx, y + dy, width, height) && differs(wet, dry, (y + dy) * width + x + dx)));
+      if (near) layer.set(wet.subarray((y * width + x) * 4, (y * width + x) * 4 + 4), (y * width + x) * 4);
+    }
+  }
+  return layer;
+}
+
+function inside(x: number, y: number, width: number, height: number): boolean {
+  return x >= 0 && y >= 0 && x < width && y < height;
+}
+
+async function writeDripLayers(headline: Headline, band: string[], raster: Raster, wet: Uint8ClampedArray) {
+  const dry = paintBand(headline, band, raster, { drips: 0 });
+  await writeWebp(`${OUT_DIR}/${headline.id}-dry.webp`, dry, raster.width, raster.height);
+  await writeWebp(`${OUT_DIR}/${headline.id}-drips.webp`, dripLayer(wet, dry, raster.width, raster.height), raster.width, raster.height);
+}
+
 async function paintHeadline(page: Page, headline: Headline) {
   await page.setContent(headlineHtml(headline), { waitUntil: "networkidle" });
   const raster = await screenshotRaw(page, "#text", true);
   const rgba = headline.band ? paintBand(headline, headline.band, raster) : paintBareLetters(headline, raster);
   await writeWebp(`${OUT_DIR}/${headline.id}.webp`, rgba, raster.width, raster.height);
+  if (headline.band) await writeDripLayers(headline, headline.band, raster, rgba);
   return { width: raster.width, height: raster.height };
 }
 

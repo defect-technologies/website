@@ -3,22 +3,29 @@ import type { Point } from "./knifePass";
 const LANES = 9;
 /** How far, in CSS pixels, one load of paint lasts before the knife runs dry. */
 const LOAD_LENGTH = 900;
+/** Points this close together add nothing but jitter to the path. */
+const MIN_STEP = 2;
+/** How far the pointer travels before the blade's angle is set from the direction it went. */
+const SETTLING_DISTANCE = 10;
 
 interface Lane {
   offset: number;
   shade: number;
-  nick: number;
+  opacity: number;
+  /** How far this lane carries paint before it runs dry, in canvas pixels. */
+  reach: number;
 }
 
 function between(low: number, high: number): number {
   return low + Math.random() * (high - low);
 }
 
-function lanesFor(width: number): Lane[] {
+function lanesFor(width: number, scale: number): Lane[] {
   return Array.from({ length: LANES }, (_, index) => ({
     offset: -width / 2 + (index + 0.5) * (width / LANES),
     shade: between(-0.1, 0.1),
-    nick: Math.random() < 0.14 ? between(0.15, 0.5) : between(0.85, 1),
+    opacity: Math.random() < 0.14 ? between(0.2, 0.5) : between(0.85, 1),
+    reach: LOAD_LENGTH * scale * between(0.55, 1),
   }));
 }
 
@@ -32,61 +39,92 @@ function shaded(hex: string, amount: number): string {
   return `rgb(${channel(16)} ${channel(8)} ${channel(0)})`;
 }
 
+/** Square across the direction the stroke set off in. */
+function bladeAcross(from: Point, to: Point): Point {
+  const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  return { x: -(to.y - from.y) / length, y: (to.x - from.x) / length };
+}
+
+function copyOf(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const copy = document.createElement("canvas");
+  copy.width = canvas.width;
+  copy.height = canvas.height;
+  copy.getContext("2d")?.drawImage(canvas, 0, 0);
+  return copy;
+}
+
 /**
- * Lays streaky knife strokes where the pointer drags. Each lane of the blade
- * carries a slightly different shade, a few lanes are nicked and skip, and the
- * load thins out along the stroke the way paint does on a real knife.
+ * Lays streaky knife strokes where the pointer drags. Like a real palette
+ * knife, the blade keeps the angle it set off at: dragged sideways it lays a
+ * broad band, dragged along its length a thin one. Each lane is the whole path
+ * shifted across the blade and drawn as one line with round joins, so corners
+ * stay smooth. Lanes carry slightly different shades, a few are nicked and
+ * thin, and each runs dry at its own distance the way paint gives out on a
+ * real knife. The stroke is redrawn from a snapshot of the canvas on every
+ * move, so paint never stacks on itself.
  */
 export class KnifeBrush {
-  private lanes: Lane[] = [];
-  private colour = "#000000";
-  private travelled = 0;
-  private colourIndex = Math.floor(Math.random() * 10);
+  private readonly lanes: Lane[];
+  private readonly colour: string;
+  private readonly before: HTMLCanvasElement;
+  private readonly points: Point[];
+  private readonly laneWidth: number;
+  private across: Point | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly palette: string[],
-    private readonly width: number,
+    palette: string[],
+    width: number,
     private readonly scale: number,
-  ) {}
-
-  begin(): void {
-    this.colour = this.palette[this.colourIndex++ % this.palette.length];
-    this.lanes = lanesFor(this.width * this.scale);
-    this.travelled = 0;
+    start: Point,
+  ) {
+    this.colour = palette[Math.floor(Math.random() * palette.length)];
+    this.lanes = lanesFor(width * scale, scale);
+    this.before = copyOf(canvas);
+    this.points = [start];
+    this.laneWidth = (width * scale) / LANES + 0.8;
   }
 
-  drag(from: Point, to: Point): void {
+  drag(to: Point): void {
+    const last = this.points[this.points.length - 1];
+    if (Math.hypot(to.x - last.x, to.y - last.y) < MIN_STEP) return;
+    this.points.push(to);
+    this.across ??= this.settledBlade(to);
+    if (this.across) this.redraw(this.across);
+  }
+
+  private settledBlade(to: Point): Point | null {
+    const start = this.points[0];
+    return Math.hypot(to.x - start.x, to.y - start.y) >= SETTLING_DISTANCE * this.scale ? bladeAcross(start, to) : null;
+  }
+
+  private redraw(across: Point): void {
     const context = this.canvas.getContext("2d");
-    const length = Math.hypot(to.x - from.x, to.y - from.y);
-    if (!context || length < 0.5) return;
-    this.travelled += length / this.scale;
-    const load = Math.max(0, 1 - this.travelled / LOAD_LENGTH);
-    if (load <= 0) return;
-    const across = { x: -(to.y - from.y) / length, y: (to.x - from.x) / length };
-    const laneWidth = (this.width * this.scale) / LANES + 0.8;
-    for (const lane of this.lanes) this.paintLane(context, { from, to, across }, lane, laneWidth, load);
+    if (!context) return;
+    context.save();
+    context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    context.drawImage(this.before, 0, 0);
+    context.lineWidth = this.laneWidth;
+    context.lineJoin = "round";
+    context.lineCap = "butt";
+    for (const lane of this.lanes) this.paintLane(context, lane, across);
+    context.restore();
   }
 
-  private paintLane(
-    context: CanvasRenderingContext2D,
-    segment: { from: Point; to: Point; across: Point },
-    lane: Lane,
-    laneWidth: number,
-    load: number,
-  ): void {
-    const { from, to, across } = segment;
-    const near = lane.offset - laneWidth / 2;
-    const far = lane.offset + laneWidth / 2;
-    context.globalAlpha = Math.min(1, load * 1.6) * lane.nick;
-    context.fillStyle = shaded(this.colour, lane.shade);
+  private paintLane(context: CanvasRenderingContext2D, lane: Lane, across: Point): void {
+    context.globalAlpha = lane.opacity;
+    context.strokeStyle = shaded(this.colour, lane.shade);
     context.beginPath();
-    context.moveTo(from.x + across.x * near, from.y + across.y * near);
-    context.lineTo(from.x + across.x * far, from.y + across.y * far);
-    context.lineTo(to.x + across.x * far, to.y + across.y * far);
-    context.lineTo(to.x + across.x * near, to.y + across.y * near);
-    context.closePath();
-    context.fill();
-    context.globalAlpha = 1;
+    let travelled = 0;
+    for (let i = 0; i < this.points.length; i++) {
+      const point = this.points[i];
+      if (i > 0) travelled += Math.hypot(point.x - this.points[i - 1].x, point.y - this.points[i - 1].y);
+      if (travelled > lane.reach) break;
+      const x = point.x + across.x * lane.offset;
+      const y = point.y + across.y * lane.offset;
+      if (i === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.stroke();
   }
 }

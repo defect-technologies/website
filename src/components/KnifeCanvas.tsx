@@ -4,7 +4,6 @@ import { useEffect, useRef, type PointerEvent } from "react";
 import { BRUSH_PAINTS } from "@/content/headlines";
 import { fitToDisplay, pointIn } from "@/paint/canvas";
 import { KnifeBrush } from "@/paint/knifeBrush";
-import type { Point } from "@/paint/knifePass";
 
 const KNIFE_WIDTH = 34;
 
@@ -25,7 +24,6 @@ function refit(canvas: HTMLCanvasElement) {
 export default function KnifeCanvas({ className = "" }: { className?: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const brush = useRef<KnifeBrush | null>(null);
-  const last = useRef<Point | null>(null);
 
   useEffect(() => {
     const surface = canvas.current;
@@ -41,21 +39,15 @@ export default function KnifeCanvas({ className = "" }: { className?: string }) 
     const surface = event.currentTarget;
     surface.setPointerCapture(event.pointerId);
     const scale = surface.width / surface.clientWidth;
-    brush.current = new KnifeBrush(surface, BRUSH_PAINTS, KNIFE_WIDTH, scale);
-    brush.current.begin();
-    last.current = pointIn(surface, event.clientX, event.clientY);
+    brush.current = new KnifeBrush(surface, BRUSH_PAINTS, KNIFE_WIDTH, scale, pointIn(surface, event.clientX, event.clientY));
   };
 
   const drag = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (!brush.current || !last.current) return;
-    const point = pointIn(event.currentTarget, event.clientX, event.clientY);
-    brush.current.drag(last.current, point);
-    last.current = point;
+    brush.current?.drag(pointIn(event.currentTarget, event.clientX, event.clientY));
   };
 
   const stop = () => {
     brush.current = null;
-    last.current = null;
   };
 
   return (

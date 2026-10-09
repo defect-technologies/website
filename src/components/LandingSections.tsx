@@ -1,6 +1,6 @@
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { CLOSING, SAVINGS, WEBSITES } from "@/content/headlines";
-import { DEFECT, FREELANCER, FREELANCER_SOURCE, YEARLY_PRICE, firstYear, priceRange, type PriceRow } from "@/content/pricing";
+import { DEFECT, FREELANCER, FREELANCER_SOURCE, firstYear, priceRange, type PriceRow } from "@/content/pricing";
 import { ButtonLink } from "./Button";
 import PaintedHeadline from "./PaintedHeadline";
 import ScrapeReveal from "./ScrapeReveal";
@@ -14,11 +14,8 @@ export function WebsitesSection() {
       <div className="flex flex-col gap-8">
         <PaintedHeadline as="h2" headline={WEBSITES} style={{ fontSize: "clamp(3rem, 9vw, 7rem)" }} />
         <p className={BODY}>
-          We rebuild small-business websites that have fallen out of date, using the words and photos you already have.
-        </p>
-        <p className={BODY}>
-          Then we keep yours current. When something changes, email us in plain English. It goes live the next business day,
-          without you logging in to anything.
+          We rebuild small-business websites. When something changes, email us and we&rsquo;ll have it up by the next business
+          day.
         </p>
       </div>
       <ScrapeReveal
@@ -26,7 +23,7 @@ export function WebsitesSection() {
         revealed="/paint/sketch-built.webp"
         width={1200}
         height={800}
-        alt="The homepage of Marigold Bakery, a made-up bakery: a large headline, an order button, and a picture of a loaf on yellow."
+        alt="An example homepage for a bakery."
       />
     </section>
   );
@@ -69,10 +66,7 @@ export function SavingsSection() {
           </tbody>
         </table>
       </div>
-      <p className={BODY}>
-        The {priceRange(DEFECT.monthly)} a month covers hosting, security, backups, and every small change you email us. A
-        whole year paid at once is {priceRange([YEARLY_PRICE, YEARLY_PRICE])}.
-      </p>
+      <p className={BODY}>Hosting and every change you send us are included.</p>
       <p className="text-ink-soft text-sm">
         Freelancer prices come from{" "}
         <a className="decoration-ink/30 hover:decoration-ink underline underline-offset-4" href={FREELANCER_SOURCE.href}>
