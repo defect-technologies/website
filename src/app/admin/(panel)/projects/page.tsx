@@ -4,6 +4,7 @@ import { inArray } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonClasses } from "@/components/Button";
+import Builds from "@/components/admin/Builds";
 import IntegrationPanel from "@/components/admin/IntegrationPanel";
 import PreviewList from "@/components/admin/PreviewList";
 import { DisconnectButton, MakeSenderButton, SyncPaymentsButton } from "@/components/admin/ProjectControls";
@@ -15,6 +16,9 @@ import { stripeSummary } from "@/server/integrations/stripe";
 import { recentSiteChanges, type SiteChange } from "@/server/integrations/siteChanges";
 import { previewDeployments } from "@/server/integrations/vercel";
 import { connectedMailboxes } from "@/server/mail/outbox";
+import { listBotKeys } from "@/server/bots/keys";
+import { buildsToday, jobsForAdmin } from "@/server/runner/jobs";
+import { activePause, runnerSettings } from "@/server/runner/settings";
 
 export const metadata: Metadata = { title: "Projects" };
 
@@ -152,7 +156,7 @@ const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "U
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ mailbox?: string }> }) {
   const { mailbox } = await searchParams;
   const database = await db();
-  const [inboxes, checks, previews, money, clients, withPreviews, siteChanges] = await Promise.all([
+  const [inboxes, checks, previews, money, clients, withPreviews, siteChanges, jobs, builder, builtToday, keys] = await Promise.all([
     connectedMailboxes(),
     healthChecks(),
     previewDeployments(),
@@ -160,6 +164,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     database.select().from(businesses).where(inArray(businesses.stage, ["paid", "live"])),
     database.select().from(businesses).where(inArray(businesses.stage, ["preview_built", "sent", "clicked", "replied", "lost"])),
     recentSiteChanges(),
+    jobsForAdmin(),
+    runnerSettings(),
+    buildsToday(),
+    listBotKeys(),
   ]);
   const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;
 
@@ -190,6 +198,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           </div>
           <Clients clients={clients} />
           <SyncPaymentsButton />
+        </Card>
+        <Card className="flex flex-col gap-4 p-5">
+          <SectionHeading>Builds</SectionHeading>
+          <Builds jobs={jobs} settings={builder} builtToday={builtToday} pausedUntil={activePause(builder)} runnerKey={keys.find((key) => key.bot === "runner" && !key.revokedAt)} />
         </Card>
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Previews</SectionHeading>

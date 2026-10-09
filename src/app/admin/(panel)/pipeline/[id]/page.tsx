@@ -2,16 +2,17 @@ import { ArrowLeft, ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import CopyCommand from "@/components/admin/CopyCommand";
 import LeadForm from "@/components/admin/LeadForm";
+import PreviewBuild from "@/components/admin/PreviewBuild";
 import PreviewThumb from "@/components/admin/PreviewThumb";
-import { ArmChip, Card, KeyValue, Notice, SectionHeading, StageChip, When } from "@/components/admin/ui";
+import { ArmChip, Card, KeyValue, SectionHeading, StageChip, When } from "@/components/admin/ui";
 import { activityFor } from "@/server/activity";
 import type { Activity, Business, Message } from "@/server/db/schema";
 import { buildCommand, checkoutLink } from "@/server/leads/buildCommand";
 import { businessById } from "@/server/leads/businesses";
 import { threadFor } from "@/server/mail/threads";
 import { previewLink } from "@/server/outreach/compose";
+import { activeJobFor } from "@/server/runner/jobs";
 import { outreachSettings } from "@/server/settings";
 
 type Params = { params: Promise<{ id: string }> };
@@ -55,19 +56,10 @@ function timeline(activity: Activity[], thread: Message[]): Event[] {
 export default async function LeadPage({ params }: Params) {
   const business = await businessById((await params).id);
   if (!business) notFound();
-  const [settings, activity, thread] = await Promise.all([outreachSettings(), activityFor(business.id), threadFor(business.id)]);
+  const [settings, activity, thread, job] = await Promise.all([outreachSettings(), activityFor(business.id), threadFor(business.id), activeJobFor(business.id)]);
   const events = timeline(activity, thread);
   const missingCheckout = Boolean(business.priceArm) && !checkoutLink(business, settings);
-  const build = (
-    <section className="flex flex-col gap-3">
-      <SectionHeading>Build the preview</SectionHeading>
-      <p className="text-ink-soft max-w-prose text-pretty">
-        Run this in core/engine. Once it deploys, the preview builder reports back here and the lead moves into the outreach queue.
-      </p>
-      {missingCheckout && <Notice tone="warn">Add the ${business.priceArm} Stripe payment link on the Template page, or the preview&apos;s button won&apos;t lead anywhere.</Notice>}
-      <CopyCommand command={buildCommand(business, settings)} />
-    </section>
-  );
+  const build = <PreviewBuild lead={business} job={job} command={buildCommand(business, settings)} missingCheckout={missingCheckout} />;
 
   return (
     <>

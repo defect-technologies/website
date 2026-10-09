@@ -1,5 +1,7 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
+import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
 import { STAGES, type Stage } from "../../lib/stages";
 
 export { STAGES, type Stage };
@@ -37,6 +39,8 @@ export const businesses = pgTable(
     previewUrl: text("preview_url").notNull().default(""),
     emailProblem: text("email_problem").notNull().default(""),
     previewBuiltAt: timestamp("preview_built_at", { withTimezone: true }),
+    previewRequestedAt: timestamp("preview_requested_at", { withTimezone: true }),
+    previewRequestedBy: text("preview_requested_by").notNull().default(""),
 
     firstSentAt: timestamp("first_sent_at", { withTimezone: true }),
     followUpSentAt: timestamp("follow_up_sent_at", { withTimezone: true }),
@@ -172,6 +176,7 @@ export const editorLinks = pgTable("editor_links", {
 
 export const botName = pgEnum("bot_name", BOTS);
 export const flagStatus = pgEnum("flag_status", FLAG_STATUSES);
+export const previewJobStatus = pgEnum("preview_job_status", PREVIEW_JOB_STATUSES);
 
 /** API keys for the Grok Bots. Only a SHA-256 hash of each key is stored; the key is shown once. */
 export const botKeys = pgTable(
@@ -228,6 +233,44 @@ export const flags = pgTable(
   (table) => [index("flags_status").on(table.status), index("flags_at").on(table.at)],
 );
 
+/**
+ * The preview build queue. A founder or the Outreach bot queues a lead; the
+ * preview runner claims one job at a time, builds it and reports back.
+ */
+export const previewJobs = pgTable(
+  "preview_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    status: previewJobStatus("status").notNull().default("queued"),
+    note: text("note").notNull().default(""),
+    requestedBy: text("requested_by").notNull(),
+    step: text("step").notNull().default(""),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    runnerName: text("runner_name").notNull().default(""),
+    previewUrl: text("preview_url").notNull().default(""),
+    verifyPassed: boolean("verify_passed"),
+    worstCls: real("worst_cls"),
+    criticVerdict: text("critic_verdict").notNull().default(""),
+    tokens: integer("tokens"),
+    minutes: real("minutes"),
+    apiEquivalentUsd: real("api_equivalent_usd"),
+    logTail: text("log_tail").notNull().default(""),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("preview_jobs_status").on(table.status, table.createdAt),
+    uniqueIndex("preview_jobs_one_active")
+      .on(table.businessId)
+      .where(sql`${table.status} in (${sql.raw(ACTIVE_JOB_STATUSES.map((status) => `'${status}'`).join(", "))})`),
+  ],
+);
+
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
@@ -235,3 +278,4 @@ export type Activity = typeof activity.$inferSelect;
 export type ClientSite = typeof clientSites.$inferSelect;
 export type BotKey = typeof botKeys.$inferSelect;
 export type Flag = typeof flags.$inferSelect;
+export type PreviewJob = typeof previewJobs.$inferSelect;

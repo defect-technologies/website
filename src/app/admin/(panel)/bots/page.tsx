@@ -38,13 +38,15 @@ function BotCard({ bot, keys }: { bot: Bot; keys: BotKey[] }) {
         <SectionHeading>{BOT_LABEL[bot]}</SectionHeading>
         <p className="text-ink-soft text-pretty">{BOT_JOB[bot]}</p>
       </div>
-      <ul className="flex flex-wrap gap-1.5" aria-label={`Stages ${BOT_LABEL[bot]} owns`}>
-        {BOT_STAGES[bot].map((stage) => (
-          <li key={stage}>
-            <StageChip stage={stage} />
-          </li>
-        ))}
-      </ul>
+      {BOT_STAGES[bot].length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label={`Stages ${BOT_LABEL[bot]} owns`}>
+          {BOT_STAGES[bot].map((stage) => (
+            <li key={stage}>
+              <StageChip stage={stage} />
+            </li>
+          ))}
+        </ul>
+      )}
       {keys.length > 0 && (
         <ul className="divide-ink/8 divide-y">
           {keys.map((botKey) => (
