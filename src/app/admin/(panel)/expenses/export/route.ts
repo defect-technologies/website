@@ -1,4 +1,4 @@
-import { founderName } from "@/lib/settleUp";
+import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
 import { allExpenses } from "@/server/expenses/expenses";
 
