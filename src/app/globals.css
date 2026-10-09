@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-void: #08080a;
   --color-paper: #f4f1ea;
-  --color-ink: #0b0b0d;
+  --color-paper-shade: #e9e4d8;
+  --color-ink: #17161a;
+  --color-ink-soft: #4b4852;
+  --color-vermilion: #e2421b;
 
   --font-display: var(--font-big-shoulders), "Arial Narrow", system-ui, sans-serif;
   --font-script: var(--font-dr-sugiyama), "Apple Chancery", cursive;
   --font-body: var(--font-geist), system-ui, sans-serif;
+
+  --shadow-lifted: 0 1px 2px rgb(23 22 26 / 0.08), 0 12px 32px -8px rgb(23 22 26 / 0.22);
+  --ease-knife: cubic-bezier(0.2, 0, 0, 1);
 
   --animate-trickle: trickle 2.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 
@@ -23,21 +28,39 @@
 
 :root {
   --line-size: clamp(2rem, 5.4vw, 4.6rem);
+  /* A palette knife, tip at the hotspot. */
+  --cursor-knife: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M3 29 L5 20 Q6 17 9 16 L15 13 L17 15 L14 21 Q13 24 10 25 Z' fill='%23d9d6cf' stroke='%2317161a' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M16 14 L20 10' stroke='%2317161a' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M20 10 L28 3' stroke='%23e2421b' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E")
+      3 29,
+    crosshair;
 }
 
 @media (width < 40rem) {
   :root {
-    --line-size: clamp(1.25rem, 5.6vw, 2.2rem);
+    --line-size: clamp(1.6rem, 7.2vw, 2.4rem);
   }
 }
 
 html {
-  background: var(--color-void);
+  background: var(--color-paper);
 }
 
 /* The family comes from the font-body utility on <body>; a raw var() here
    does not resolve against the theme token. */
 body {
-  background: var(--color-void);
-  color: #f4f1ea;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  overflow-x: clip;
+}
+
+/* Painted text shows its ink until scripts can lay the painting over it. */
+.painted-text {
+  color: var(--ink);
+}
+
+.js .painted-text {
+  color: transparent;
+}
+
+@utility cursor-knife {
+  cursor: var(--cursor-knife);
 }

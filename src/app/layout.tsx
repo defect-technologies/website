@@ -20,15 +20,21 @@ const body = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "defect.tech",
-  description: "A design studio.",
+  title: { default: "defect.tech", template: "%s · defect.tech" },
+  description: "We rebuild small-business websites and keep them current for $59 a month.",
 };
+
+/** Lets CSS hide the plain text under each painting only when scripts can lay the painting down. */
+const MARK_SCRIPTS_RUNNING = "document.documentElement.classList.add('js')";
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: MARK_SCRIPTS_RUNNING }} />
+      </head>
       <body
         className={`${display.variable} ${script.variable} ${body.variable} font-body antialiased`}
       >

@@ -1,9 +1,17 @@
-import LitConversation from "@/components/LitConversation";
+import { Closing, SavingsSection, WebsitesSection } from "@/components/LandingSections";
+import PaintedStage from "@/components/PaintedStage";
+import SiteNav from "@/components/SiteNav";
 
 export default function Home() {
   return (
-    <main>
-      <LitConversation />
-    </main>
+    <>
+      <SiteNav page="home" />
+      <main>
+        <PaintedStage />
+        <WebsitesSection />
+        <SavingsSection />
+        <Closing />
+      </main>
+    </>
   );
 }
