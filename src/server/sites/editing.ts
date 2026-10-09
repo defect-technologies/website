@@ -3,6 +3,7 @@ import { applyEditable, describeChanges, editableFrom } from "@/lib/siteContent"
 import { checkEdit } from "@/lib/siteContentRules";
 import { record } from "../activity";
 import type { Owner } from "../auth/ownerSession";
+import type { Founder } from "../auth/session";
 import { databaseSiteStore } from "./databaseStore";
 import type { SiteStore, StoredSite } from "./store";
 
@@ -46,4 +47,20 @@ export async function restoreOwnerVersion(owner: Owner, slug: string, version: n
   if (!saved.ok) return { ok: false, problems: [STALE] };
   await record(owner.email, "restored their site", { businessId: site.businessId, detail: `${site.businessName}: version ${version} is live again as version ${saved.version}`, priority: "fyi" });
   return { ok: true, version: saved.version, message: `Version ${version} is back. Your site is updating now.` };
+}
+
+/**
+ * A founder rolling a site back to an earlier version, whole file, the way
+ * reverting content.json to an earlier commit would. Owners' restores bring
+ * back only their own fields; this brings back everything.
+ */
+export async function rollBackSite(founder: Founder, slug: string, version: number): Promise<EditOutcome> {
+  const site = await siteStore.site(slug);
+  if (!site) return { ok: false, problems: ["That site doesn't exist."] };
+  const content = await siteStore.versionContent(slug, version);
+  if (!content) return { ok: false, problems: ["That version doesn't exist."] };
+  const saved = await siteStore.save({ slug, baseVersion: site.version, content, summary: `Rolled back to version ${version}`, savedBy: founder.email });
+  if (!saved.ok) return { ok: false, problems: ["The site changed while you were looking. Reload and try again."] };
+  await record(founder.email, "rolled back a site", { businessId: site.businessId, detail: `${site.businessName}: version ${version} is live again as version ${saved.version}` });
+  return { ok: true, version: saved.version, message: `Version ${version} is live again.` };
 }

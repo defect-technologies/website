@@ -13,10 +13,9 @@ type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ restor
 
 export const metadata: Metadata = { title: "Earlier versions" };
 
+/** One history holds everyone's changes; anything the owner didn't save came from our team. */
 function who(savedBy: string, ownerEmail: string) {
-  if (savedBy === ownerEmail) return "You";
-  if (savedBy === "sample") return "Defect Technologies";
-  return savedBy.includes("@") ? savedBy : "Defect Technologies";
+  return savedBy === ownerEmail ? "You" : "Defect Technologies";
 }
 
 function VersionRow({ entry, slug, isCurrent, ownerEmail }: { entry: VersionSummary; slug: string; isCurrent: boolean; ownerEmail: string }) {
@@ -55,7 +54,7 @@ export default async function HistoryPage({ params, searchParams }: Props) {
       {query.restored && <Notice tone="good">Version {query.restored} is back on your site. Restoring made a new version, so you can undo it the same way.</Notice>}
       {query.restore === "failed" && <Notice tone="bad">That version couldn&apos;t be restored. Reload the page and try again, or email hello@defect.tech.</Notice>}
       <p className="text-ink-soft text-pretty">
-        Restoring brings back the words, hours, contact details, and services from that version. Photos and design stay as they are now.
+        This list has every change to your site, yours and ours. Restoring brings back the words, hours, contact details, and services from that version. Photos and design stay as they are now.
       </p>
       <Card>
         <ol className="divide-ink/8 flex flex-col divide-y">

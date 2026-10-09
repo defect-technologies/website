@@ -168,7 +168,6 @@ export function ContactFields({ draft, update }: Props) {
         <TextField id="email" label="Email" type="email" autoComplete="off" value={draft.email} maxLength={LIMITS.email} onChange={(event) => update({ email: event.target.value })} />
       </div>
       <TextField id="booking-url" label="Booking or ordering link" type="url" placeholder="https://" value={draft.bookingUrl} maxLength={LIMITS.bookingUrl} onChange={(event) => update({ bookingUrl: event.target.value })} hint="Leave it blank and your main button calls your phone instead." />
-      <LimitedText id="booking-label" label="Button wording" value={draft.bookingLabel} max={LIMITS.bookingLabel} onChange={(bookingLabel) => update({ bookingLabel })} placeholder="Book online" />
     </FormSection>
   );
 }

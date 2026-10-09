@@ -69,7 +69,6 @@ export const EditableContentRules = z
     phone,
     email,
     bookingUrl,
-    bookingLabel: plainText("The booking button", LIMITS.bookingLabel),
     sectionOrder,
   })
   .strict() satisfies z.ZodType<EditableContent>;

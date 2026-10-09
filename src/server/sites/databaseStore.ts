@@ -32,6 +32,11 @@ async function siteRow(slug: string) {
  * nobody else did in between.
  */
 export const databaseSiteStore: SiteStore = {
+  async allSites() {
+    const rows = await (await db()).select().from(sites).orderBy(sites.slug);
+    return rows.map(toStored);
+  },
+
   async sitesFor(ownerEmail) {
     const rows = await (await db()).select().from(sites).where(eq(sites.ownerEmail, ownerEmail.toLowerCase())).orderBy(sites.slug);
     return rows.map(toStored);

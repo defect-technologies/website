@@ -28,14 +28,19 @@ export type SaveRequest = {
 export type SaveResult = { ok: true; version: number } | { ok: false; reason: "not-found" | "stale" };
 
 /**
- * Where client sites' content.json lives. The editor only talks to this.
+ * Where client sites' content.json lives, and its one history: owners' edits,
+ * our team's edits, and restores all land here as versions, the way every
+ * change becomes a commit in the client-sites repository. Nothing writes a
+ * site any other way.
  *
- * Today: Postgres (DatabaseSiteStore). Later: the private client-sites Git
+ * Today: Postgres (databaseSiteStore), a stand-in that departs from the spec,
+ * which says "no database". The target: the private client-sites Git
  * repository, where save() becomes a commit to <slug>/content.json through
  * a GitHub App, versions() reads that file's commit history, and the
  * owner-to-site mapping is a file in the same repository.
  */
 export interface SiteStore {
+  allSites(): Promise<StoredSite[]>;
   sitesFor(ownerEmail: string): Promise<StoredSite[]>;
   site(slug: string): Promise<StoredSite | null>;
   save(request: SaveRequest): Promise<SaveResult>;

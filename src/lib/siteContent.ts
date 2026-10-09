@@ -57,7 +57,6 @@ export type EditableContent = {
   phone: string;
   email: string;
   bookingUrl: string;
-  bookingLabel: string;
   sectionOrder: Section[];
 };
 
@@ -75,7 +74,6 @@ export const LIMITS = {
   phone: 30,
   email: 120,
   bookingUrl: 300,
-  bookingLabel: 24,
 } as const;
 
 export function sectionOrderOf(content: SiteContent): Section[] {
@@ -95,7 +93,6 @@ export function editableFrom(content: SiteContent): EditableContent {
     phone: content.contact.phone ?? "",
     email: content.contact.email ?? "",
     bookingUrl: content.contact.booking_url ?? "",
-    bookingLabel: content.contact.booking_label ?? "",
     sectionOrder: sectionOrderOf(content),
   };
 }
@@ -125,7 +122,7 @@ export function applyEditable(content: SiteContent, edit: EditableContent): Site
     services: withServices(content.services, edit.services.map(dropEmpty)),
     hours: edit.hours.length > 0 ? edit.hours : null,
     hours_note: edit.hoursNote,
-    contact: { ...content.contact, phone: edit.phone, email: edit.email, booking_url: edit.bookingUrl, booking_label: edit.bookingLabel },
+    contact: { ...content.contact, phone: edit.phone, email: edit.email, booking_url: edit.bookingUrl },
     layout: { ...content.layout, section_order: edit.sectionOrder },
   };
 }
@@ -142,7 +139,6 @@ export function describeChanges(before: EditableContent, after: EditableContent)
     phone: "phone",
     email: "email",
     bookingUrl: "booking link",
-    bookingLabel: "booking button",
     sectionOrder: "section order",
   };
   return (Object.keys(labels) as (keyof EditableContent)[])
