@@ -2,17 +2,20 @@ import "server-only";
 import { and, asc, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { canMove, type Bot } from "@/lib/bots";
+import type { OutreachSettings } from "@/lib/emailTemplate";
 import { STAGES, type Stage } from "@/lib/stages";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { activity, businesses, messages, type Business, type BotKey } from "../db/schema";
 import { businessById, optOut, updateBusiness } from "../leads/businesses";
+import { checkoutLink } from "../leads/buildCommand";
+import { outreachSettings } from "../settings";
 import { actorOf, BotError } from "./http";
 
 const NOTE_ACTIONS = ["note", "handoff note"];
 
 /** What a bot sees of a lead. Stripe IDs and internal codes stay out. */
-function leadView(lead: Business) {
+function leadView(lead: Business, settings: OutreachSettings) {
   return {
     id: lead.id,
     slug: lead.slug,
@@ -25,6 +28,7 @@ function leadView(lead: Business) {
     priceArm: lead.priceArm,
     plan: lead.plan,
     previewUrl: lead.previewUrl,
+    checkoutUrl: checkoutLink(lead, settings),
     siteUrl: lead.siteUrl,
     problem: lead.emailProblem || lead.problemSummary,
     note: lead.note,
@@ -51,7 +55,9 @@ function visibleStages(key: BotKey, stage?: Stage): Stage[] {
 function searchClause({ email, q }: z.infer<typeof LeadQuery>) {
   const byEmail = email ? or(eq(businesses.email, email), eq(businesses.ownerEmail, email)) : undefined;
   const like = q ? `%${q}%` : "";
-  const byText = q ? or(ilike(businesses.businessName, like), ilike(businesses.website, like), ilike(businesses.slug, like)) : undefined;
+  const byText = q
+    ? or(ilike(businesses.email, like), ilike(businesses.ownerEmail, like), ilike(businesses.businessName, like), ilike(businesses.website, like), ilike(businesses.slug, like))
+    : undefined;
   return and(byEmail, byText);
 }
 
@@ -62,7 +68,8 @@ export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
     .where(and(inArray(businesses.stage, visibleStages(key, query.stage)), searchClause(query)))
     .orderBy(desc(businesses.updatedAt))
     .limit(100);
-  return { leads: rows.map(leadView) };
+  const settings = await outreachSettings();
+  return { leads: rows.map((row) => leadView(row, settings)) };
 }
 
 /** The lead, if it exists and sits in one of this bot's stages. */
@@ -76,16 +83,17 @@ async function ownedLead(key: BotKey, id: string): Promise<Business> {
 export async function leadDetail(key: BotKey, id: string) {
   const lead = await ownedLead(key, id);
   const database = await db();
-  const [thread, history] = await Promise.all([
+  const [thread, history, settings] = await Promise.all([
     database
       .select({ direction: messages.direction, from: messages.fromAddress, to: messages.toAddress, subject: messages.subject, body: messages.body, at: messages.at })
       .from(messages)
       .where(eq(messages.businessId, id))
       .orderBy(asc(messages.at)),
     database.select().from(activity).where(eq(activity.businessId, id)).orderBy(desc(activity.at)).limit(50),
+    outreachSettings(),
   ]);
   const notes = history.filter((entry) => NOTE_ACTIONS.includes(entry.action)).map(({ at, actor, action, detail }) => ({ at, by: actor, handoff: action === "handoff note", text: detail }));
-  return { lead: leadView(lead), messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
+  return { lead: leadView(lead, settings), messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
 }
 
 export const NoteBody = z.object({ text: z.string().trim().min(1).max(4000), handoff: z.boolean().default(false) });

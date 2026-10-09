@@ -20,7 +20,7 @@ export const BOT_JOB: Record<Bot, string> = {
 
 /** The lead stages each bot owns. The admin's bot API refuses everything else. */
 export const BOT_STAGES: Record<Bot, Stage[]> = {
-  outreach: ["new", "preview_built", "sent", "clicked", "replied", "lost", "opted_out"],
+  outreach: ["new", "preview_built", "sent", "clicked", "replied", "lost"],
   onboarding: ["paid"],
   client_care: ["live"],
   overseer: ["new", "preview_built", "sent", "clicked", "replied", "paid", "live", "lost", "opted_out"],
