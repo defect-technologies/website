@@ -73,7 +73,7 @@ export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
 }
 
 /** The lead, if it exists and sits in one of this bot's stages. */
-async function ownedLead(key: BotKey, id: string): Promise<Business> {
+export async function ownedLead(key: BotKey, id: string): Promise<Business> {
   const lead = await businessById(id);
   if (!lead) throw new BotError(404, "No lead has that ID.");
   if (!key.stages.includes(lead.stage)) throw new BotError(403, `This lead is at stage ${lead.stage}, which belongs to another bot. Leave it alone.`);

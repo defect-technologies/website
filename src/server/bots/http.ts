@@ -39,21 +39,33 @@ async function logCall(request: Request, key: BotKey | null, status: number) {
   await (await db()).insert(botCalls).values({ keyId: key?.id ?? null, bot: key?.bot ?? null, method: request.method, path, status });
 }
 
-/** Wraps a bot API route: checks the key, runs the handler, logs the call. */
-export function botRoute(handler: Handler) {
+async function respond(handler: Handler, context: BotContext): Promise<Response> {
+  try {
+    const result = await handler(context);
+    return result instanceof Response ? result : NextResponse.json(result);
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+/** Wraps a bot API route: checks the key, runs the handler, logs the call. A handler may return its own Response. */
+export function botRoute(handler: Handler, missingKeyHint = "Authorization: Bearer <DEFECT_BOT_KEY>") {
   return async (request: Request, context: RouteContext) => {
     const key = await keyFromRequest(request);
     if (!key) {
       await logCall(request, null, 401);
-      return NextResponse.json({ error: "Missing, wrong or revoked key. Send it as Authorization: Bearer <DEFECT_BOT_KEY>." }, { status: 401 });
+      return NextResponse.json({ error: `Missing, wrong or revoked key. Send it as ${missingKeyHint}.` }, { status: 401 });
     }
-    let response: NextResponse;
-    try {
-      response = NextResponse.json(await handler({ key, request, params: (await context.params) ?? {} }));
-    } catch (error) {
-      response = failure(error);
-    }
+    const response = await respond(handler, { key, request, params: (await context.params) ?? {} });
     await logCall(request, key, response.status);
     return response;
   };
+}
+
+/** A route only the preview runner's key may call. */
+export function runnerRoute(handler: Handler) {
+  return botRoute(async (context) => {
+    if (context.key.bot !== "runner") throw new BotError(403, "Only the preview runner's key can use /api/runner.");
+    return handler(context);
+  }, "Authorization: Bearer <DEFECT_RUNNER_KEY>");
 }

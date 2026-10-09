@@ -8,6 +8,7 @@ import { requireFounder } from "@/server/auth/session";
 import { STAGES } from "@/server/db/schema";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
+import { requestPreview } from "@/server/runner/jobs";
 
 export type FormResult = { ok: boolean; message: string };
 
@@ -52,4 +53,15 @@ export async function saveLeadAction(id: string, _previous: FormResult, form: Fo
   await record(founder.email, "edited lead", { businessId: id });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved." };
+}
+
+/** Queues a build on the preview runner, optionally with a founder's note for a rebuild. */
+export async function requestPreviewAction(form: FormData) {
+  const founder = await requireFounder();
+  const lead = await businessById(String(form.get("id") ?? ""));
+  if (!lead) return;
+  const note = String(form.get("note") ?? "").trim().slice(0, 2000);
+  await requestPreview(lead, founder.email, note);
+  revalidatePath(`/admin/pipeline/${lead.id}`);
+  revalidatePath("/admin/projects");
 }

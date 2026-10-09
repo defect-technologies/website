@@ -1,7 +1,12 @@
+import { RUNNER_KEY_ENV } from "./previewJobs";
 import type { Stage } from "./stages";
 
-/** The four Grok Bots from 02-system/oversight.md. */
-export const BOTS = ["outreach", "onboarding", "client_care", "overseer"] as const;
+/**
+ * The four Grok Bots from 02-system/oversight.md, plus the preview runner on the
+ * always-on Ubuntu machine (02-system/preview-runner.md), which owns no leads and
+ * only talks to /api/runner.
+ */
+export const BOTS = ["outreach", "onboarding", "client_care", "overseer", "runner"] as const;
 export type Bot = (typeof BOTS)[number];
 
 export const BOT_LABEL: Record<Bot, string> = {
@@ -9,6 +14,7 @@ export const BOT_LABEL: Record<Bot, string> = {
   onboarding: "Onboarding",
   client_care: "Client care",
   overseer: "Overseer",
+  runner: "Preview runner",
 };
 
 export const BOT_JOB: Record<Bot, string> = {
@@ -16,7 +22,11 @@ export const BOT_JOB: Record<Bot, string> = {
   onboarding: "Takes a paying client from checkout to a live site, then hands them to Client care.",
   client_care: "Handles every live client's email: changes, questions, billing, reports and cancellations.",
   overseer: "Reviews the other bots, flags what's uncertain and sends the evening digest.",
+  runner: "Builds previews for leads in the build queue on the always-on machine, then reports the link and its usage.",
 };
+
+/** Said to the Outreach bot only once a founder lets it request previews. */
+export const OUTREACH_PREVIEW_JOB = "Answers prospects, sends interested owners their checkout links, and requests previews for leads worth one.";
 
 /** The lead stages each bot owns. The admin's bot API refuses everything else. */
 export const BOT_STAGES: Record<Bot, Stage[]> = {
@@ -24,6 +34,7 @@ export const BOT_STAGES: Record<Bot, Stage[]> = {
   onboarding: ["paid"],
   client_care: ["live"],
   overseer: ["new", "preview_built", "sent", "clicked", "replied", "paid", "live", "lost", "opted_out"],
+  runner: [],
 };
 
 /** Stage moves each bot may make. Paid comes from Stripe, never from a bot. */
@@ -38,6 +49,7 @@ export const BOT_TRANSITIONS: Record<Bot, Partial<Record<Stage, Stage[]>>> = {
   onboarding: { paid: ["live"] },
   client_care: { live: ["lost"] },
   overseer: {},
+  runner: {},
 };
 
 export function canMove(bot: Bot, from: Stage, to: Stage): boolean {
@@ -52,3 +64,9 @@ export type FlagStatus = (typeof FLAG_STATUSES)[number];
 
 /** Grok Bot stores each bot's key as a Secret under this name. */
 export const BOT_KEY_ENV = "DEFECT_BOT_KEY";
+
+/** Where each key goes once it's created: a Grok Bot Secret, or the runner machine's env file. */
+export function keyHome(bot: Bot): { env: string; where: string } {
+  if (bot === "runner") return { env: RUNNER_KEY_ENV, where: "/etc/defect-runner.env on the runner machine" };
+  return { env: BOT_KEY_ENV, where: "the bot's Secrets in Grok Bot" };
+}
