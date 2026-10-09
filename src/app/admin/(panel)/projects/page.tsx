@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonClasses } from "@/components/Button";
 import IntegrationPanel from "@/components/admin/IntegrationPanel";
+import PreviewList from "@/components/admin/PreviewList";
 import { DisconnectButton, MakeSenderButton, SyncPaymentsButton } from "@/components/admin/ProjectControls";
 import { Card, Notice, PageHeader, SectionHeading, StageChip, When } from "@/components/admin/ui";
 import { flaggedActivity } from "@/server/activity";
@@ -12,7 +13,7 @@ import { db } from "@/server/db/client";
 import { businesses, type Activity, type Business, type Mailbox } from "@/server/db/schema";
 import { healthChecks, type CheckStatus, type HealthCheck } from "@/server/integrations/healthchecks";
 import { stripeSummary } from "@/server/integrations/stripe";
-import { PREVIEW_LIFETIME_DAYS, previewDeployments, type PreviewDeployment } from "@/server/integrations/vercel";
+import { previewDeployments } from "@/server/integrations/vercel";
 import { connectedMailboxes } from "@/server/mail/outbox";
 
 export const metadata: Metadata = { title: "Projects" };
@@ -117,40 +118,6 @@ function Clients({ clients }: { clients: Business[] }) {
   );
 }
 
-function daysLeft(created: Date) {
-  return Math.max(0, PREVIEW_LIFETIME_DAYS - Math.floor((Date.now() - created.getTime()) / 86_400_000));
-}
-
-function Previews({ previews, owners }: { previews: PreviewDeployment[]; owners: Map<string, Business> }) {
-  if (previews.length === 0) return <p className="text-ink-soft text-sm">No previews deployed.</p>;
-  return (
-    <ul className="flex flex-col gap-2">
-      {previews
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-        .map((preview) => {
-          const owner = owners.get(preview.url);
-          const left = daysLeft(preview.createdAt);
-          return (
-            <li key={preview.id} className="flex items-center gap-3">
-              <span className="min-w-0 flex-1 truncate">
-                {owner ? (
-                  <Link href={`/admin/pipeline/${owner.id}`} className="font-medium hover:underline">
-                    {owner.businessName}
-                  </Link>
-                ) : (
-                  <span className="text-ink-soft font-mono text-sm">{preview.url.replace("https://", "")}</span>
-                )}
-              </span>
-              <span className={`text-sm tabular-nums ${left <= 5 ? "text-warn font-medium" : "text-ink-faint"}`}>
-                {left === 0 ? "Deleted at the next cleanup" : `${left} days left`}
-              </span>
-            </li>
-          );
-        })}
-    </ul>
-  );
-}
-
 function OwnerEdits({ edits }: { edits: Activity[] }) {
   if (edits.length === 0) return <p className="text-ink-soft text-sm">No owner has used the editor yet. Their saves go live right away and show up here.</p>;
   return (
@@ -214,7 +181,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </Card>
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Previews</SectionHeading>
-          <IntegrationPanel result={previews}>{(data) => <Previews previews={data} owners={owners} />}</IntegrationPanel>
+          <IntegrationPanel result={previews}>{(data) => <PreviewList previews={data} owners={owners} />}</IntegrationPanel>
         </Card>
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Edits by owners</SectionHeading>
