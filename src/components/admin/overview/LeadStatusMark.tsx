@@ -1,5 +1,5 @@
 import type { Icon } from "@phosphor-icons/react";
-import { ChatsCircle, CircleDashed, Clock, HourglassMedium, PaperPlaneTilt, WarningCircle, Wrench, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { ChatsCircle, CircleDashed, Clock, Eye, HourglassMedium, PaperPlaneTilt, WarningCircle, Wrench, XCircle } from "@phosphor-icons/react/dist/ssr";
 import { LEAD_STATUS_LABEL, type LeadStatus } from "@/lib/leadStatus";
 import WorkingDot from "./WorkingDot";
 
@@ -7,6 +7,7 @@ const MARK: Record<Exclude<LeadStatus, "building">, { icon: Icon; className: str
   not_queued: { icon: CircleDashed, className: "text-ink-faint" },
   queued: { icon: HourglassMedium, className: "text-ink-soft" },
   build_failed: { icon: WarningCircle, className: "text-bad" },
+  needs_a_look: { icon: Eye, className: "text-warn" },
   ready_to_send: { icon: PaperPlaneTilt, className: "text-ink" },
   waiting: { icon: Clock, className: "text-ink-soft" },
   negotiating: { icon: ChatsCircle, className: "text-ink" },

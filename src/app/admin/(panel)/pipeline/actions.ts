@@ -75,3 +75,13 @@ export async function launchSiteAction(form: FormData) {
   revalidatePath(`/admin/pipeline/${lead.id}`);
   revalidatePath("/admin/sites");
 }
+
+/** A founder has looked at a preview the design critic held back, and it's fine to send. */
+export async function approvePreviewAction(form: FormData) {
+  const founder = await requireFounder();
+  const lead = await businessById(String(form.get("id") ?? ""));
+  if (!lead || lead.stage !== "new" || !lead.previewUrl) return;
+  await updateBusiness(lead.id, { stage: "preview_built" });
+  await record(founder.email, "approved the preview", { businessId: lead.id });
+  revalidatePath("/admin", "layout");
+}

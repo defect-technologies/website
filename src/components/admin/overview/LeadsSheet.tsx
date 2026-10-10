@@ -61,6 +61,12 @@ const NOW: Record<LeadStatus, (row: LeadRow) => ReactNode> = {
       {job?.criticVerdict || "The build failed"} <When date={job?.finishedAt ?? null} />
     </>
   ),
+  needs_a_look: ({ lead, job }) => (
+    <span className="flex flex-wrap gap-x-3">
+      <span>{job?.criticVerdict || "The design critic asked for changes"}</span>
+      <OpenPreview url={lead.previewUrl} />
+    </span>
+  ),
   ready_to_send: ({ lead }) => (
     <span className="flex flex-wrap gap-x-3">
       <span>
