@@ -134,10 +134,29 @@ function results(body: Done) {
   };
 }
 
+/** The design critic's last word was "revise": the preview goes up, but a founder looks before the owner does. */
+const criticWantsRevision = (verdict: string | undefined) => /\brevise\b/i.test(verdict ?? "");
+
+async function holdForReview(lead: Business, previewUrl: string, verdict: string) {
+  await (await db()).insert(flags).values({
+    bot: "runner" satisfies Bot,
+    businessId: lead.id,
+    priority: "review",
+    whatHappened: `The design critic's verdict on ${lead.businessName}'s new preview is "${verdict}".`,
+    whatBotDid: "Deployed the preview and kept the lead out of the outreach queue.",
+    why: "The owner sees this preview in our first email, so a founder looks at it first. If it's fine, press Ready to send on the lead's page. If not, use Rebuild with a note.",
+    link: previewUrl,
+  });
+  await record(ACTOR, "held a preview for review", { businessId: lead.id, detail: verdict });
+}
+
 async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (!body.previewUrl) throw new BotError(400, "A finished build needs previewUrl, the deployed preview's https address.");
   await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
-  await updateBusiness(lead.id, { previewUrl: body.previewUrl, previewBuiltAt: new Date(), ...(lead.stage === "new" ? { stage: "preview_built" as const } : {}) });
+  const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
+  const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
+  await updateBusiness(lead.id, { previewUrl: body.previewUrl, previewBuiltAt: new Date(), ...ready });
+  if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   await record(ACTOR, "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
   // A launched site's changes go live by launching again: the same project, redeployed.

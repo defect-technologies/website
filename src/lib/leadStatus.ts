@@ -7,7 +7,7 @@ import type { Stage } from "./stages";
  * lead might be untouched, queued, building, or stuck on a failed build, which
  * only its latest preview job knows. Live leads are clients and have no status.
  */
-export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "ready_to_send", "waiting", "negotiating", "setting_up", "closed"] as const;
+export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "needs_a_look", "ready_to_send", "waiting", "negotiating", "setting_up", "closed"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
@@ -15,6 +15,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   queued: "Queued",
   building: "Building",
   build_failed: "Build failed",
+  needs_a_look: "Built, needs a look",
   ready_to_send: "Built, not emailed",
   waiting: "Waiting for reply",
   negotiating: "Negotiating",
@@ -30,6 +31,7 @@ export const LEAD_STATUS_OWNER: Record<LeadStatus, Owner> = {
   queued: "runner",
   building: "runner",
   build_failed: "founders",
+  needs_a_look: "founders",
   ready_to_send: "founders",
   waiting: "outreach",
   negotiating: "outreach",
@@ -53,7 +55,8 @@ const BY_JOB: Record<PreviewJobStatus, LeadStatus> = {
   running: "building",
   waiting_for_usage: "queued",
   failed: "build_failed",
-  done: "not_queued",
+  // A new lead whose build is done was held back: the design critic asked for a revision.
+  done: "needs_a_look",
 };
 
 /** A new lead's status comes from its latest build; every later stage speaks for itself. */
