@@ -35,7 +35,7 @@ export type DomainFacts = {
   nameservers: string[];
 };
 
-function domainOf(website: string) {
+export function domainOf(website: string) {
   try {
     return new URL(website.includes("://") ? website : `https://${website}`).hostname.replace(/^www\./, "");
   } catch {

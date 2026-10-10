@@ -4,13 +4,17 @@ import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
 import { db } from "../db/client";
+import { MAX_FAILED_BUILDS, type JobKind } from "@/lib/previewJobs";
 import { flags, type BotKey, type Business, type PreviewJob } from "../db/schema";
+import { env } from "../env";
+import { domainOf } from "../integrations/domain";
+import { addClientSite } from "../sites/clientSites";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { checkoutLink } from "../leads/buildCommand";
 import { updateBusiness } from "../leads/businesses";
 import { outreachSettings } from "../settings";
-import { autoQueueNext, buildsToday, claimNextJob, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
+import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
 
 const ACTOR = "bot:runner";
@@ -22,7 +26,8 @@ function idle(reason: string) {
   return new NextResponse(null, { status: 204, headers: { "X-Runner-Reason": reason } });
 }
 
-async function whyIdle(): Promise<string | null> {
+/** Why the runner may not build previews right now, or null if it may. */
+async function whyNoBuilds(): Promise<string | null> {
   const current = await runnerSettings();
   const pause = activePause(current);
   if (pause) return `Paused until ${pause.toISOString()} after Claude's usage limit.`;
@@ -31,27 +36,51 @@ async function whyIdle(): Promise<string | null> {
   return null;
 }
 
+/**
+ * The kinds of work this runner may take now. A launch uses no Claude and a paying client is
+ * waiting, so it goes ahead through a pause or the daily cap. Runners from before launches
+ * existed don't send can=launch, so they're never handed one.
+ */
+function kindsAllowed(search: URLSearchParams, noBuilds: string | null): JobKind[] {
+  const launches: JobKind[] = search.getAll("can").includes("launch") ? ["launch"] : [];
+  return noBuilds ? launches : [...launches, "preview"];
+}
+
+/**
+ * A launch carries the editor secret the live site signs owner sessions with, so the runner
+ * needn't store it. It stays in the runner's memory for that one launch.
+ */
+function launchPayload(job: PreviewJob, lead: Business) {
+  if (job.kind !== "launch") return {};
+  const editorSecret = env.editorSecret();
+  if (!editorSecret) throw new BotError(503, "EDITOR_SECRET isn't set on the admin, so a site can't be launched yet.");
+  return { launch: { domain: domainOf(lead.website) ?? "", editorSecret } };
+}
+
 function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string) {
   return {
-    job: { id: job.id, attempt: job.attempts, note: job.note },
+    job: { id: job.id, attempt: job.attempts, note: job.note, kind: job.kind },
     lead: { id: lead.id, slug: lead.slug, businessName: lead.businessName, website: lead.website, priceArm: lead.priceArm ?? 59, checkoutUrl },
+    ...launchPayload(job, lead),
   };
 }
 
-async function claimAutoQueued(runnerName: string): Promise<PreviewJob | null> {
+async function claimAutoQueued(runnerName: string, kinds: JobKind[]): Promise<PreviewJob | null> {
   if (!(await runnerSettings()).autoQueue) return null;
-  return (await autoQueueNext()) ? claimNextJob(runnerName) : null;
+  return (await autoQueueNext()) ? claimNextJob(runnerName, kinds) : null;
 }
 
 /** GET /api/runner/next: claims one queued build, or 204 with why there's nothing to do. */
 export async function claimNext(key: BotKey, request: Request) {
-  const reason = await whyIdle();
-  if (reason) return idle(reason);
-  const runnerName = new URL(request.url).searchParams.get("runner")?.slice(0, 60) || key.name;
-  const job = (await claimNextJob(runnerName)) ?? (await claimAutoQueued(runnerName));
-  if (!job) return idle("Nothing queued, and no new lead with an email is waiting for a preview.");
+  const search = new URL(request.url).searchParams;
+  const noBuilds = await whyNoBuilds();
+  const kinds = kindsAllowed(search, noBuilds);
+  if (kinds.length === 0) return idle(noBuilds ?? "Nothing to do.");
+  const runnerName = search.get("runner")?.slice(0, 60) || key.name;
+  const job = (await claimNextJob(runnerName, kinds)) ?? (noBuilds ? null : await claimAutoQueued(runnerName, kinds));
+  if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
-  await record(ACTOR, "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
+  await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
   return jobPayload(job, lead, checkoutLink(lead, await outreachSettings()));
 }
 
@@ -82,6 +111,13 @@ export const DoneBody = z.object({
   apiEquivalentUsd: z.number().min(0).optional(),
   logTail: z.string().max(LOG_TAIL_LIMIT * 4).optional(),
   resumeAt: z.iso.datetime({ offset: true }).optional(),
+  launch: z
+    .object({
+      projectId: z.string().trim().min(1).max(100),
+      liveUrl: z.url({ protocol: /^https$/ }),
+      records: z.array(z.object({ host: z.string().max(253), type: z.enum(["A", "CNAME"]), name: z.string().max(253), value: z.string().max(253) })).max(4),
+    })
+    .optional(),
 });
 type Done = z.infer<typeof DoneBody>;
 
@@ -104,23 +140,61 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   await updateBusiness(lead.id, { previewUrl: body.previewUrl, previewBuiltAt: new Date(), ...(lead.stage === "new" ? { stage: "preview_built" as const } : {}) });
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   await record(ACTOR, "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
+  // A launched site's changes go live by launching again: the same project, redeployed.
+  if (lead.vercelProjectId) await requestPreview(lead, ACTOR, "Redeploy with the changes just built.", "launch");
+}
+
+/** The address the site answers on once the owner connects their domain, or the Vercel one until then. */
+function liveAddress(lead: Business, liveUrl: string) {
+  const domain = domainOf(lead.website);
+  return domain ? `https://${domain}` : liveUrl;
+}
+
+async function finishLaunched(job: PreviewJob, lead: Business, body: Done) {
+  if (!body.launch) throw new BotError(400, "A finished launch needs launch: { projectId, liveUrl, records }.");
+  await updateJob(job.id, { status: "done", step: "Live", result: body.launch, ...results(body) });
+  const siteUrl = liveAddress(lead, body.launch.liveUrl);
+  await updateBusiness(lead.id, { vercelProjectId: body.launch.projectId, siteUrl, launchedAt: lead.launchedAt ?? new Date() });
+  await addClientSite({ slug: lead.slug, ownerEmail: lead.ownerEmail || lead.email, url: siteUrl, businessId: lead.id, createdBy: ACTOR });
+  const records = body.launch.records.map((entry) => `${entry.type} ${entry.name} → ${entry.value}`).join(", ");
+  await record(ACTOR, "launched the site", { businessId: lead.id, detail: `${body.launch.liveUrl}; ${records}` });
+}
+
+function finishDone(job: PreviewJob, lead: Business, body: Done) {
+  return job.kind === "launch" ? finishLaunched(job, lead, body) : finishBuilt(job, lead, body);
 }
 
 function lastLines(text: string, count: number) {
   return text.trim().split("\n").slice(-count).join("\n");
 }
 
+const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.";
+
+/** A failed build tries once more by itself with a note pointing at what failed. After that, only a paying client's failure reaches a founder. */
+async function retryOrGiveUp(job: PreviewJob, lead: Business, body: Done) {
+  if (job.kind === "preview" && (await failuresInARow(lead.id)) < MAX_FAILED_BUILDS) {
+    await requestPreview(lead, ACTOR, [job.note, RETRY_NOTE].filter(Boolean).join("\n\n"));
+    return;
+  }
+  if (lead.paidAt) await flagFailure(job, lead, body);
+  else await record(ACTOR, "gave up on a preview", { businessId: lead.id, detail: `${MAX_FAILED_BUILDS} builds in a row failed, so this lead is skipped.` });
+}
+
 async function finishFailed(job: PreviewJob, lead: Business, body: Done) {
   await updateJob(job.id, { status: "failed", step: "Failed", ...results(body) });
+  await record(ACTOR, job.kind === "launch" ? "launch failed" : "preview build failed", { businessId: lead.id, detail: lastLines(body.logTail ?? "", 3) });
+  await retryOrGiveUp(job, lead, body);
+}
+
+async function flagFailure(job: PreviewJob, lead: Business, body: Done) {
   await (await db()).insert(flags).values({
     bot: "runner" satisfies Bot,
     businessId: lead.id,
     priority: "review",
     whatHappened: `The preview build for ${lead.businessName} failed${body.verifyPassed === false ? " verification" : ""}.\n\n${lastLines(body.logTail ?? "", 12)}`,
     whatBotDid: "Stopped. Nothing was deployed; the lead keeps any earlier preview.",
-    why: "A build failed. Read the log on the runner machine, then use Rebuild preview or Rebuild with a note on the lead.",
+    why: `A paying client's ${job.kind === "launch" ? "launch" : "build"} failed${job.kind === "launch" ? "" : " after a retry"}. Read the log on the runner machine, then use Rebuild with a note on the lead.`,
   });
-  await record(ACTOR, "preview build failed", { businessId: lead.id, detail: lastLines(body.logTail ?? "", 3), priority: "review" });
 }
 
 async function finishWaiting(job: PreviewJob, lead: Business, body: Done) {
@@ -131,7 +205,7 @@ async function finishWaiting(job: PreviewJob, lead: Business, body: Done) {
 }
 
 const FINISHERS: Record<Done["status"], (job: PreviewJob, lead: Business, body: Done) => Promise<void>> = {
-  done: finishBuilt,
+  done: finishDone,
   failed: finishFailed,
   waiting_for_usage: finishWaiting,
 };

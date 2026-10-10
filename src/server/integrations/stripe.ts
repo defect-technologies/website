@@ -102,3 +102,41 @@ export function syncPayments() {
     return { checkouts: data.length, newClients: matched };
   });
 }
+
+async function stripePost<T>(path: string, form: Record<string, string>): Promise<{ ok: boolean; body: T & { error?: { message?: string } } }> {
+  const response = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.stripeKey()}`, "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(form),
+    cache: "no-store",
+  });
+  return { ok: response.ok, body: (await response.json()) as T & { error?: { message?: string } } };
+}
+
+/** What a client can do on their billing page. Created once, the first time a link is asked for, if the account has no portal settings yet. */
+const PORTAL_FEATURES: Record<string, string> = {
+  "business_profile[headline]": "Defect Technologies: your website plan",
+  "features[invoice_history][enabled]": "true",
+  "features[payment_method_update][enabled]": "true",
+  "features[customer_update][enabled]": "true",
+  "features[customer_update][allowed_updates][0]": "email",
+  "features[customer_update][allowed_updates][1]": "address",
+  "features[subscription_cancel][enabled]": "true",
+  "features[subscription_cancel][mode]": "at_period_end",
+};
+
+async function ensurePortalConfiguration() {
+  const { data } = await stripe<{ data: { id: string; is_default: boolean }[] }>("/billing_portal/configurations?is_default=true&limit=1");
+  if (data.length > 0) return;
+  const created = await stripePost<{ id: string }>("/billing_portal/configurations", PORTAL_FEATURES);
+  if (!created.ok) throw new Error(`Stripe refused the billing page settings: ${created.body.error?.message ?? "no reason given"}`);
+}
+
+/** A one-time link to the client's Stripe billing page. */
+export async function billingPortalLink(customerId: string, returnUrl: string): Promise<string> {
+  if (!env.stripeKey()) throw new Error("STRIPE_API_KEY isn't set.");
+  await ensurePortalConfiguration();
+  const session = await stripePost<{ url: string }>("/billing_portal/sessions", { customer: customerId, return_url: returnUrl });
+  if (!session.ok) throw new Error(`Stripe refused the billing link: ${session.body.error?.message ?? "no reason given"}`);
+  return session.body.url;
+}

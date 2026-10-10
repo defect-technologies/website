@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
-import { ACTIVE_JOB_STATUSES, type PreviewJobStatus } from "@/lib/previewJobs";
+import { ACTIVE_JOB_STATUSES, type JobKind, type PreviewJobStatus } from "@/lib/previewJobs";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
@@ -19,19 +19,47 @@ export async function activeJobFor(businessId: string): Promise<PreviewJob | nul
   return job ?? null;
 }
 
-/** Queues a build for the lead, or returns the one already queued or running. */
-export async function requestPreview(lead: Business, requestedBy: string, note = ""): Promise<RequestResult> {
+const REQUEST_ACTION: Record<JobKind, (note: string) => string> = {
+  preview: (note) => (note ? "requested a preview rebuild" : "requested a preview"),
+  launch: () => "requested a launch",
+};
+
+/** Queues a build (or a launch) for the lead, or returns the job already queued or running. */
+export async function requestPreview(lead: Business, requestedBy: string, note = "", kind: JobKind = "preview"): Promise<RequestResult> {
   const existing = await activeJobFor(lead.id);
   if (existing) return { job: existing, created: false };
   const [job] = await (await db())
     .insert(previewJobs)
-    .values({ businessId: lead.id, requestedBy, note })
+    .values({ businessId: lead.id, requestedBy, note, kind })
     .onConflictDoNothing()
     .returning();
   if (!job) return { job: (await activeJobFor(lead.id))!, created: false };
-  await updateBusiness(lead.id, { previewRequestedAt: new Date(), previewRequestedBy: requestedBy });
-  await record(requestedBy, note ? "requested a preview rebuild" : "requested a preview", { businessId: lead.id, detail: note });
+  if (kind === "preview") await updateBusiness(lead.id, { previewRequestedAt: new Date(), previewRequestedBy: requestedBy });
+  await record(requestedBy, REQUEST_ACTION[kind](note), { businessId: lead.id, detail: note });
   return { job, created: true };
+}
+
+/** The lead's most recent job of this kind, finished or not. */
+export async function latestJob(businessId: string, kind: JobKind): Promise<PreviewJob | null> {
+  const [job] = await (await db())
+    .select()
+    .from(previewJobs)
+    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.kind, kind)))
+    .orderBy(desc(previewJobs.createdAt))
+    .limit(1);
+  return job ?? null;
+}
+
+/** Failed builds since the lead's last successful one. */
+export async function failuresInARow(businessId: string): Promise<number> {
+  const jobs = await (await db())
+    .select({ status: previewJobs.status })
+    .from(previewJobs)
+    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.kind, "preview"), inArray(previewJobs.status, ["done", "failed"])))
+    .orderBy(desc(previewJobs.createdAt))
+    .limit(10);
+  const firstSuccess = jobs.findIndex((job) => job.status === "done");
+  return firstSuccess === -1 ? jobs.length : firstSuccess;
 }
 
 export const AUTO_QUEUE_ACTOR = "auto-queue";
@@ -59,7 +87,7 @@ export async function buildsToday(): Promise<number> {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
     .from(previewJobs)
-    .where(gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT));
+    .where(and(eq(previewJobs.kind, "preview"), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
   return row?.count ?? 0;
 }
 
@@ -73,11 +101,12 @@ export async function spentToday(): Promise<number> {
 }
 
 /**
- * Claims the oldest queued job in one statement. SKIP LOCKED means two runners
+ * Claims the oldest queued job of a kind this runner can do, in one statement. SKIP LOCKED means two runners
  * polling at once can never both get the same job.
  */
-export async function claimNextJob(runnerName: string): Promise<PreviewJob | null> {
-  const oldestQueued = sql`(select ${previewJobs.id} from ${previewJobs} where ${previewJobs.status} = 'queued' order by ${previewJobs.createdAt} limit 1 for update skip locked)`;
+export async function claimNextJob(runnerName: string, kinds: JobKind[] = ["preview"]): Promise<PreviewJob | null> {
+  const kindList = sql.join(kinds.map((kind) => sql`${kind}`), sql`, `);
+  const oldestQueued = sql`(select ${previewJobs.id} from ${previewJobs} where ${previewJobs.status} = 'queued' and ${previewJobs.kind} in (${kindList}) order by ${previewJobs.createdAt} limit 1 for update skip locked)`;
   const [job] = await (await db())
     .update(previewJobs)
     .set({ status: "claimed", claimedAt: new Date(), runnerName, attempts: sql`${previewJobs.attempts} + 1` })
