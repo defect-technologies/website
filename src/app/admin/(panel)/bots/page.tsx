@@ -39,13 +39,18 @@ function BotCard({ bot, keys }: { bot: Bot; keys: BotKey[] }) {
         <p className="text-ink-soft text-pretty">{BOT_JOB[bot]}</p>
       </div>
       {BOT_STAGES[bot].length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label={`Stages ${BOT_LABEL[bot]} owns`}>
-          {BOT_STAGES[bot].map((stage) => (
-            <li key={stage}>
-              <StageChip stage={stage} />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-2">
+          <p id={`${bot}-stages`} className="text-ink-faint text-sm">
+            Leads it can reach
+          </p>
+          <ul className="flex flex-wrap gap-1.5" aria-labelledby={`${bot}-stages`}>
+            {BOT_STAGES[bot].map((stage) => (
+              <li key={stage}>
+                <StageChip stage={stage} />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {keys.length > 0 && (
         <ul className="divide-ink/8 divide-y">
