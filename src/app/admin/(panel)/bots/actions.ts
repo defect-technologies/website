@@ -29,15 +29,15 @@ export async function revokeBotKeyAction(form: FormData) {
   revalidatePath("/admin/bots");
 }
 
-const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean() });
+const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean(), autoQueue: z.boolean() });
 
-/** The daily build cap and whether the Outreach bot may queue previews. */
+/** The daily build cap, whether new leads are built automatically, and whether the Outreach bot may queue previews. */
 export async function saveRunnerSettingsAction(form: FormData) {
   const founder = await requireFounder();
-  const parsed = RunnerForm.safeParse({ dailyCap: form.get("dailyCap"), outreachPicksPreviews: form.get("outreachPicksPreviews") === "on" });
+  const parsed = RunnerForm.safeParse({ dailyCap: form.get("dailyCap"), outreachPicksPreviews: form.get("outreachPicksPreviews") === "on", autoQueue: form.get("autoQueue") === "on" });
   if (!parsed.success) return;
   await updateRunnerSettings(parsed.data, founder.email);
-  await record(founder.email, "changed preview runner settings", { detail: `${parsed.data.dailyCap} builds a day; Outreach ${parsed.data.outreachPicksPreviews ? "can" : "can't"} request previews` });
+  await record(founder.email, "changed preview runner settings", { detail: `${parsed.data.dailyCap} builds a day; Outreach ${parsed.data.outreachPicksPreviews ? "can" : "can't"} request previews; new leads ${parsed.data.autoQueue ? "are" : "aren't"} built automatically` });
   revalidatePath("/admin", "layout");
 }
 

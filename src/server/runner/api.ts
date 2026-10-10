@@ -10,7 +10,7 @@ import { ownedLead } from "../bots/leads";
 import { checkoutLink } from "../leads/buildCommand";
 import { updateBusiness } from "../leads/businesses";
 import { outreachSettings } from "../settings";
-import { buildsToday, claimNextJob, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
+import { autoQueueNext, buildsToday, claimNextJob, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
 
 const ACTOR = "bot:runner";
@@ -38,13 +38,18 @@ function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string) {
   };
 }
 
+async function claimAutoQueued(runnerName: string): Promise<PreviewJob | null> {
+  if (!(await runnerSettings()).autoQueue) return null;
+  return (await autoQueueNext()) ? claimNextJob(runnerName) : null;
+}
+
 /** GET /api/runner/next: claims one queued build, or 204 with why there's nothing to do. */
 export async function claimNext(key: BotKey, request: Request) {
   const reason = await whyIdle();
   if (reason) return idle(reason);
   const runnerName = new URL(request.url).searchParams.get("runner")?.slice(0, 60) || key.name;
-  const job = await claimNextJob(runnerName);
-  if (!job) return idle("Nothing queued.");
+  const job = (await claimNextJob(runnerName)) ?? (await claimAutoQueued(runnerName));
+  if (!job) return idle("Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
   return jobPayload(job, lead, checkoutLink(lead, await outreachSettings()));

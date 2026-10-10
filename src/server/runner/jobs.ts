@@ -1,9 +1,9 @@
 import "server-only";
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { ACTIVE_JOB_STATUSES, type PreviewJobStatus } from "@/lib/previewJobs";
 import { record } from "../activity";
 import { db } from "../db/client";
-import { previewJobs, type Business, type PreviewJob } from "../db/schema";
+import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
 import { businessById, updateBusiness } from "../leads/businesses";
 
 export type RequestResult = { job: PreviewJob; created: boolean };
@@ -32,6 +32,26 @@ export async function requestPreview(lead: Business, requestedBy: string, note =
   await updateBusiness(lead.id, { previewRequestedAt: new Date(), previewRequestedBy: requestedBy });
   await record(requestedBy, note ? "requested a preview rebuild" : "requested a preview", { businessId: lead.id, detail: note });
   return { job, created: true };
+}
+
+export const AUTO_QUEUE_ACTOR = "auto-queue";
+
+/** The new lead most worth a preview: never requested, has a website and an email, highest outdated score first. */
+export async function nextLeadToBuild(): Promise<Business | null> {
+  const [lead] = await (await db())
+    .select()
+    .from(businesses)
+    .where(and(eq(businesses.stage, "new"), ne(businesses.website, ""), ne(businesses.email, ""), eq(businesses.previewUrl, ""), isNull(businesses.previewRequestedAt)))
+    .orderBy(desc(businesses.outdatedScore), asc(businesses.createdAt))
+    .limit(1);
+  return lead ?? null;
+}
+
+/** Queues the next lead's preview, so an empty queue never leaves the runner idle. Returns whether one was queued. */
+export async function autoQueueNext(): Promise<boolean> {
+  const lead = await nextLeadToBuild();
+  if (!lead) return false;
+  return (await requestPreview(lead, AUTO_QUEUE_ACTOR)).created;
 }
 
 /** Builds started (or claimed) since midnight in Los Angeles. */
