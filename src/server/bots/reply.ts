@@ -24,15 +24,16 @@ function checkBody(body: string) {
   if (/urldefense\.(?:com|proofpoint\.com)/i.test(body)) throw new BotError(422, "The email has a urldefense link copied from another email. Use links from the admin API.");
 }
 
-/** The client's latest message in a thread, or our latest if they haven't written in one. */
-async function threadToAnswer(lead: Business): Promise<Message> {
+/** The lead's latest message from them in a thread (in this inbox, when one is given), or our latest if they haven't written. */
+async function threadToAnswer(lead: Business, mailboxId: string | null = null): Promise<Message> {
   const database = await db();
-  const inThread = and(eq(messages.businessId, lead.id), isNotNull(messages.threadId));
+  const inThread = and(eq(messages.businessId, lead.id), isNotNull(messages.threadId), mailboxId ? eq(messages.mailboxId, mailboxId) : undefined);
   const [inbound] = await database.select().from(messages).where(and(inThread, eq(messages.direction, "in"))).orderBy(desc(messages.at)).limit(1);
   if (inbound) return inbound;
   const [latest] = await database.select().from(messages).where(inThread).orderBy(desc(messages.at)).limit(1);
-  if (!latest) throw new BotError(409, "This lead has no email thread to reply to yet.");
-  return latest;
+  if (latest) return latest;
+  if (mailboxId) return threadToAnswer(lead);
+  throw new BotError(409, "This lead has no email thread to reply to yet.");
 }
 
 function recipientOf(message: Message, lead: Business): string {
@@ -91,7 +92,7 @@ export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof
   const lead = await ownedLead(key, id);
   const { text: body, unwrapped } = unwrapLinks(withoutSubjectLine(input.body));
   checkBody(body);
-  const answering = await threadToAnswer(lead);
+  const answering = await threadToAnswer(lead, key.bot === "outreach" ? lead.mailboxId : null);
   const to = recipientOf(answering, lead);
   const subject = replySubject(answering.subject);
   const sender = await senderFor(lead, answering);
