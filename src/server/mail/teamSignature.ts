@@ -9,16 +9,14 @@ export const TEAM_SIGNATURE_TEXT = ["The Defect Technologies team", "hello@defec
 
 const INK = "#17161a";
 const INK_SOFT = "#4b4852";
-const VERMILION = "#e2421b";
 
 export const TEAM_SIGNATURE_HTML = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Helvetica,Arial,sans-serif;margin-top:8px;">
 <tr>
-<td style="padding:0 16px 0 0;vertical-align:middle;"><a href="https://defect.tech" style="text-decoration:none;"><img src="https://defect.tech/brand/defect-tech-paper-1200.png" width="128" height="70" alt="defect.tech" style="display:block;width:128px;height:70px;border:0;border-radius:6px;"></a></td>
+<td style="padding:0 16px 0 0;vertical-align:middle;"><a href="https://defect.tech" style="text-decoration:none;"><img src="https://defect.tech/brand/defect-tech-signature.png" width="136" height="48" alt="defect.tech" style="display:block;width:136px;height:48px;border:0;"></a></td>
 <td style="padding:0;vertical-align:middle;">
 <div style="font-size:14px;line-height:20px;font-weight:bold;color:${INK};">The Defect Technologies team</div>
 <div style="font-size:13px;line-height:20px;color:${INK_SOFT};">Websites for small businesses</div>
 <div style="font-size:13px;line-height:20px;padding-top:4px;"><a href="mailto:hello@defect.tech" style="color:${INK};text-decoration:none;">hello@defect.tech</a></div>
-<div style="font-size:13px;line-height:20px;"><a href="https://defect.tech" style="color:${INK};text-decoration:none;">defect<span style="color:${VERMILION};font-weight:bold;">.</span>tech</a></div>
 </td>
 </tr>
 </table>`;
