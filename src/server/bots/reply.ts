@@ -8,7 +8,7 @@ import { updateBusiness } from "../leads/businesses";
 import { deliver } from "../mail/outbox";
 import { TEAM_SIGNATURE_TEXT, withTeamSignatureHtml } from "../mail/teamSignature";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
-import { replySubject, unwrapLinks } from "@/lib/emailLinks";
+import { replySubject, unwrapLinks, withoutSubjectLine } from "@/lib/emailLinks";
 import { actorOf, BotError } from "./http";
 import { ownedLead } from "./leads";
 
@@ -51,7 +51,7 @@ function htmlFor(body: string): string | undefined {
 export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof ReplyBody>) {
   if (!["onboarding", "client_care"].includes(key.bot)) throw new BotError(403, "Only Onboarding and Client care send through the admin.");
   const lead = await ownedLead(key, id);
-  const { text: body, unwrapped } = unwrapLinks(input.body);
+  const { text: body, unwrapped } = unwrapLinks(withoutSubjectLine(input.body));
   checkBody(body);
   const answering = await threadToAnswer(lead);
   const to = recipientOf(answering, lead);

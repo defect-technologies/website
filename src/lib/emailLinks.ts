@@ -38,3 +38,8 @@ export function unwrapLinks(text: string): { text: string; unwrapped: number } {
 export function replySubject(subject: string): string {
   return `Re: ${subject.replace(/^(?:\s*(?:re|fwd?|aw)\s*:\s*)+/i, "").trim()}`;
 }
+
+/** Drops a "Subject: ..." first line a bot left in from drafting; the thread's own subject is used instead. */
+export function withoutSubjectLine(text: string): string {
+  return text.replace(/^\s*subject:[^\n]*\n+/i, "");
+}
