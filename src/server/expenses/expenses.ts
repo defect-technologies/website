@@ -3,7 +3,8 @@ import { asc, desc, eq } from "drizzle-orm";
 import { FOUNDER_EMAILS } from "@/lib/founders";
 import { monthlyBalances } from "@/lib/settleUp";
 import { db } from "../db/client";
-import { expenses, settlements } from "../db/schema";
+import { expenses, settlements, type Expense } from "../db/schema";
+import { addAllDueRows, allRecurring } from "./recurring";
 
 export async function allExpenses() {
   return (await db()).select().from(expenses).orderBy(desc(expenses.spentOn), desc(expenses.createdAt));
@@ -12,6 +13,13 @@ export async function allExpenses() {
 export async function addExpense(input: { spentOn: string; item: string; amountCents: number; paidBy: string; createdBy: string }) {
   const [row] = await (await db()).insert(expenses).values(input).returning();
   return row;
+}
+
+type ExpenseChange = Partial<Pick<Expense, "spentOn" | "item" | "amountCents" | "paidBy">>;
+
+export async function updateExpense(id: string, change: ExpenseChange) {
+  const [row] = await (await db()).update(expenses).set(change).where(eq(expenses.id, id)).returning();
+  return row ?? null;
 }
 
 export async function deleteExpense(id: string) {
@@ -23,10 +31,12 @@ async function allSettlements() {
   return (await db()).select().from(settlements).orderBy(asc(settlements.sentAt));
 }
 
+/** Every expense by month, with repeating expenses brought up to date first. */
 export async function balances() {
-  const [expenseRows, settlementRows] = await Promise.all([allExpenses(), allSettlements()]);
+  await addAllDueRows();
+  const [expenseRows, settlementRows, recurring] = await Promise.all([allExpenses(), allSettlements(), allRecurring()]);
   const sent = settlementRows.map((row) => ({ month: row.month, from: row.fromFounder, to: row.toFounder, amountCents: row.amountCents }));
-  return { expenses: expenseRows, months: monthlyBalances([FOUNDER_EMAILS[0], FOUNDER_EMAILS[1]], expenseRows, sent) };
+  return { expenses: expenseRows, recurring, months: monthlyBalances([FOUNDER_EMAILS[0], FOUNDER_EMAILS[1]], expenseRows, sent) };
 }
 
 /** Records the Zelle that evens out a month. Returns null when nothing was owed. */

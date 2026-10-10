@@ -271,6 +271,23 @@ export const previewJobs = pgTable(
   ],
 );
 
+export const expenseFrequency = pgEnum("expense_frequency", ["monthly", "annual"]);
+
+/** A cost that repeats. Each time it comes due it adds a row to expenses, which can then be edited on its own. */
+export const recurringExpenses = pgTable("recurring_expenses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  item: text("item").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  paidBy: text("paid_by").notNull(),
+  frequency: expenseFrequency("frequency").notNull(),
+  startsOn: date("starts_on", { mode: "string" }).notNull(),
+  /** The last date rows were added through, so a deleted month isn't added back. */
+  addedThrough: date("added_through", { mode: "string" }),
+  stoppedOn: date("stopped_on", { mode: "string" }),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** A business cost one founder paid. The founders split each month's total evenly. */
 export const expenses = pgTable(
   "expenses",
@@ -280,10 +297,11 @@ export const expenses = pgTable(
     item: text("item").notNull(),
     amountCents: integer("amount_cents").notNull(),
     paidBy: text("paid_by").notNull(),
+    recurringId: uuid("recurring_id").references(() => recurringExpenses.id, { onDelete: "set null" }),
     createdBy: text("created_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("expenses_spent_on").on(table.spentOn)],
+  (table) => [index("expenses_spent_on").on(table.spentOn), uniqueIndex("expenses_recurring_date").on(table.recurringId, table.spentOn)],
 );
 
 /** One Zelle from a founder to the other, evening out a month's expenses. */
@@ -311,3 +329,5 @@ export type Flag = typeof flags.$inferSelect;
 export type PreviewJob = typeof previewJobs.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
+export type RecurringExpense = typeof recurringExpenses.$inferSelect;
+export type ExpenseFrequency = RecurringExpense["frequency"];
