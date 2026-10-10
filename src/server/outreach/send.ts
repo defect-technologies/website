@@ -7,6 +7,7 @@ import { businesses, messages, type Business, type Mailbox } from "../db/schema"
 import { advanceStage, blockedDomains, businessById, updateBusiness } from "../leads/businesses";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
+import { withSignerHtml } from "../mail/teamSignature";
 import { outreachSettings } from "../settings";
 import { blockers, composeBody, composeSubject, type EmailKind } from "./compose";
 import { sentToday } from "./queue";
@@ -52,11 +53,13 @@ async function prepare(kind: EmailKind, id: string, problem?: string): Promise<P
 }
 
 function outgoing(kind: EmailKind, { business, subject, body }: Prepared, from: Mailbox | null, senderName: string): OutgoingEmail {
+  const email = from?.email ?? "outbox@dev.localhost";
   return {
-    from: { name: senderName, email: from?.email ?? "outbox@dev.localhost" },
+    from: { name: senderName, email },
     to: business.email,
     subject,
     body,
+    html: withSignerHtml(body, { name: senderName, line: "Defect Technologies", email }) ?? undefined,
     threadId: kind === "follow_up" ? business.threadId : null,
     inReplyTo: kind === "follow_up" ? business.firstMessageHeaderId : null,
   };
