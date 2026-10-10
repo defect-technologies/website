@@ -1,0 +1,1 @@
+ALTER TABLE "businesses" ADD COLUMN "launch_domain" text DEFAULT '' NOT NULL;

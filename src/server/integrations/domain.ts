@@ -74,6 +74,11 @@ function dnsHostOf(nameservers: string[]) {
   return DNS_HOSTS.find(([suffix]) => first.includes(suffix))?.[1] ?? first;
 }
 
+/** The host a lead's site launches at: a founder's override, or the domain of their old website. */
+export function launchDomainOf(lead: { launchDomain: string; website: string }): string | null {
+  return lead.launchDomain.trim().toLowerCase() || domainOf(lead.website);
+}
+
 /** Public facts about the lead's domain, so nobody has to ask the owner where it's managed. */
 export async function domainFacts(website: string): Promise<DomainFacts | null> {
   const domain = domainOf(website);

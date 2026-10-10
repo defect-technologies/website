@@ -7,7 +7,7 @@ import { db } from "../db/client";
 import { MAX_FAILED_BUILDS, type JobKind } from "@/lib/previewJobs";
 import { flags, type BotKey, type Business, type PreviewJob } from "../db/schema";
 import { env } from "../env";
-import { domainOf } from "../integrations/domain";
+import { launchDomainOf } from "../integrations/domain";
 import { addClientSite } from "../sites/clientSites";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
@@ -54,7 +54,7 @@ function launchPayload(job: PreviewJob, lead: Business) {
   if (job.kind !== "launch") return {};
   const editorSecret = env.editorSecret();
   if (!editorSecret) throw new BotError(503, "EDITOR_SECRET isn't set on the admin, so a site can't be launched yet.");
-  return { launch: { domain: domainOf(lead.website) ?? "", editorSecret } };
+  return { launch: { domain: launchDomainOf(lead) ?? "", editorSecret } };
 }
 
 function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string) {
@@ -146,7 +146,7 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
 
 /** The address the site answers on once the owner connects their domain, or the Vercel one until then. */
 function liveAddress(lead: Business, liveUrl: string) {
-  const domain = domainOf(lead.website);
+  const domain = launchDomainOf(lead);
   return domain ? `https://${domain}` : liveUrl;
 }
 

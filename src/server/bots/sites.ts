@@ -3,7 +3,7 @@ import { SignJWT } from "jose";
 import { z } from "zod";
 import { env } from "../env";
 import type { BotKey, Business, PreviewJob } from "../db/schema";
-import { domainOf } from "../integrations/domain";
+import { launchDomainOf } from "../integrations/domain";
 import { billingPortalLink } from "../integrations/stripe";
 import { latestJob, requestPreview } from "../runner/jobs";
 import { actorOf, BotError } from "./http";
@@ -37,7 +37,7 @@ export async function requestLaunch(key: BotKey, id: string) {
   const lead = await ownedLead(key, id);
   if (!lead.paidAt) throw new BotError(409, "This lead hasn't paid, so its site can't launch.");
   if (!lead.previewUrl) throw new BotError(409, "This lead has no built preview to launch yet.");
-  if (!domainOf(lead.website)) throw new BotError(409, "This lead has no website address on file to launch at. Flag it for a founder.");
+  if (!launchDomainOf(lead)) throw new BotError(409, "This lead has no website address on file to launch at. Flag it for a founder.");
   const { job, created } = await requestPreview(lead, actorOf(key), "", "launch");
   if (job.kind !== "launch") throw new BotError(409, "A build for this lead is still running. Launch once it's done.");
   return { ok: true, jobId: job.id, alreadyRunning: !created, status: job.status };

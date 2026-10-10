@@ -61,6 +61,8 @@ export const businesses = pgTable(
     vercelProjectId: text("vercel_project_id").notNull().default(""),
     launchedAt: timestamp("launched_at", { withTimezone: true }),
     dnsBackup: text("dns_backup").notNull().default(""),
+    /** Where the site launches when it isn't the domain of the lead's old website, such as a defect.tech subdomain. Set by a founder. */
+    launchDomain: text("launch_domain").notNull().default(""),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
