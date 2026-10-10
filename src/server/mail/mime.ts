@@ -12,6 +12,8 @@ export type OutgoingEmail = {
   html?: string;
   threadId?: string | null;
   inReplyTo?: string | null;
+  /** Cold email needs a one-click way out. Clients' email leaves it off, or mail apps file it as a mailing list. */
+  listUnsubscribe?: boolean;
 };
 
 /** Header values come partly from scraped websites, so line breaks are never allowed through. */
@@ -62,7 +64,7 @@ export function buildRawMessage(email: OutgoingEmail): string {
     `Subject: ${encodedWord(email.subject)}`,
     "MIME-Version: 1.0",
     ...bodyHeaders,
-    `List-Unsubscribe: <mailto:${headerSafe(email.from.email)}?subject=unsubscribe>`,
+    ...(email.listUnsubscribe ? [`List-Unsubscribe: <mailto:${headerSafe(email.from.email)}?subject=unsubscribe>`] : []),
     ...threadingHeaders(email.inReplyTo),
   ];
   const message = `${headers.join("\r\n")}\r\n\r\n${content}`;

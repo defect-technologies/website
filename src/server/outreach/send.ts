@@ -62,6 +62,7 @@ function outgoing(kind: EmailKind, { business, subject, body }: Prepared, from: 
     html: withSignerHtml(body, { name: senderName, line: "Defect Technologies", email }) ?? undefined,
     threadId: kind === "follow_up" ? business.threadId : null,
     inReplyTo: kind === "follow_up" ? business.firstMessageHeaderId : null,
+    listUnsubscribe: true,
   };
 }
 
