@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 
 export type Address = { name: string; email: string };
 
@@ -7,6 +8,8 @@ export type OutgoingEmail = {
   to: string;
   subject: string;
   body: string;
+  /** An HTML version shown by mail apps that render it; body stays the plain-text fallback. */
+  html?: string;
   threadId?: string | null;
   inReplyTo?: string | null;
 };
@@ -37,19 +40,32 @@ function wrapBase64(text: string) {
   return (Buffer.from(text.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").match(/.{1,76}/g) ?? []).join("\r\n");
 }
 
-/** A plain-text RFC 5322 message, base64url-encoded the way the Gmail API wants it. */
+const BASE64_TEXT = (type: "plain" | "html") => [`Content-Type: text/${type}; charset=UTF-8`, "Content-Transfer-Encoding: base64"];
+
+/** The body headers and content: plain text alone, or plain text and HTML as alternatives. */
+function bodyParts(email: OutgoingEmail): { headers: string[]; content: string } {
+  if (!email.html) return { headers: BASE64_TEXT("plain"), content: wrapBase64(email.body) };
+  const boundary = `defect-${randomUUID()}`;
+  const part = (type: "plain" | "html", text: string) => `--${boundary}\r\n${BASE64_TEXT(type).join("\r\n")}\r\n\r\n${wrapBase64(text)}`;
+  return {
+    headers: [`Content-Type: multipart/alternative; boundary="${boundary}"`],
+    content: [part("plain", email.body), part("html", email.html), `--${boundary}--`].join("\r\n"),
+  };
+}
+
+/** An RFC 5322 message, base64url-encoded the way the Gmail API wants it. */
 export function buildRawMessage(email: OutgoingEmail): string {
+  const { headers: bodyHeaders, content } = bodyParts(email);
   const headers = [
     `From: ${mailbox(email.from)}`,
     `To: ${headerSafe(email.to)}`,
     `Subject: ${encodedWord(email.subject)}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
+    ...bodyHeaders,
     `List-Unsubscribe: <mailto:${headerSafe(email.from.email)}?subject=unsubscribe>`,
     ...threadingHeaders(email.inReplyTo),
   ];
-  const message = `${headers.join("\r\n")}\r\n\r\n${wrapBase64(email.body)}`;
+  const message = `${headers.join("\r\n")}\r\n\r\n${content}`;
   return Buffer.from(message, "utf8").toString("base64url");
 }
 

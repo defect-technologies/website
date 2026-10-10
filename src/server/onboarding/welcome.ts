@@ -3,6 +3,7 @@ import { record } from "../activity";
 import { db } from "../db/client";
 import { messages, type Business } from "../db/schema";
 import { connectedMailboxes, deliver } from "../mail/outbox";
+import { TEAM_SIGNATURE_TEXT, withTeamSignatureHtml } from "../mail/teamSignature";
 
 const SUBJECT = "Welcome to Defect Technologies";
 /** Clients hear from the studio inbox, never from a cold-email domain. */
@@ -26,16 +27,16 @@ function welcomeBody(business: Business) {
     "",
     "Warmly,",
     "",
-    "The Defect Technologies team",
-    "hello@defect.tech",
+    ...TEAM_SIGNATURE_TEXT,
   ].join("\n");
 }
 
 /** Sent once, right after Stripe reports the checkout. It always comes from the studio inbox, where the Onboarding bot follows up. */
 export async function sendWelcome(business: Business, to: string) {
+  const body = welcomeBody(business);
   try {
     const delivery = await deliver(
-      (from) => ({ from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" }, to, subject: SUBJECT, body: welcomeBody(business) }),
+      (from) => ({ from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" }, to, subject: SUBJECT, body, html: withTeamSignatureHtml(body) }),
       await studioMailboxId(),
     );
     await (await db()).insert(messages).values({
