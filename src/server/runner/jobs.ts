@@ -39,6 +39,13 @@ export async function requestPreview(lead: Business, requestedBy: string, note =
   return { job, created: true };
 }
 
+/** Why the lead's site can't launch yet, or null when it can. */
+export function launchBlocker(lead: Business): string | null {
+  if (!lead.paidAt) return "This lead hasn't paid, so its site can't launch.";
+  if (!lead.previewUrl) return "This lead has no built preview to launch yet.";
+  return null;
+}
+
 /** The lead's most recent job of this kind, finished or not. */
 export async function latestJob(businessId: string, kind: JobKind): Promise<PreviewJob | null> {
   const [job] = await (await db())

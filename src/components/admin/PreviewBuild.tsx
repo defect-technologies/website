@@ -1,7 +1,9 @@
-import { ArrowsClockwise, CaretRight, Hammer } from "@phosphor-icons/react/dist/ssr";
-import { requestPreviewAction } from "@/app/admin/(panel)/pipeline/actions";
+import { ArrowsClockwise, CaretRight, Hammer, RocketLaunch } from "@phosphor-icons/react/dist/ssr";
+import { launchSiteAction, requestPreviewAction } from "@/app/admin/(panel)/pipeline/actions";
 import { JOB_STATUS_LABEL } from "@/lib/previewJobs";
 import type { Business, PreviewJob } from "@/server/db/schema";
+import { launchDomainOf } from "@/server/integrations/domain";
+import { launchBlocker } from "@/server/runner/jobs";
 import CopyCommand from "./CopyCommand";
 import { TextAreaField } from "./fields";
 import SubmitButton from "./SubmitButton";
@@ -18,13 +20,25 @@ function Queued({ job }: { job: PreviewJob }) {
   );
 }
 
-function RequestButton({ lead }: { lead: Business }) {
+function RequestButton({ lead, primary }: { lead: Business; primary: boolean }) {
   return (
     <form action={requestPreviewAction}>
       <input type="hidden" name="id" value={lead.id} />
-      <SubmitButton variant="solid" icon={<Hammer size={18} aria-hidden="true" />}>
+      <SubmitButton variant={primary ? "solid" : undefined} icon={<Hammer size={18} aria-hidden="true" />}>
         {lead.previewUrl ? "Rebuild preview" : "Build preview"}
       </SubmitButton>
+    </form>
+  );
+}
+
+/** Puts a paid client's preview live. The runner adds it to Sites when it's done, so the owner can sign in at /edit. */
+function LaunchButton({ lead }: { lead: Business }) {
+  const domain = launchDomainOf(lead);
+  return (
+    <form action={launchSiteAction} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <input type="hidden" name="id" value={lead.id} />
+      <SubmitButton variant="solid" icon={<RocketLaunch size={18} aria-hidden="true" />}>{lead.vercelProjectId ? "Redeploy the live site" : "Launch site"}</SubmitButton>
+      <span className="text-ink-soft text-sm">{domain ? `Live at ${domain} once its records point at Vercel` : "Live at a vercel.app address"}</span>
     </form>
   );
 }
@@ -63,11 +77,13 @@ function ManualCommand({ command }: { command: string }) {
 
 /** The lead page's build controls: queue it for the preview runner, or run the command by hand. */
 export default function PreviewBuild({ lead, job, command, missingCheckout }: { lead: Business; job: PreviewJob | null; command: string; missingCheckout: boolean }) {
+  const canLaunch = !launchBlocker(lead);
   return (
     <section className="flex flex-col gap-3">
       <SectionHeading>{lead.previewUrl ? "Preview" : "Build the preview"}</SectionHeading>
       {missingCheckout && <Notice tone="warn">Add the ${lead.priceArm} Stripe payment link on the Template page, or the preview&apos;s button won&apos;t lead anywhere.</Notice>}
-      {job ? <Queued job={job} /> : <RequestButton lead={lead} />}
+      {!job && canLaunch && <LaunchButton lead={lead} />}
+      {job ? <Queued job={job} /> : <RequestButton lead={lead} primary={!canLaunch} />}
       {!job && lead.previewUrl && <RebuildWithNote lead={lead} />}
       <ManualCommand command={command} />
     </section>
