@@ -39,6 +39,10 @@ export function RunnerSettingsForm({ settings }: { settings: RunnerSettings }) {
         <TextField label="Builds a day" name="dailyCap" type="number" min={0} max={100} defaultValue={settings.dailyCap} required />
       </div>
       <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input type="checkbox" name="autoQueue" defaultChecked={settings.autoQueue} className="accent-ink size-4" />
+        Build previews for new leads automatically
+      </label>
+      <label className="flex min-h-11 items-center gap-2 text-sm">
         <input type="checkbox" name="outreachPicksPreviews" defaultChecked={settings.outreachPicksPreviews} className="accent-ink size-4" />
         Let the Outreach bot request previews
       </label>

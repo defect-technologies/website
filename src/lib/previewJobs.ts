@@ -20,9 +20,11 @@ export type RunnerSettings = {
   dailyCap: number;
   pausedUntil: string | null;
   outreachPicksPreviews: boolean;
+  /** When the queue is empty, the runner's next poll queues the highest-scoring new lead with an email. */
+  autoQueue: boolean;
 };
 
-export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = { dailyCap: 10, pausedUntil: null, outreachPicksPreviews: false };
+export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = { dailyCap: 10, pausedUntil: null, outreachPicksPreviews: false, autoQueue: true };
 
 /** Env var the runner machine keeps its admin key in. */
 export const RUNNER_KEY_ENV = "DEFECT_RUNNER_KEY";
