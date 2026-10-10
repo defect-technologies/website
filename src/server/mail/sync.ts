@@ -1,10 +1,11 @@
 import "server-only";
-import { eq, or } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { SENT_FROM_GMAIL } from "@/lib/senders";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, mailboxes, messages, type Business, type Mailbox } from "../db/schema";
 import { advanceStage, updateBusiness } from "../leads/businesses";
-import { inboxSince, MailboxNeedsReconnect, type IncomingEmail } from "./gmail";
+import { mailSince, MailboxNeedsReconnect, type IncomingEmail } from "./gmail";
 import { domainOf } from "./mime";
 import { connectedMailboxes } from "./outbox";
 
@@ -40,19 +41,19 @@ function indexBusinesses(all: Business[], threads: { threadId: string | null; bu
   return index;
 }
 
-/** Thread first, then the exact sender, then the sender's company domain. Unmatched mail is left alone. */
-function matchBusiness(email: IncomingEmail, index: Index): Business | undefined {
-  return index.byThread.get(email.threadId) ?? index.byEmail.get(email.from) ?? index.byDomain.get(domainOf(email.from));
+/** Thread first, then the exact address, then its company domain. Unmatched mail is left alone. */
+function matchBusiness(threadId: string, address: string, index: Index): Business | undefined {
+  return index.byThread.get(threadId) ?? index.byEmail.get(address) ?? index.byDomain.get(domainOf(address));
 }
 
-async function storeIncoming(mailbox: Mailbox, email: IncomingEmail, business: Business): Promise<boolean> {
+async function store(mailbox: Mailbox, email: IncomingEmail, business: Business, direction: "in" | "out"): Promise<boolean> {
   const inserted = await (await db())
     .insert(messages)
     .values({
       businessId: business.id,
       mailboxId: mailbox.id,
-      direction: "in",
-      kind: "inbound",
+      direction,
+      kind: direction === "in" ? "inbound" : "reply",
       gmailId: email.gmailId,
       threadId: email.threadId,
       headerMessageId: email.headerMessageId,
@@ -60,6 +61,7 @@ async function storeIncoming(mailbox: Mailbox, email: IncomingEmail, business: B
       toAddress: email.to,
       subject: email.subject,
       body: email.body,
+      sentBy: direction === "out" ? SENT_FROM_GMAIL : "",
       at: email.at,
     })
     .onConflictDoNothing()
@@ -74,18 +76,38 @@ async function noteReply(business: Business, email: IncomingEmail) {
   await record("mail sync", "reply received", { businessId: business.id, detail });
 }
 
-async function syncMailbox(mailbox: Mailbox, index: Index): Promise<number> {
+async function syncInbox(mailbox: Mailbox, index: Index): Promise<number> {
   const since = mailbox.lastSyncedAt ?? new Date(Date.now() - FIRST_SYNC_WINDOW);
   const startedAt = new Date();
-  const incoming = (await inboxSince(mailbox, since)).filter((email) => email.from !== mailbox.email);
+  const incoming = (await mailSince(mailbox, "inbox", since)).filter((email) => email.from !== mailbox.email);
   let stored = 0;
   for (const email of incoming) {
-    const business = matchBusiness(email, index);
-    if (!business || !(await storeIncoming(mailbox, email, business))) continue;
+    const business = matchBusiness(email.threadId, email.from, index);
+    if (!business || !(await store(mailbox, email, business, "in"))) continue;
     await noteReply(business, email);
     stored += 1;
   }
   await (await db()).update(mailboxes).set({ lastSyncedAt: startedAt, lastError: "" }).where(eq(mailboxes.id, mailbox.id));
+  return stored;
+}
+
+async function noteSent(business: Business, email: IncomingEmail) {
+  if (!business.lastContactAt || business.lastContactAt < email.at) await updateBusiness(business.id, { lastContactAt: email.at });
+  await record("mail sync", "saw an email sent from Gmail", { businessId: business.id, detail: email.to });
+}
+
+/** Mail the admin sent is already stored under its Gmail ID, so only mail sent from Gmail directly is new here. */
+async function syncSent(mailbox: Mailbox, index: Index): Promise<number> {
+  const since = mailbox.lastSentSyncedAt ?? new Date(Date.now() - FIRST_SYNC_WINDOW);
+  const startedAt = new Date();
+  let stored = 0;
+  for (const email of await mailSince(mailbox, "sent", since)) {
+    const business = matchBusiness(email.threadId, email.to, index);
+    if (!business || !(await store(mailbox, email, business, "out"))) continue;
+    await noteSent(business, email);
+    stored += 1;
+  }
+  await (await db()).update(mailboxes).set({ lastSentSyncedAt: startedAt }).where(eq(mailboxes.id, mailbox.id));
   return stored;
 }
 
@@ -96,18 +118,31 @@ async function failMailbox(mailbox: Mailbox, error: unknown) {
 
 export type MailSyncResult = { mailboxes: number; newMessages: number; errors: string[] };
 
+const REPLYING_STAGES: Business["stage"][] = ["sent", "clicked", "replied", "paid", "live"];
+
+/** Mail we send can go to a lead before its first tracked email, so Sent also matches leads with a built preview. */
+const EMAILED_STAGES: Business["stage"][] = ["preview_built", ...REPLYING_STAGES];
+
+async function syncMailbox(mailbox: Mailbox, inbound: Index, outbound: Index): Promise<number> {
+  return (await syncInbox(mailbox, inbound)) + (await syncSent(mailbox, outbound));
+}
+
 export async function syncMail(): Promise<MailSyncResult> {
   const all = await connectedMailboxes();
   const database = await db();
   const [leads, threads] = await Promise.all([
-    database.select().from(businesses).where(or(eq(businesses.stage, "sent"), eq(businesses.stage, "clicked"), eq(businesses.stage, "replied"), eq(businesses.stage, "paid"), eq(businesses.stage, "live"))),
+    database.select().from(businesses).where(inArray(businesses.stage, EMAILED_STAGES)),
     database.selectDistinct({ threadId: messages.threadId, businessId: messages.businessId }).from(messages),
   ]);
-  const index = indexBusinesses(leads, threads);
+  const inbound = indexBusinesses(
+    leads.filter((lead) => REPLYING_STAGES.includes(lead.stage)),
+    threads,
+  );
+  const outbound = indexBusinesses(leads, threads);
   const result: MailSyncResult = { mailboxes: all.length, newMessages: 0, errors: [] };
   for (const mailbox of all) {
     try {
-      result.newMessages += await syncMailbox(mailbox, index);
+      result.newMessages += await syncMailbox(mailbox, inbound, outbound);
     } catch (error) {
       await failMailbox(mailbox, error);
       result.errors.push(`${mailbox.email}: ${(error as Error).message}`);

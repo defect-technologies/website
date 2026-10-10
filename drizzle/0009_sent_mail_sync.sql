@@ -1,0 +1,1 @@
+ALTER TABLE "mailboxes" ADD COLUMN "last_sent_synced_at" timestamp with time zone;

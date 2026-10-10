@@ -83,6 +83,8 @@ export const mailboxes = pgTable("mailboxes", {
   connectedBy: text("connected_by").notNull(),
   connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  /** Kept apart from lastSyncedAt so mail sent before Sent was read still gets picked up once. */
+  lastSentSyncedAt: timestamp("last_sent_synced_at", { withTimezone: true }),
   lastError: text("last_error").notNull().default(""),
 });
 

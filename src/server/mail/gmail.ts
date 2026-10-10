@@ -97,9 +97,11 @@ function toIncoming(message: GmailMessage): IncomingEmail {
   };
 }
 
-/** Inbox mail that arrived after `since`, oldest first. */
-export async function inboxSince(mailbox: Mailbox, since: Date): Promise<IncomingEmail[]> {
-  const query = encodeURIComponent(`in:inbox after:${Math.floor(since.getTime() / 1000)}`);
+export type Folder = "inbox" | "sent";
+
+/** Mail in one folder dated after `since`, oldest first. */
+export async function mailSince(mailbox: Mailbox, folder: Folder, since: Date): Promise<IncomingEmail[]> {
+  const query = encodeURIComponent(`in:${folder} after:${Math.floor(since.getTime() / 1000)}`);
   const list = await gmail<{ messages?: { id: string }[] }>(mailbox, `/messages?q=${query}&maxResults=100`);
   const full = await Promise.all(
     (list.messages ?? []).map((m) => gmail<GmailMessage>(mailbox, `/messages/${m.id}?format=full`)),

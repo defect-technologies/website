@@ -4,6 +4,7 @@ import Link from "next/link";
 import EmptyState from "@/components/admin/EmptyState";
 import { CheckMailButton, OptOutButton, ReplyBox } from "@/components/admin/ThreadControls";
 import { ArmChip, Card, Notice, PageHeader, StageChip, When } from "@/components/admin/ui";
+import { sentByLine } from "@/lib/senders";
 import type { Business, Message } from "@/server/db/schema";
 import { businessById } from "@/server/leads/businesses";
 import { domainOf } from "@/server/mail/mime";
@@ -51,7 +52,7 @@ function MessageBlock({ message, business }: { message: Message; business: Busin
   return (
     <article className={`flex flex-col gap-2 rounded-2xl p-4 ${ours ? "bg-paper-shade/60 ml-6 sm:ml-12" : "bg-surface shadow-card mr-6 sm:mr-12"}`}>
       <header className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-        <span className="font-semibold">{ours ? (message.sentBy ? `Us, sent by ${message.sentBy.split("@")[0]}` : "Us") : business.businessName}</span>
+        <span className="font-semibold">{ours ? sentByLine(message.sentBy) : business.businessName}</span>
         <span className="text-ink-faint">
           {ours ? `to ${message.toAddress}` : message.fromAddress}, <When date={message.at} />
         </span>
