@@ -1,7 +1,7 @@
 import "server-only";
-import { and, asc, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, notInArray, or } from "drizzle-orm";
 import { z } from "zod";
-import { canMove, type Bot } from "@/lib/bots";
+import { BOT_LABEL, canMove, ownerOfStage, type Bot } from "@/lib/bots";
 import type { OutreachSettings } from "@/lib/emailTemplate";
 import { STAGES, type Stage } from "@/lib/stages";
 import { record } from "../activity";
@@ -65,15 +65,35 @@ function searchClause({ email, q }: z.infer<typeof LeadQuery>) {
   return and(byEmail, byText);
 }
 
-export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
+/**
+ * For a sender search, which other bot owns any match this key can't see, so a bot
+ * can tell "another bot's lead" from "no lead at all". Only the owner and stage leave.
+ */
+async function ownedElsewhere(key: BotKey, query: z.infer<typeof LeadQuery>) {
+  if (!query.email && !query.q) return [];
   const rows = await (await db())
-    .select()
+    .select({ stage: businesses.stage })
     .from(businesses)
-    .where(and(inArray(businesses.stage, visibleStages(key, query.stage)), searchClause(query)))
-    .orderBy(desc(businesses.updatedAt))
-    .limit(100);
-  const settings = await outreachSettings();
-  return { leads: rows.map((row) => leadView(row, settings)) };
+    .where(and(notInArray(businesses.stage, key.stages), searchClause(query)))
+    .limit(20);
+  return rows.map(({ stage }) => {
+    const owner = ownerOfStage(stage);
+    return { stage, ownedBy: owner ? BOT_LABEL[owner] : "nobody: this sender opted out, never email them" };
+  });
+}
+
+export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
+  const [rows, elsewhere, settings] = await Promise.all([
+    (await db())
+      .select()
+      .from(businesses)
+      .where(and(inArray(businesses.stage, visibleStages(key, query.stage)), searchClause(query)))
+      .orderBy(desc(businesses.updatedAt))
+      .limit(100),
+    ownedElsewhere(key, query),
+    outreachSettings(),
+  ]);
+  return { leads: rows.map((row) => leadView(row, settings)), ownedByOtherBots: elsewhere };
 }
 
 /** The lead, if it exists and sits in one of this bot's stages. */

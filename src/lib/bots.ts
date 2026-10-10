@@ -52,6 +52,13 @@ export const BOT_TRANSITIONS: Record<Bot, Partial<Record<Stage, Stage[]>>> = {
   runner: {},
 };
 
+const LEAD_OWNERS = ["outreach", "onboarding", "client_care"] as const satisfies Bot[];
+
+/** The bot that answers a lead at this stage, or null for opted-out leads nobody emails. */
+export function ownerOfStage(stage: Stage): Bot | null {
+  return LEAD_OWNERS.find((bot) => BOT_STAGES[bot].includes(stage)) ?? null;
+}
+
 export function canMove(bot: Bot, from: Stage, to: Stage): boolean {
   return BOT_TRANSITIONS[bot][from]?.includes(to) ?? false;
 }
