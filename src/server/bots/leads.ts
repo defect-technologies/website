@@ -35,6 +35,8 @@ function leadView(lead: Business, settings: OutreachSettings) {
     previewUrl: lead.previewUrl,
     checkoutUrl: checkoutLink(lead, settings),
     siteUrl: lead.siteUrl,
+    /** Set by a founder when the site launches somewhere other than the old website's domain. */
+    launchDomain: lead.launchDomain,
     problem: lead.emailProblem || lead.problemSummary,
     note: lead.note,
     firstSentAt: lead.firstSentAt,
