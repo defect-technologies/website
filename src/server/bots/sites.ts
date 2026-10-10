@@ -5,7 +5,7 @@ import { env } from "../env";
 import type { BotKey, Business, PreviewJob } from "../db/schema";
 import { launchDomainOf } from "../integrations/domain";
 import { billingPortalLink } from "../integrations/stripe";
-import { latestJob, requestPreview } from "../runner/jobs";
+import { latestJob, launchBlocker, requestPreview } from "../runner/jobs";
 import { actorOf, BotError } from "./http";
 import { ownedLead } from "./leads";
 
@@ -35,8 +35,8 @@ export async function requestCorrections(key: BotKey, id: string, body: z.infer<
 export async function requestLaunch(key: BotKey, id: string) {
   requireBot(key, ["onboarding"], "launch sites");
   const lead = await ownedLead(key, id);
-  if (!lead.paidAt) throw new BotError(409, "This lead hasn't paid, so its site can't launch.");
-  if (!lead.previewUrl) throw new BotError(409, "This lead has no built preview to launch yet.");
+  const blocker = launchBlocker(lead);
+  if (blocker) throw new BotError(409, blocker);
   if (!launchDomainOf(lead)) throw new BotError(409, "This lead has no website address on file to launch at. Flag it for a founder.");
   const { job, created } = await requestPreview(lead, actorOf(key), "", "launch");
   if (job.kind !== "launch") throw new BotError(409, "A build for this lead is still running. Launch once it's done.");

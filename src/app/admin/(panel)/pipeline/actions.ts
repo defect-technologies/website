@@ -8,7 +8,7 @@ import { requireFounder } from "@/server/auth/session";
 import { STAGES } from "@/server/db/schema";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
-import { requestPreview } from "@/server/runner/jobs";
+import { launchBlocker, requestPreview } from "@/server/runner/jobs";
 
 export type FormResult = { ok: boolean; message: string };
 
@@ -64,4 +64,14 @@ export async function requestPreviewAction(form: FormData) {
   await requestPreview(lead, founder.email, note);
   revalidatePath(`/admin/pipeline/${lead.id}`);
   revalidatePath("/admin/projects");
+}
+
+/** Queues a launch on the runner. When it finishes, the site is added to Sites so its owner can sign in at /edit. */
+export async function launchSiteAction(form: FormData) {
+  const founder = await requireFounder();
+  const lead = await businessById(String(form.get("id") ?? ""));
+  if (!lead || launchBlocker(lead)) return;
+  await requestPreview(lead, founder.email, "", "launch");
+  revalidatePath(`/admin/pipeline/${lead.id}`);
+  revalidatePath("/admin/sites");
 }
