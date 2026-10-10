@@ -6,7 +6,10 @@ import { db } from "../db/client";
 import { messages, type BotKey, type Business, type Message } from "../db/schema";
 import { updateBusiness } from "../leads/businesses";
 import { deliver } from "../mail/outbox";
-import { TEAM_SIGNATURE_TEXT, withTeamSignatureHtml } from "../mail/teamSignature";
+import type { OutgoingEmail } from "../mail/mime";
+import { TEAM_SIGNATURE_TEXT, withSignerHtml, withTeamSignatureHtml } from "../mail/teamSignature";
+import { outreachSettings } from "../settings";
+import type { Mailbox } from "../db/schema";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
 import { replySubject, unwrapLinks, withoutSubjectLine } from "@/lib/emailLinks";
 import { actorOf, BotError } from "./http";
@@ -44,22 +47,55 @@ function htmlFor(body: string): string | undefined {
   return endsWithSignature ? withTeamSignatureHtml(body) : undefined;
 }
 
+type Reply = { to: string; subject: string; body: string; answering: Message };
+type Sender = { mailboxId: string | null; compose: (from: Mailbox | null, reply: Reply) => OutgoingEmail };
+
+function threaded(from: Mailbox | null, name: string, reply: Reply): OutgoingEmail {
+  const { to, subject, body, answering } = reply;
+  return { from: { name, email: from?.email ?? "outbox@dev.localhost" }, to, subject, body, threadId: answering.threadId, inReplyTo: answering.headerMessageId || null };
+}
+
+/** Clients hear from hello@defect.tech as the team. */
+async function studioSender(): Promise<Sender> {
+  return { mailboxId: await studioMailboxId(), compose: (from, reply) => ({ ...threaded(from, STUDIO_NAME, reply), html: htmlFor(reply.body) }) };
+}
+
+/** Prospects hear from the cold inbox their thread is on, as the founder, with the cold signature and a way out. */
+async function outreachSender(lead: Business, answering: Message): Promise<Sender> {
+  const mailboxId = answering.mailboxId ?? lead.mailboxId;
+  // Never let a prospect's reply fall back to hello@defect.tech, which only clients hear from.
+  if (!mailboxId) throw new BotError(409, "This prospect's thread isn't on a cold inbox the admin knows. Reply with the Gmail tool this once and flag it.");
+  const { senderName } = await outreachSettings();
+  return {
+    mailboxId,
+    compose: (from, reply) => {
+      const email = threaded(from, senderName, reply);
+      return { ...email, html: withSignerHtml(reply.body, { name: senderName, line: "Defect Technologies", email: email.from.email }) ?? undefined, listUnsubscribe: true };
+    },
+  };
+}
+
+const SENDERS: Record<string, (lead: Business, answering: Message) => Promise<Sender>> = {
+  onboarding: studioSender,
+  client_care: studioSender,
+  outreach: outreachSender,
+};
+
 /**
- * POST /leads/:id/reply: sends the bot's reply from hello@defect.tech in the client's thread.
- * Links come out unwrapped and the subject gets a single "Re:", whatever the bot pasted.
+ * POST /leads/:id/reply: sends the bot's reply in the lead's own thread. Links come out
+ * unwrapped and the subject gets a single "Re:", whatever the bot pasted.
  */
 export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof ReplyBody>) {
-  if (!["onboarding", "client_care"].includes(key.bot)) throw new BotError(403, "Only Onboarding and Client care send through the admin.");
+  const senderFor = SENDERS[key.bot];
+  if (!senderFor) throw new BotError(403, "Only Outreach, Onboarding and Client care send email.");
   const lead = await ownedLead(key, id);
   const { text: body, unwrapped } = unwrapLinks(withoutSubjectLine(input.body));
   checkBody(body);
   const answering = await threadToAnswer(lead);
   const to = recipientOf(answering, lead);
   const subject = replySubject(answering.subject);
-  const delivery = await deliver(
-    (from) => ({ from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" }, to, subject, body, html: htmlFor(body), threadId: answering.threadId, inReplyTo: answering.headerMessageId || null }),
-    await studioMailboxId(),
-  );
+  const sender = await senderFor(lead, answering);
+  const delivery = await deliver((from) => sender.compose(from, { to, subject, body, answering }), sender.mailboxId);
   await (await db()).insert(messages).values({
     businessId: lead.id,
     mailboxId: delivery.mailbox?.id ?? null,
