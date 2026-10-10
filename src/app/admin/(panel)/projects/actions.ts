@@ -2,13 +2,11 @@
 
 import { eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import { mailboxes } from "@/server/db/schema";
 import { syncPayments } from "@/server/integrations/stripe";
-import { updateRunnerSettings } from "@/server/runner/settings";
 import { updateBusiness } from "@/server/leads/businesses";
 
 export async function makeSenderAction(mailboxId: string) {
@@ -45,24 +43,4 @@ export async function switchPreviewVersionAction(form: FormData) {
   await updateBusiness(businessId, { previewUrl: url });
   await record(founder.email, "switched preview version", { businessId, detail: url });
   revalidatePath("/admin", "layout");
-}
-
-const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean() });
-
-/** The daily build cap and whether the Outreach bot may queue previews. */
-export async function saveRunnerSettingsAction(form: FormData) {
-  const founder = await requireFounder();
-  const parsed = RunnerForm.safeParse({ dailyCap: form.get("dailyCap"), outreachPicksPreviews: form.get("outreachPicksPreviews") === "on" });
-  if (!parsed.success) return;
-  await updateRunnerSettings(parsed.data, founder.email);
-  await record(founder.email, "changed preview runner settings", { detail: `${parsed.data.dailyCap} builds a day; Outreach ${parsed.data.outreachPicksPreviews ? "can" : "can't"} request previews` });
-  revalidatePath("/admin/projects");
-}
-
-/** Lifts the pause set when Claude's usage limit was hit. */
-export async function resumeRunnerAction() {
-  const founder = await requireFounder();
-  await updateRunnerSettings({ pausedUntil: null }, founder.email);
-  await record(founder.email, "resumed preview builds");
-  revalidatePath("/admin/projects");
 }

@@ -23,7 +23,7 @@ function QueueSection({ title, items, limitReached }: { title: string; items: Qu
 function NothingToSend({ waitingOnPreview }: { waitingOnPreview: number }) {
   if (waitingOnPreview === 0) {
     return (
-      <EmptyState title="Nothing to send" action={<ButtonLink href="/admin/pipeline" variant="soft" icon={<ArrowRight size={18} aria-hidden="true" />}>Import leads</ButtonLink>}>
+      <EmptyState title="Nothing to send" action={<ButtonLink href="/admin/overview?tab=leads" variant="soft" icon={<ArrowRight size={18} aria-hidden="true" />}>Import leads</ButtonLink>}>
         Import a leads.csv from the lead finder to start a batch.
       </EmptyState>
     );
@@ -32,7 +32,7 @@ function NothingToSend({ waitingOnPreview }: { waitingOnPreview: number }) {
     <EmptyState
       title="Nothing to send"
       action={
-        <ButtonLink href="/admin/pipeline?stage=new" variant="soft" icon={<ArrowRight size={18} aria-hidden="true" />}>
+        <ButtonLink href="/admin/overview?tab=leads&status=not_queued" variant="soft" icon={<ArrowRight size={18} aria-hidden="true" />}>
           See leads without a preview
         </ButtonLink>
       }

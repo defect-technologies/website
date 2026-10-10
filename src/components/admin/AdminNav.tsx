@@ -1,23 +1,25 @@
 "use client";
 
-import { Browsers, ChatsCircle, Flag, Funnel, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, type Icon } from "@phosphor-icons/react";
+import { Browsers, ChatsCircle, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
 
-type Item = { href: string; label: string; icon: Icon; count?: number };
+type Item = { href: string; label: string; icon: Icon; count?: number; also?: string };
 
-function isCurrent(pathname: string, href: string) {
-  return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+/** `also` is a second path the item owns, like the lead pages the Overview's rows open. */
+function isCurrent(pathname: string, { href, also }: Item) {
+  if (href === "/admin") return pathname === "/admin";
+  return pathname.startsWith(href) || Boolean(also && pathname.startsWith(also));
 }
 
 export default function AdminNav({ counts }: { counts: { outreach: number; messages: number; review: number } }) {
   const pathname = usePathname();
   const items: Item[] = [
+    { href: "/admin/overview", label: "Overview", icon: Table, also: "/admin/pipeline" },
     { href: "/admin", label: "Outreach", icon: PaperPlaneTilt, count: counts.outreach },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },
     { href: "/admin/review", label: "Review queue", icon: Flag, count: counts.review },
-    { href: "/admin/pipeline", label: "Pipeline", icon: Funnel },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/projects", label: "Projects", icon: Gauge },
     { href: "/admin/expenses", label: "Expenses", icon: Receipt },
@@ -26,10 +28,10 @@ export default function AdminNav({ counts }: { counts: { outreach: number; messa
   ];
 
   return (
-    <nav aria-label="Admin" className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0">
-      <ul className="flex gap-1 lg:flex-col">
+    <nav aria-label="Admin">
+      <ul className="flex flex-wrap gap-x-1 lg:flex-col">
         {items.map((item, index) => {
-          const current = isCurrent(pathname, item.href);
+          const current = isCurrent(pathname, item);
           const ItemIcon = item.icon;
           return (
             <li key={item.href}>

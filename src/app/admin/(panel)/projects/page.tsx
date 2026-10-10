@@ -2,23 +2,17 @@ import type { Icon } from "@phosphor-icons/react";
 import { CheckCircle, Clock, EnvelopeSimple, PauseCircle, Plus, Sparkle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { inArray } from "drizzle-orm";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { buttonClasses } from "@/components/Button";
-import Builds from "@/components/admin/Builds";
 import IntegrationPanel from "@/components/admin/IntegrationPanel";
 import PreviewList from "@/components/admin/PreviewList";
-import { DisconnectButton, MakeSenderButton, SyncPaymentsButton } from "@/components/admin/ProjectControls";
-import { Card, Notice, PageHeader, SectionHeading, StageChip, When } from "@/components/admin/ui";
+import { DisconnectButton, MakeSenderButton } from "@/components/admin/ProjectControls";
+import { Card, Notice, PageHeader, SectionHeading, When } from "@/components/admin/ui";
 import { db } from "@/server/db/client";
-import { businesses, type Business, type Mailbox } from "@/server/db/schema";
+import { businesses, type Mailbox } from "@/server/db/schema";
 import { healthChecks, type CheckStatus, type HealthCheck } from "@/server/integrations/healthchecks";
-import { stripeSummary } from "@/server/integrations/stripe";
 import { recentSiteChanges, type SiteChange } from "@/server/integrations/siteChanges";
 import { previewDeployments } from "@/server/integrations/vercel";
 import { connectedMailboxes } from "@/server/mail/outbox";
-import { listBotKeys } from "@/server/bots/keys";
-import { buildsToday, jobsForAdmin } from "@/server/runner/jobs";
-import { activePause, runnerSettings } from "@/server/runner/settings";
 
 export const metadata: Metadata = { title: "Projects" };
 
@@ -94,34 +88,6 @@ function Checks({ checks }: { checks: HealthCheck[] }) {
   );
 }
 
-function Clients({ clients }: { clients: Business[] }) {
-  if (clients.length === 0) return <p className="text-ink-soft text-sm">Nobody has paid yet. When someone checks out, they show up here within half an hour.</p>;
-  return (
-    <ul className="flex flex-col gap-3">
-      {clients.map((client) => (
-        <li key={client.id} className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <Link href={`/admin/pipeline/${client.id}`} className="font-medium hover:underline">
-            {client.businessName}
-          </Link>
-          <StageChip stage={client.stage} />
-          <span className="text-ink-soft text-sm tabular-nums">{client.plan || "Plan unknown"}</span>
-          <span className="text-ink-faint ml-auto text-sm">
-            {client.siteUrl ? (
-              <a href={client.siteUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-                {client.siteUrl.replace(/^https?:\/\//, "")}
-              </a>
-            ) : (
-              <>
-                Paid <When date={client.paidAt} />, not live yet
-              </>
-            )}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** "page:/about" reads as "the /about page". */
 function documentName(key: string) {
   if (key === "theme") return "the theme";
@@ -151,23 +117,15 @@ function SiteChanges({ changes }: { changes: SiteChange[] }) {
   );
 }
 
-const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ mailbox?: string }> }) {
   const { mailbox } = await searchParams;
   const database = await db();
-  const [inboxes, checks, previews, money, clients, withPreviews, siteChanges, jobs, builder, builtToday, keys] = await Promise.all([
+  const [inboxes, checks, previews, withPreviews, siteChanges] = await Promise.all([
     connectedMailboxes(),
     healthChecks(),
     previewDeployments(),
-    stripeSummary(),
-    database.select().from(businesses).where(inArray(businesses.stage, ["paid", "live"])),
     database.select().from(businesses).where(inArray(businesses.stage, ["preview_built", "sent", "clicked", "replied", "lost"])),
     recentSiteChanges(),
-    jobsForAdmin(),
-    runnerSettings(),
-    buildsToday(),
-    listBotKeys(),
   ]);
   const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;
 
@@ -183,25 +141,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Health checks</SectionHeading>
           <IntegrationPanel result={checks}>{(data) => <Checks checks={data} />}</IntegrationPanel>
-        </Card>
-        <Card className="flex flex-col gap-4 p-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <SectionHeading count={clients.length}>Clients</SectionHeading>
-            <IntegrationPanel result={money}>
-              {(data) => (
-                <p className="text-sm tabular-nums">
-                  <span className="text-xl font-semibold">{dollars.format(data.monthlyRevenue)}</span>
-                  <span className="text-ink-faint"> a month from {data.active} subscriptions</span>
-                </p>
-              )}
-            </IntegrationPanel>
-          </div>
-          <Clients clients={clients} />
-          <SyncPaymentsButton />
-        </Card>
-        <Card className="flex flex-col gap-4 p-5">
-          <SectionHeading>Builds</SectionHeading>
-          <Builds jobs={jobs} settings={builder} builtToday={builtToday} pausedUntil={activePause(builder)} runnerKey={keys.find((key) => key.bot === "runner" && !key.revokedAt)} />
         </Card>
         <Card className="flex flex-col gap-4 p-5">
           <SectionHeading>Previews</SectionHeading>

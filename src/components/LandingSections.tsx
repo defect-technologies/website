@@ -29,17 +29,74 @@ export function WebsitesSection() {
   );
 }
 
+const PRICE_COLUMNS: { label: string; figure: (row: PriceRow) => [number, number] }[] = [
+  { label: "Up front", figure: (row) => row.upFront },
+  { label: "Each month", figure: (row) => row.monthly },
+  { label: "First year", figure: firstYear },
+];
+
+const figureClass = (emphasis: boolean) => (emphasis ? "text-ink text-3xl font-semibold sm:text-4xl" : "text-ink-soft text-lg");
+
 function PriceCells({ row, emphasis }: { row: PriceRow; emphasis: boolean }) {
-  const figure = emphasis ? "text-ink text-3xl font-semibold sm:text-4xl" : "text-ink-soft text-lg";
   return (
     <tr className="border-ink/10 border-t align-baseline">
       <th scope="row" className={`py-5 pr-6 text-left font-medium ${emphasis ? "text-ink text-lg" : "text-ink-soft"}`}>
         {row.who}
       </th>
-      <td className={`py-5 pr-6 tabular-nums ${figure}`}>{priceRange(row.upFront)}</td>
-      <td className={`py-5 pr-6 tabular-nums ${figure}`}>{priceRange(row.monthly)}</td>
-      <td className={`py-5 tabular-nums ${figure}`}>{priceRange(firstYear(row))}</td>
+      {PRICE_COLUMNS.map((column) => (
+        <td key={column.label} className={`py-5 pr-6 tabular-nums last:pr-0 ${figureClass(emphasis)}`}>
+          {priceRange(column.figure(row))}
+        </td>
+      ))}
     </tr>
+  );
+}
+
+function PriceTable() {
+  return (
+    <table className="hidden w-full border-collapse sm:table">
+      <caption className="sr-only">What a small-business website costs</caption>
+      <thead>
+        <tr className="text-ink-soft text-left text-sm">
+          <th scope="col" className="pb-3 font-normal">
+            <span className="sr-only">Who builds it</span>
+          </th>
+          {PRICE_COLUMNS.map((column) => (
+            <th key={column.label} scope="col" className="pb-3 font-normal">
+              {column.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        <PriceCells row={FREELANCER} emphasis={false} />
+        <PriceCells row={DEFECT} emphasis />
+      </tbody>
+    </table>
+  );
+}
+
+/** On a phone the table's four columns don't fit, so each builder gets its own block with the same three figures. */
+function PriceStack() {
+  return (
+    <div className="flex flex-col sm:hidden">
+      {[
+        { row: FREELANCER, emphasis: false },
+        { row: DEFECT, emphasis: true },
+      ].map(({ row, emphasis }) => (
+        <section key={row.who} className="border-ink/10 flex flex-col gap-3 border-t py-5">
+          <h3 className={`font-medium ${emphasis ? "text-ink text-lg" : "text-ink-soft"}`}>{row.who}</h3>
+          <dl className="flex flex-col gap-2">
+            {PRICE_COLUMNS.map((column) => (
+              <div key={column.label} className="flex items-baseline justify-between gap-4">
+                <dt className="text-ink-soft text-sm">{column.label}</dt>
+                <dd className={`text-right tabular-nums ${emphasis ? "text-ink text-2xl font-semibold" : "text-ink-soft text-lg"}`}>{priceRange(column.figure(row))}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -47,24 +104,9 @@ export function SavingsSection() {
   return (
     <section className={`${SECTION} flex flex-col gap-12`}>
       <PaintedHeadline as="h2" headline={SAVINGS} style={{ fontSize: "clamp(2.25rem, 7.5vw, 6rem)" }} />
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <table className="w-full min-w-[34rem] border-collapse">
-          <caption className="sr-only">What a small-business website costs</caption>
-          <thead>
-            <tr className="text-ink-soft text-left text-sm">
-              <th scope="col" className="pb-3 font-normal">
-                <span className="sr-only">Who builds it</span>
-              </th>
-              <th scope="col" className="pb-3 font-normal">Up front</th>
-              <th scope="col" className="pb-3 font-normal">Each month</th>
-              <th scope="col" className="pb-3 font-normal">First year</th>
-            </tr>
-          </thead>
-          <tbody>
-            <PriceCells row={FREELANCER} emphasis={false} />
-            <PriceCells row={DEFECT} emphasis />
-          </tbody>
-        </table>
+      <div>
+        <PriceTable />
+        <PriceStack />
       </div>
       <p className={BODY}>Hosting and every change you send us are included.</p>
       <p className="text-ink-soft text-sm">

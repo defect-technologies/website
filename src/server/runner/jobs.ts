@@ -1,9 +1,9 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { ACTIVE_JOB_STATUSES, type PreviewJobStatus } from "@/lib/previewJobs";
 import { record } from "../activity";
 import { db } from "../db/client";
-import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
+import { previewJobs, type Business, type PreviewJob } from "../db/schema";
 import { businessById, updateBusiness } from "../leads/businesses";
 
 export type RequestResult = { job: PreviewJob; created: boolean };
@@ -43,6 +43,15 @@ export async function buildsToday(): Promise<number> {
   return row?.count ?? 0;
 }
 
+/** What today's finished builds would have cost at API prices, in dollars. */
+export async function spentToday(): Promise<number> {
+  const [row] = await (await db())
+    .select({ usd: sql<number>`coalesce(sum(${previewJobs.apiEquivalentUsd}), 0)::float` })
+    .from(previewJobs)
+    .where(and(eq(previewJobs.status, "done"), gte(previewJobs.finishedAt, LA_MIDNIGHT)));
+  return row?.usd ?? 0;
+}
+
 /**
  * Claims the oldest queued job in one statement. SKIP LOCKED means two runners
  * polling at once can never both get the same job.
@@ -66,20 +75,6 @@ export async function jobById(id: string): Promise<PreviewJob | null> {
 export async function updateJob(id: string, fields: Partial<PreviewJob>) {
   const [job] = await (await db()).update(previewJobs).set(fields).where(eq(previewJobs.id, id)).returning();
   return job;
-}
-
-export type JobRow = PreviewJob & { businessName: string; slug: string };
-
-/** Jobs for the admin's Builds section: everything active, plus what finished since midnight. */
-export async function jobsForAdmin(): Promise<JobRow[]> {
-  const rows = await (await db())
-    .select({ job: previewJobs, businessName: businesses.businessName, slug: businesses.slug })
-    .from(previewJobs)
-    .innerJoin(businesses, eq(previewJobs.businessId, businesses.id))
-    .where(sql`${previewJobs.status} in ('queued', 'claimed', 'running') or ${previewJobs.finishedAt} >= ${LA_MIDNIGHT}`)
-    .orderBy(desc(previewJobs.createdAt))
-    .limit(100);
-  return rows.map(({ job, businessName, slug }) => ({ ...job, businessName, slug }));
 }
 
 export async function leadForJob(job: PreviewJob): Promise<Business> {

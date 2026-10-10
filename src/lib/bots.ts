@@ -78,3 +78,13 @@ export function keyHome(bot: Bot): { env: string; where: string } {
   if (bot === "runner") return { env: RUNNER_KEY_ENV, where: "/etc/defect-runner.env on the runner machine" };
   return { env: BOT_KEY_ENV[bot], where: "the bot's Secrets in Grok Bot" };
 }
+
+/** "bot:client_care" reads as "Client care bot", a founder's address as their name; scripts keep their own names. */
+export function actorLabel(actor: string): string {
+  if (actor.startsWith("bot:")) {
+    const bot = actor.slice("bot:".length) as Bot;
+    if (bot === "runner") return BOT_LABEL.runner;
+    return BOT_LABEL[bot] ? `${BOT_LABEL[bot]} bot` : actor;
+  }
+  return actor.includes("@") ? actor.split("@")[0] : actor;
+}

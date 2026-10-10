@@ -6,6 +6,7 @@ import { BOTS, BOT_LABEL } from "@/lib/bots";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { createBotKey, revokeBotKey } from "@/server/bots/keys";
+import { updateRunnerSettings } from "@/server/runner/settings";
 
 export type CreateKeyState = { key: string; bot: string; error: string };
 
@@ -26,4 +27,24 @@ export async function revokeBotKeyAction(form: FormData) {
   const revoked = await revokeBotKey(String(form.get("id") ?? ""));
   if (revoked) await record(founder.email, "revoked a bot key", { detail: `${BOT_LABEL[revoked.bot]}: ${revoked.name}` });
   revalidatePath("/admin/bots");
+}
+
+const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean() });
+
+/** The daily build cap and whether the Outreach bot may queue previews. */
+export async function saveRunnerSettingsAction(form: FormData) {
+  const founder = await requireFounder();
+  const parsed = RunnerForm.safeParse({ dailyCap: form.get("dailyCap"), outreachPicksPreviews: form.get("outreachPicksPreviews") === "on" });
+  if (!parsed.success) return;
+  await updateRunnerSettings(parsed.data, founder.email);
+  await record(founder.email, "changed preview runner settings", { detail: `${parsed.data.dailyCap} builds a day; Outreach ${parsed.data.outreachPicksPreviews ? "can" : "can't"} request previews` });
+  revalidatePath("/admin", "layout");
+}
+
+/** Lifts the pause set when Claude's usage limit was hit. */
+export async function resumeRunnerAction() {
+  const founder = await requireFounder();
+  await updateRunnerSettings({ pausedUntil: null }, founder.email);
+  await record(founder.email, "resumed preview builds");
+  revalidatePath("/admin", "layout");
 }

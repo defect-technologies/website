@@ -8,5 +8,5 @@ export async function POST() {
   if (!devShortcutsEnabled) return new NextResponse(null, { status: 404 });
   await requireFounder();
   await loadSamples();
-  return NextResponse.redirect(new URL("/admin/pipeline", env.siteUrl()), 303);
+  return NextResponse.redirect(new URL("/admin/overview?tab=leads", env.siteUrl()), 303);
 }

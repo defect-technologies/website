@@ -63,8 +63,8 @@ export default async function LeadPage({ params }: Params) {
 
   return (
     <>
-      <Link href="/admin/pipeline" className="text-ink-soft hover:text-ink inline-flex w-fit items-center gap-1.5 text-sm">
-        <ArrowLeft size={16} aria-hidden="true" /> Pipeline
+      <Link href="/admin/overview?tab=leads" className="text-ink-soft hover:text-ink inline-flex w-fit items-center gap-1.5 text-sm">
+        <ArrowLeft size={16} aria-hidden="true" /> Leads
       </Link>
       <header className="flex flex-wrap items-center gap-4">
         <h1 className="font-display text-5xl leading-none font-black">{business.businessName}</h1>

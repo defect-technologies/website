@@ -65,11 +65,6 @@ export async function stageCounts(): Promise<Record<string, number>> {
   return Object.fromEntries(rows.map((row) => [row.stage, row.count]));
 }
 
-export async function niches(): Promise<string[]> {
-  const rows = await (await db()).selectDistinct({ niche: businesses.niche }).from(businesses).where(isNotNull(businesses.niche));
-  return rows.map((row) => row.niche).filter(Boolean).sort();
-}
-
 export type ArmFunnel = { arm: number; leads: number; sent: number; clicked: number; replied: number; paid: number };
 
 /** How far each price arm's leads got, counting a lead at every step it has reached. */
