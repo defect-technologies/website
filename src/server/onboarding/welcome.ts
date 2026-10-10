@@ -9,9 +9,9 @@ const SUBJECT = "Welcome to Defect Technologies";
 /** Clients hear from the studio inbox, never from a cold-email domain. */
 const STUDIO_INBOX = "hello@defect.tech";
 /** The studio inbox writes as the team; founders' names are for cold email only. */
-const STUDIO_NAME = "Defect Technologies";
+export const STUDIO_NAME = "Defect Technologies";
 
-async function studioMailboxId() {
+export async function studioMailboxId() {
   const studio = (await connectedMailboxes()).find((mailbox) => mailbox.email.toLowerCase() === STUDIO_INBOX);
   if (!studio) throw new Error(`${STUDIO_INBOX} isn't connected on the Projects page.`);
   return studio.id;
