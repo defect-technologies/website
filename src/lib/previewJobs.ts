@@ -15,6 +15,13 @@ export const JOB_STATUS_LABEL: Record<PreviewJobStatus, string> = {
   waiting_for_usage: "Waiting for Claude usage",
 };
 
+/** A preview build (or rebuild with a note), or a launch onto the client's own Vercel project. */
+export const JOB_KINDS = ["preview", "launch"] as const;
+export type JobKind = (typeof JOB_KINDS)[number];
+
+/** How many times a lead's build may fail in a row before it's left for a founder. */
+export const MAX_FAILED_BUILDS = 2;
+
 /** Settings the founders control from the Projects page. */
 export type RunnerSettings = {
   dailyCap: number;

@@ -13,6 +13,7 @@ import { checkoutLink } from "../leads/buildCommand";
 import { previewLink } from "../outreach/compose";
 import { outreachSettings } from "../settings";
 import { actorOf, BotError } from "./http";
+import { buildAndLaunchState } from "./sites";
 
 const NOTE_ACTIONS = ["note", "handoff note"];
 
@@ -118,7 +119,8 @@ export async function leadDetail(key: BotKey, id: string) {
     domainFacts(lead.website),
   ]);
   const notes = history.filter((entry) => NOTE_ACTIONS.includes(entry.action)).map(({ at, actor, action, detail }) => ({ at, by: actor, handoff: action === "handoff note", text: detail }));
-  return { lead: leadView(lead, settings), domain, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
+  const builds = await buildAndLaunchState(lead);
+  return { lead: leadView(lead, settings), domain, ...builds, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
 }
 
 export const NoteBody = z.object({ text: z.string().trim().min(1).max(4000), handoff: z.boolean().default(false) });

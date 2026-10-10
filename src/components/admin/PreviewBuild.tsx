@@ -10,6 +10,7 @@ import { Notice, SectionHeading, When } from "./ui";
 function Queued({ job }: { job: PreviewJob }) {
   return (
     <Notice tone="good">
+      {job.kind === "launch" ? "Launch: " : ""}
       {JOB_STATUS_LABEL[job.status]}
       {job.step ? `: ${job.step}` : ""}. Requested by {job.requestedBy} <When date={job.createdAt} />.
       {job.note && <span className="mt-1 block">Note: {job.note}</span>}

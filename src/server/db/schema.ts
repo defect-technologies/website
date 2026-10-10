@@ -263,6 +263,10 @@ export const previewJobs = pgTable(
     apiEquivalentUsd: real("api_equivalent_usd"),
     logTail: text("log_tail").notNull().default(""),
     attempts: integer("attempts").notNull().default(0),
+    /** preview builds and redeploys a preview; launch puts a paid site live on its own Vercel project. */
+    kind: text("kind").notNull().default("preview"),
+    /** A launch's outcome: { projectId, liveUrl, records: [{ host, type, name, value }] }. */
+    result: jsonb("result"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

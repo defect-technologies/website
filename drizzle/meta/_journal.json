@@ -71,6 +71,13 @@
       "when": 1791595436265,
       "tag": "0009_sent_mail_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791610761187,
+      "tag": "0010_launch_jobs",
+      "breakpoints": true
     }
   ]
 }
