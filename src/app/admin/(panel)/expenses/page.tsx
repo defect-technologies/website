@@ -2,22 +2,21 @@ import { ArrowRight, CheckCircle, DownloadSimple } from "@phosphor-icons/react/d
 import type { Metadata } from "next";
 import { buttonClasses } from "@/components/Button";
 import AddExpenseForm from "@/components/admin/AddExpenseForm";
-import DeleteExpenseButton from "@/components/admin/DeleteExpenseButton";
 import EmptyState from "@/components/admin/EmptyState";
+import { MonthSheet, RecurringSheet } from "@/components/admin/ExpenseSheets";
 import KnifeStroke from "@/components/admin/KnifeStroke";
 import SubmitButton from "@/components/admin/SubmitButton";
-import { Card, KeyValue, PageHeader } from "@/components/admin/ui";
+import { Card, KeyValue, PageHeader, SectionHeading } from "@/components/admin/ui";
 import { FOUNDER_EMAILS, FOUNDERS, founderName } from "@/lib/founders";
 import { formatCents, monthName, monthOf, todayInPacific, type MonthBalance } from "@/lib/settleUp";
 import { requireFounder } from "@/server/auth/session";
-import type { Expense } from "@/server/db/schema";
+import type { Expense, ExpenseFrequency, RecurringExpense } from "@/server/db/schema";
 import { balances } from "@/server/expenses/expenses";
 import { settleMonthAction } from "./actions";
 
 export const metadata: Metadata = { title: "Expenses" };
 
 const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const dayOf = (spentOn: string) => shortDate.format(new Date(`${spentOn}T00:00:00Z`));
 
 function lastDayOf(month: string) {
   const [year, monthIndex] = month.split("-").map(Number);
@@ -74,7 +73,9 @@ function MonthStatus({ balance }: { balance: MonthBalance }) {
   );
 }
 
-function MonthTable({ balance, expenses }: { balance: MonthBalance; expenses: Expense[] }) {
+type SheetProps = { frequencies: Map<string, ExpenseFrequency>; today: string };
+
+function MonthTable({ balance, expenses, frequencies, today }: SheetProps & { balance: MonthBalance; expenses: Expense[] }) {
   return (
     <section className="flex flex-col gap-3" aria-labelledby={`month-${balance.month}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -84,37 +85,18 @@ function MonthTable({ balance, expenses }: { balance: MonthBalance; expenses: Ex
         </h2>
         <MonthStatus balance={balance} />
       </div>
-      {expenses.length > 0 && (
-        <Card>
-          <table className="w-full table-fixed text-left text-sm">
-            <thead className="text-ink-faint">
-              <tr>
-                <th scope="col" className="w-20 px-4 py-3 font-medium sm:w-24 sm:px-5">Date</th>
-                <th scope="col" className="px-2 py-3 font-medium sm:px-5">What it was for</th>
-                <th scope="col" className="hidden w-36 px-5 py-3 font-medium sm:table-cell">Paid by</th>
-                <th scope="col" className="w-24 px-2 py-3 text-right font-medium sm:w-28 sm:px-5">Amount</th>
-                <th scope="col" className="w-14 py-3 pr-2"><span className="sr-only">Delete</span></th>
-              </tr>
-            </thead>
-            <tbody className="divide-ink/8 divide-y">
-              {expenses.map((expense) => (
-                <tr key={expense.id}>
-                  <td className="text-ink-soft px-4 py-2 whitespace-nowrap tabular-nums sm:px-5">{dayOf(expense.spentOn)}</td>
-                  <td className="px-2 py-2 sm:px-5">
-                    <span className="block font-medium break-words">{expense.item}</span>
-                    <span className="text-ink-faint block sm:hidden">{founderName(expense.paidBy)}</span>
-                  </td>
-                  <td className="text-ink-soft hidden px-5 py-2 sm:table-cell">{founderName(expense.paidBy)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums sm:px-5">{formatCents(expense.amountCents)}</td>
-                  <td className="relative py-1 pr-2 text-right">
-                    <DeleteExpenseButton id={expense.id} item={expense.item} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+      {expenses.length > 0 && <MonthSheet expenses={expenses} frequencies={frequencies} today={today} />}
+    </section>
+  );
+}
+
+function Repeating({ recurring, today }: { recurring: RecurringExpense[]; today: string }) {
+  const running = recurring.filter((row) => !row.stoppedOn);
+  if (running.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionHeading count={running.length}>Repeating</SectionHeading>
+      <RecurringSheet recurring={running} today={today} />
     </section>
   );
 }
@@ -133,7 +115,8 @@ function SettleUp({ months, thisMonth }: { months: MonthBalance[]; thisMonth: st
 
 export default async function ExpensesPage() {
   const founder = await requireFounder();
-  const { expenses, months } = await balances();
+  const { expenses, recurring, months } = await balances();
+  const frequencies = new Map(recurring.map((row) => [row.id, row.frequency]));
   const today = todayInPacific();
   const csvLink = (
     <a href="/admin/expenses/export" className={buttonClasses("ghost", "sm")}>
@@ -147,10 +130,11 @@ export default async function ExpensesPage() {
       <PageHeader title="Expenses">{expenses.length > 0 && csvLink}</PageHeader>
       <SettleUp months={months} thisMonth={monthOf(today)} />
       <AddExpenseForm founders={[...FOUNDERS]} signedIn={founder.email} today={today} />
+      <Repeating recurring={recurring} today={today} />
       {months.length === 0 ? (
         <EmptyState title="No expenses yet">Add anything one of you paid for the business. Each month&apos;s total is split evenly, and whoever paid less sends the difference by Zelle.</EmptyState>
       ) : (
-        months.map((balance) => <MonthTable key={balance.month} balance={balance} expenses={expenses.filter((expense) => monthOf(expense.spentOn) === balance.month)} />)
+        months.map((balance) => <MonthTable key={balance.month} balance={balance} expenses={expenses.filter((expense) => monthOf(expense.spentOn) === balance.month)} frequencies={frequencies} today={today} />)
       )}
     </>
   );
