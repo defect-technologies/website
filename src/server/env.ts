@@ -41,4 +41,6 @@ export const env = {
   signInEmail: () => ({ apiKey: optional("SIGN_IN_EMAIL_API_KEY"), from: optional("SIGN_IN_EMAIL_FROM") }),
   /** Shared with every client site on site-kit, which checks the sign-in links we mint with it. */
   editorSecret: () => optional("EDITOR_SECRET"),
+  /** Fine-grained, Contents read-only on defect-technologies/defect-tech. The bots' instructions are read from there. */
+  githubReadToken: () => optional("GITHUB_READ_TOKEN"),
 };
