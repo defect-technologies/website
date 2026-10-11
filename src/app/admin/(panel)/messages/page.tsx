@@ -63,7 +63,9 @@ function MessageBlock({ message, business }: { message: Message; business: Busin
 }
 
 function ThreadView({ business, thread }: { business: Business; thread: Message[] }) {
-  const lastIncoming = [...thread].reverse().find((m) => m.direction === "in");
+  // Newest first, so the latest reply is at the top and the first cold email at the bottom.
+  const newestFirst = [...thread].reverse();
+  const lastIncoming = newestFirst.find((m) => m.direction === "in");
   const suggestOptOut = Boolean(lastIncoming && looksLikeOptOut(lastIncoming.body)) && business.stage !== "opted_out";
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -80,13 +82,6 @@ function ThreadView({ business, thread }: { business: Business; thread: Message[
         {business.stage !== "opted_out" && <OptOutButton businessId={business.id} domain={domainOf(business.email)} suggested={suggestOptOut} />}
       </header>
       {suggestOptOut && <Notice tone="warn">Their last message reads like a no. If it is, mark them opted out so they never hear from us again.</Notice>}
-      <ol className="flex flex-col gap-3">
-        {thread.map((message) => (
-          <li key={message.id}>
-            <MessageBlock message={message} business={business} />
-          </li>
-        ))}
-      </ol>
       {business.stage === "opted_out" ? (
         <Notice tone="bad">They opted out. Nothing more can be sent to them.</Notice>
       ) : (
@@ -94,6 +89,13 @@ function ThreadView({ business, thread }: { business: Business; thread: Message[
           <ReplyBox businessId={business.id} to={lastIncoming?.fromAddress ?? business.email} />
         </Card>
       )}
+      <ol className="flex flex-col gap-3" aria-label="Messages, newest first">
+        {newestFirst.map((message) => (
+          <li key={message.id}>
+            <MessageBlock message={message} business={business} />
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
