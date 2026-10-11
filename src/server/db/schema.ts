@@ -185,6 +185,40 @@ export const editorLinks = pgTable("editor_links", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** A client's sign-in to their portal. Anyone who owns a client site can sign in; the row appears on first sign-in. */
+export const portalAccounts = pgTable("portal_accounts", {
+  email: text("email").primaryKey(),
+  passwordHash: text("password_hash").notNull().default(""),
+  passwordSetAt: timestamp("password_set_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
+});
+
+/** One-time sign-in links for the portal. Only the code's hash is stored. */
+export const portalLinks = pgTable(
+  "portal_links",
+  {
+    codeHash: text("code_hash").primaryKey(),
+    email: text("email").notNull(),
+    next: text("next").notNull().default(""),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("portal_links_email").on(table.email, table.createdAt)],
+);
+
+/** Wrong passwords, counted per email so guessing stops after a few tries. */
+export const portalFailedSignIns = pgTable(
+  "portal_failed_sign_ins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("portal_failed_sign_ins_email").on(table.email, table.at)],
+);
+
 export const botName = pgEnum("bot_name", BOTS);
 export const flagStatus = pgEnum("flag_status", FLAG_STATUSES);
 export const previewJobStatus = pgEnum("preview_job_status", PREVIEW_JOB_STATUSES);
@@ -493,3 +527,4 @@ export type SpotCheck = typeof spotChecks.$inferSelect;
 export type Prospect = typeof prospects.$inferSelect;
 export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type ExpenseFrequency = RecurringExpense["frequency"];
+export type PortalAccount = typeof portalAccounts.$inferSelect;

@@ -39,7 +39,7 @@ function SpentLink({ message, slug }: { message: string; slug?: string }) {
           <SubmitButton variant="solid">Email me a new link</SubmitButton>
         </form>
       ) : (
-        <ButtonLink href="/edit/sign-in">Email me a new link</ButtonLink>
+        <ButtonLink href="/portal/sign-in">Email me a new link</ButtonLink>
       )}
     </div>
   );
