@@ -38,7 +38,7 @@ const SECTIONS: LegalSection[] = [
     title: "What the plan includes",
     body: (
       <ul>
-        <li>A rebuilt version of your website made from your current site&apos;s words, photos, and details. It works on phones and is built to WCAG 2.2 AA, the common accessibility standard.</li>
+        <li>A redesigned version of your website made from your current site&apos;s words, photos, and details. It works on phones and is built to WCAG 2.2 AA, the common accessibility standard.</li>
         <li>Hosting, security updates, and backups.</li>
         <li>Changes by email to text, hours, prices, photos, announcements, and services. Small changes are unlimited within reason, and most are live the same day. Same-day changes are our aim, not a promise.</li>
         <li>Setup so search engines and AI answer tools can find and describe your business. Nobody can promise a ranking or a mention, and we don&apos;t.</li>
