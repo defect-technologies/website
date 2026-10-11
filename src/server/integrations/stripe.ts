@@ -132,11 +132,66 @@ async function ensurePortalConfiguration() {
   if (!created.ok) throw new Error(`Stripe refused the billing page settings: ${created.body.error?.message ?? "no reason given"}`);
 }
 
-/** A one-time link to the client's Stripe billing page. */
+type ArmPrice = { id: string; product: string; lookup_key: string | null; metadata?: Record<string, string> };
+type PortalConfiguration = { id: string; active: boolean; metadata: Record<string, string> | null };
+
+/** The price test arm ($59 or $79) of the customer's current plan, from its price's metadata or lookup key. */
+async function currentArm(customerId: string): Promise<string | null> {
+  const { data } = await stripe<{ data: { items: { data: { price: ArmPrice }[] } }[] }>(`/subscriptions?customer=${encodeURIComponent(customerId)}&status=active&limit=1`);
+  const price = data[0]?.items.data[0]?.price;
+  return price?.metadata?.price_arm || price?.lookup_key?.match(/^website_(\d+)_/)?.[1] || null;
+}
+
+/**
+ * Billing page settings that let a client switch between monthly and yearly at their own price,
+ * and never to the other arm's: a $59 client sees $59 a month and $708 a year, nothing else.
+ * One per arm, found again by its metadata and remade if the arm's prices change.
+ */
+async function switchingConfiguration(arm: string): Promise<string | null> {
+  const keys = [`website_${arm}_month`, `website_${arm}_year`];
+  const { data: prices } = await stripe<{ data: ArmPrice[] }>(`/prices?active=true&${keys.map((key) => `lookup_keys[]=${key}`).join("&")}`);
+  const ordered = keys.map((key) => prices.find((price) => price.lookup_key === key));
+  if (ordered.some((price) => !price)) return null;
+  const priceIds = ordered.map((price) => price!.id).join(",");
+  const { data: existing } = await stripe<{ data: PortalConfiguration[] }>("/billing_portal/configurations?active=true&limit=100");
+  const match = existing.find((config) => config.metadata?.defect_arm === arm && config.metadata?.defect_prices === priceIds);
+  if (match) return match.id;
+  const created = await stripePost<{ id: string }>("/billing_portal/configurations", {
+    ...PORTAL_FEATURES,
+    "features[subscription_update][enabled]": "true",
+    "features[subscription_update][default_allowed_updates][0]": "price",
+    "features[subscription_update][proration_behavior]": "create_prorations",
+    "features[subscription_update][products][0][product]": ordered[0]!.product,
+    "features[subscription_update][products][0][prices][0]": ordered[0]!.id,
+    "features[subscription_update][products][0][prices][1]": ordered[1]!.id,
+    "metadata[defect_arm]": arm,
+    "metadata[defect_prices]": priceIds,
+  });
+  if (!created.ok) throw new Error(`Stripe refused the plan-switching settings: ${created.body.error?.message ?? "no reason given"}`);
+  return created.body.id;
+}
+
+/** The settings for this customer's billing page: plan switching at their own price when it can be set up, else the default. */
+async function configurationFor(customerId: string): Promise<string | null> {
+  try {
+    const arm = await currentArm(customerId);
+    return arm ? await switchingConfiguration(arm) : null;
+  } catch (error) {
+    console.error("[stripe] Plan switching unavailable, opening the billing page without it", error);
+    return null;
+  }
+}
+
+/** A one-time link to the client's Stripe billing page, where they can also switch between monthly and yearly. */
 export async function billingPortalLink(customerId: string, returnUrl: string): Promise<string> {
   if (!env.stripeKey()) throw new Error("STRIPE_API_KEY isn't set.");
-  await ensurePortalConfiguration();
-  const session = await stripePost<{ url: string }>("/billing_portal/sessions", { customer: customerId, return_url: returnUrl });
+  const configuration = await configurationFor(customerId);
+  if (!configuration) await ensurePortalConfiguration();
+  const session = await stripePost<{ url: string }>("/billing_portal/sessions", {
+    customer: customerId,
+    return_url: returnUrl,
+    ...(configuration ? { configuration } : {}),
+  });
   if (!session.ok) throw new Error(`Stripe refused the billing link: ${session.body.error?.message ?? "no reason given"}`);
   return session.body.url;
 }

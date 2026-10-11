@@ -65,7 +65,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
               Manage billing
               <ArrowSquareOut size={20} aria-hidden="true" />
             </a>
-            <p className="text-ink-faint text-sm">Opens Stripe, where you can update your card, see past invoices or cancel.</p>
+            <p className="text-ink-faint text-sm">Opens Stripe, where you can switch between monthly and yearly, update your card, see past invoices or cancel.</p>
           </div>
         )}
       </Card>
