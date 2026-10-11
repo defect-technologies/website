@@ -1,7 +1,6 @@
 import type { Icon } from "@phosphor-icons/react";
 import { ArrowDownRight, ArrowUpRight, CalendarCheck, EnvelopeSimple, MapPin, Phone } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import KnifeStroke from "@/components/admin/KnifeStroke";
 import { Card } from "@/components/admin/ui";
 import { ACTIONS, RANGES, type Action, type Compared, type RangeDays, type Ranked, type SiteAnalytics } from "@/lib/siteAnalytics";
 import VisitorsChart from "./VisitorsChart";
@@ -19,6 +18,7 @@ const count = (value: number) => value.toLocaleString("en-US");
 function Change({ value, days }: { value: Compared; days: RangeDays }) {
   const difference = value.now - value.before;
   const span = <span className="sr-only"> than the {days} days before</span>;
+  if (value.now === 0 && value.before === 0) return <p className="text-ink-faint text-sm">No data yet</p>;
   if (difference === 0) return <p className="text-ink-faint text-sm">No change{span}</p>;
   const up = difference > 0;
   const Arrow = up ? ArrowUpRight : ArrowDownRight;
@@ -134,19 +134,5 @@ export function RangePicker({ days, site }: { days: RangeDays; site?: string }) 
         );
       })}
     </nav>
-  );
-}
-
-/** Before the first visit is counted: what will appear here, and when. */
-export function NoVisitsYet() {
-  return (
-    <Card className="flex flex-col items-start gap-4 p-8 sm:p-10">
-      <KnifeStroke variant={1} className="text-vermilion/30 h-6 w-28" />
-      <h2 className="text-2xl font-semibold text-balance">No visits counted yet</h2>
-      <p className="text-ink-soft max-w-[52ch] text-pretty">
-        Once people find your website, you&apos;ll see how many visit, which pages they read, where they came from, and every call, email,
-        booking and request for directions.
-      </p>
-    </Card>
   );
 }

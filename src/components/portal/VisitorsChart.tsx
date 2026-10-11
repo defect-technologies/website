@@ -54,6 +54,23 @@ export default function VisitorsChart({ days }: { days: Day[] }) {
 
   const peak = Math.max(0, ...days.map((day) => day.visitors));
   const middle = days[Math.floor(last / 2)];
+  const axis = (
+    <div aria-hidden="true" className="text-ink-faint flex justify-between text-xs">
+      <span>{days[0] && axisLabel.format(asDate(days[0].date))}</span>
+      <span>{middle && axisLabel.format(asDate(middle.date))}</span>
+      <span>{days[last] && axisLabel.format(asDate(days[last].date))}</span>
+    </div>
+  );
+  if (peak === 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="border-ink/15 flex h-44 items-center justify-center border-b">
+          <p className="text-ink-faint">No visits yet</p>
+        </div>
+        {axis}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       <div
@@ -95,11 +112,7 @@ export default function VisitorsChart({ days }: { days: Day[] }) {
           </>
         )}
       </div>
-      <div aria-hidden="true" className="text-ink-faint flex justify-between text-xs">
-        <span>{days[0] && axisLabel.format(asDate(days[0].date))}</span>
-        <span>{middle && axisLabel.format(asDate(middle.date))}</span>
-        <span>{days[last] && axisLabel.format(asDate(days[last].date))}</span>
-      </div>
+      {axis}
       <p role="status" className="sr-only">
         {shown ? `${dayLabel.format(asDate(shown.day.date))}: ${plural(shown.day.visitors, "visitor", "visitors")}, ${plural(shown.day.pageviews, "page view", "page views")}` : ""}
       </p>
