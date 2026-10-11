@@ -46,7 +46,7 @@ export function stripeSummary() {
   });
 }
 
-/** $59 and $79 a month, or $590 and $790 a year. */
+/** $59 and $79 a month, or $708 and $948 a year. */
 function planFor(cents: number | null) {
   const dollars = (cents ?? 0) / 100;
   return dollars >= 500 ? `$${dollars}/year` : `$${dollars}/month`;
