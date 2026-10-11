@@ -5,7 +5,9 @@ import "server-only";
  * defect-tech/02-system/email-signature.html: inline styles and a hosted PNG, because
  * mail apps drop <style> blocks and Gmail won't show SVG.
  */
-export const TEAM_SIGNATURE_TEXT = ["The Defect Technologies team", "hello@defect.tech"];
+import { TEAM_SIGN_OFF } from "@/lib/teamSignOff";
+
+export const TEAM_SIGNATURE_TEXT = TEAM_SIGN_OFF;
 
 const INK = "#17161a";
 const INK_SOFT = "#4b4852";

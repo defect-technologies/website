@@ -1,15 +1,15 @@
 import type { Icon } from "@phosphor-icons/react";
-import { ArrowDownRight, ArrowUpRight, CalendarCheck, EnvelopeSimple, MapPin, Phone } from "@phosphor-icons/react/dist/ssr";
+import { ArrowDownRight, ArrowUpRight, CalendarCheck, EnvelopeSimple, Lightbulb, MapPin, Phone, TrendUp, Warning } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { Card } from "@/components/admin/ui";
-import { ACTIONS, RANGES, type Action, type Compared, type RangeDays, type Ranked, type SiteAnalytics } from "@/lib/siteAnalytics";
+import { ACTIONS, RANGES, totalActions, type Action, type Compared, type Insight, type RangeDays, type Ranked, type SiteAnalytics, type WeekGrid } from "@/lib/siteAnalytics";
 import VisitorsChart from "./VisitorsChart";
 
-const ACTION_COPY: Record<Action, { label: string; what: string; icon: Icon }> = {
-  Call: { label: "Calls", what: "Taps on your phone number", icon: Phone },
-  Directions: { label: "Directions", what: "Opened your address in maps", icon: MapPin },
-  Email: { label: "Emails", what: "Taps on your email address", icon: EnvelopeSimple },
-  Book: { label: "Bookings", what: "Taps on your booking button", icon: CalendarCheck },
+const ACTION_COPY: Record<Action, { label: string; icon: Icon }> = {
+  Call: { label: "Calls", icon: Phone },
+  Directions: { label: "Directions", icon: MapPin },
+  Email: { label: "Emails", icon: EnvelopeSimple },
+  Book: { label: "Bookings", icon: CalendarCheck },
 };
 
 const count = (value: number) => value.toLocaleString("en-US");
@@ -35,7 +35,36 @@ function Change({ value, days }: { value: Compared; days: RangeDays }) {
 
 const ComparedWith = ({ days }: { days: RangeDays }) => <p className="text-ink-faint text-sm">Compared with the {days} days before</p>;
 
-export function ActionTiles({ analytics, days }: { analytics: SiteAnalytics; days: RangeDays }) {
+const INSIGHT_LOOK: Record<Insight["tone"], { icon: Icon; className: string }> = {
+  attention: { icon: Warning, className: "text-warn" },
+  opportunity: { icon: Lightbulb, className: "text-ink" },
+  good: { icon: TrendUp, className: "text-good" },
+};
+
+/** The few things worth reading first, each a sentence and what to do about it. */
+export function InsightCards({ items }: { items: Insight[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section aria-label="What to know" className="grid gap-3 md:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]">
+      {items.map((item) => {
+        const { icon: InsightIcon, className } = INSIGHT_LOOK[item.tone];
+        return (
+          <Card key={item.title} className="flex gap-3 p-5">
+            <InsightIcon size={22} weight="fill" aria-hidden="true" className={`mt-0.5 shrink-0 ${className}`} />
+            <div className="flex flex-col gap-1">
+              <h2 className="font-semibold text-balance">{item.title}</h2>
+              <p className="text-ink-soft text-sm text-pretty">{item.detail}</p>
+            </div>
+          </Card>
+        );
+      })}
+    </section>
+  );
+}
+
+/** The number owners care about most, with how it breaks down beneath it. */
+export function ReachedYou({ analytics, days }: { analytics: SiteAnalytics; days: RangeDays }) {
+  const total = totalActions(analytics);
   return (
     <section aria-labelledby="reached-you" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
@@ -44,27 +73,28 @@ export function ActionTiles({ analytics, days }: { analytics: SiteAnalytics; day
         </h2>
         <ComparedWith days={days} />
       </div>
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {ACTIONS.map((action) => {
-          const { label, what, icon: ActionIcon } = ACTION_COPY[action];
-          const value = analytics.actions[action];
-          return (
-            <li key={action}>
-              <Card className="flex h-full flex-col gap-2 p-5">
+      <Card className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:gap-10">
+        <div className="flex shrink-0 flex-col gap-1">
+          <p className="font-display text-8xl leading-none font-black tabular-nums">{count(total.now)}</p>
+          <Change value={total} days={days} />
+        </div>
+        <ul className="grid flex-1 grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          {ACTIONS.map((action) => {
+            const { label, icon: ActionIcon } = ACTION_COPY[action];
+            const value = analytics.actions[action];
+            return (
+              <li key={action} className="flex flex-col gap-1">
                 <p className="text-ink-soft flex items-center gap-2 font-medium">
                   <ActionIcon size={20} aria-hidden="true" />
                   {label}
                 </p>
-                <p className="font-display text-6xl leading-none font-black tabular-nums">{count(value.now)}</p>
-                <p className="text-ink-faint text-sm text-pretty">{what}</p>
-                <div className="mt-auto pt-1">
-                  <Change value={value} days={days} />
-                </div>
-              </Card>
-            </li>
-          );
-        })}
-      </ul>
+                <p className="text-3xl font-semibold tabular-nums">{count(value.now)}</p>
+                <Change value={value} days={days} />
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
     </section>
   );
 }
@@ -88,8 +118,8 @@ export function VisitorsCard({ analytics, days }: { analytics: SiteAnalytics; da
   );
 }
 
-export function RankedList({ title, rows, empty }: { title: string; rows: Ranked[]; empty: string }) {
-  const top = Math.max(1, ...rows.map((row) => row.visitors));
+export function RankedList({ title, rows, unit, empty = "No data yet" }: { title: string; rows: Ranked[]; unit: string; empty?: string }) {
+  const top = Math.max(1, ...rows.map((row) => row.count));
   return (
     <Card className="flex flex-col gap-4 p-5 sm:p-6">
       <h2 className="text-lg font-semibold">{title}</h2>
@@ -99,18 +129,67 @@ export function RankedList({ title, rows, empty }: { title: string; rows: Ranked
         <ol className="flex flex-col gap-1.5">
           {rows.map((row) => (
             <li key={row.label} className="relative isolate flex min-h-10 items-center justify-between gap-4 rounded-lg px-3">
-              <span aria-hidden="true" className="bg-paper-shade absolute inset-y-0 left-0 -z-10 rounded-lg" style={{ width: `${(row.visitors / top) * 100}%` }} />
+              <span aria-hidden="true" className="bg-paper-shade absolute inset-y-0 left-0 -z-10 rounded-lg" style={{ width: `${(row.count / top) * 100}%` }} />
               <span className="min-w-0 truncate" title={row.label}>
                 {row.label}
               </span>
               <span className="shrink-0 font-medium tabular-nums">
-                {count(row.visitors)}
-                <span className="sr-only"> visitors</span>
+                {count(row.count)}
+                <span className="sr-only"> {unit}</span>
               </span>
             </li>
           ))}
         </ol>
       )}
+    </Card>
+  );
+}
+
+const DAY_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const AXIS_HOURS = [0, 6, 12, 18];
+
+const hourName = (hour: number) => (hour === 0 ? "midnight" : hour === 12 ? "noon" : hour < 12 ? `${hour} a.m.` : `${hour - 12} p.m.`);
+
+/** "Saturdays around 11 a.m.", from the busiest cell of the week. */
+function busiest(week: WeekGrid): string | null {
+  const cells = week.flatMap((hours, day) => hours.map((visitors, hour) => ({ day, hour, visitors })));
+  const best = cells.reduce((top, cell) => (cell.visitors > top.visitors ? cell : top), { day: 0, hour: 0, visitors: 0 });
+  return best.visitors > 0 ? `${DAY_NAMES[best.day]} around ${hourName(best.hour)}` : null;
+}
+
+/** Visitors by weekday and hour, darker where it's busier: when to answer the phone. */
+export function BusiestTimes({ week }: { week: WeekGrid }) {
+  const peak = Math.max(1, ...week.flat());
+  const summary = busiest(week);
+  return (
+    <Card className="flex flex-col gap-4 p-5 sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+        <h2 className="text-lg font-semibold">Busiest times</h2>
+        <p className="text-ink-soft text-sm">{summary ? `Most visits: ${summary}` : "No data yet"}</p>
+      </div>
+      <div role="img" aria-label={summary ? `Visitors by day and hour. Busiest: ${summary}.` : "No visits yet."} className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-1">
+        {week.map((hours, day) => (
+          <div key={DAY_SHORT[day]} className="contents">
+            <span aria-hidden="true" className="text-ink-faint text-xs leading-5">
+              {DAY_SHORT[day]}
+            </span>
+            <div aria-hidden="true" className="grid grid-cols-24 gap-0.5">
+              {hours.map((visitors, hour) => (
+                <span key={hour} className="bg-paper-shade relative h-5 overflow-hidden rounded-[3px]">
+                  <span className="bg-ink absolute inset-0" style={{ opacity: visitors / peak }} />
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+        <span aria-hidden="true" />
+        <div aria-hidden="true" className="text-ink-faint grid grid-cols-4 text-xs">
+          {AXIS_HOURS.map((hour) => (
+            <span key={hour}>{hourName(hour)}</span>
+          ))}
+        </div>
+      </div>
     </Card>
   );
 }
