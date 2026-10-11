@@ -9,6 +9,7 @@ import { STAGES } from "@/server/db/schema";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
 import { launchBlocker, requestPreview } from "@/server/runner/jobs";
+import { closeFlagsOn } from "@/server/bots/flags";
 
 export type FormResult = { ok: boolean; message: string };
 
@@ -83,5 +84,6 @@ export async function approvePreviewAction(form: FormData) {
   if (!lead || lead.stage !== "new" || !lead.previewUrl) return;
   await updateBusiness(lead.id, { stage: "preview_built" });
   await record(founder.email, "approved the preview", { businessId: lead.id });
+  await closeFlagsOn(lead.id, ["preview-review"], "A founder marked the preview ready to send.", founder.email);
   revalidatePath("/admin", "layout");
 }

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
+import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
 import { STAGES, type Stage } from "../../lib/stages";
 
@@ -225,16 +226,28 @@ export const flags = pgTable(
     bot: botName("bot").notNull(),
     businessId: uuid("business_id").references(() => businesses.id),
     priority: text("priority").notNull(),
-    whatHappened: text("what_happened").notNull(),
-    whatBotDid: text("what_bot_did").notNull(),
-    why: text("why").notNull(),
+    /** One plain sentence a founder reads at a glance. Empty on flags from before the review queue was rebuilt. */
+    headline: text("headline").notNull().default(""),
+    needs: text("needs").$type<FlagNeeds>().notNull().default("decision"),
+    /** The question for a decision, or the step to take for a fix. */
+    ask: text("ask").notNull().default(""),
+    options: jsonb("options").$type<string[]>().notNull().default([]),
+    fixer: text("fixer").$type<Fixer>().notNull().default("either"),
+    topic: text("topic").$type<FlagTopic>().notNull().default("other"),
+    /** Every report merged into this flag, newest last. */
+    details: text("details").notNull().default(""),
+    reports: integer("reports").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    whatHappened: text("what_happened").notNull().default(""),
+    whatBotDid: text("what_bot_did").notNull().default(""),
+    why: text("why").notNull().default(""),
     link: text("link").notNull().default(""),
     status: flagStatus("status").notNull().default("open"),
     reviewer: text("reviewer").notNull().default(""),
     note: text("note").notNull().default(""),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
-  (table) => [index("flags_status").on(table.status), index("flags_at").on(table.at)],
+  (table) => [index("flags_status").on(table.status), index("flags_at").on(table.at), index("flags_lead_topic").on(table.businessId, table.topic)],
 );
 
 /**

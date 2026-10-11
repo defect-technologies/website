@@ -12,6 +12,7 @@ import { outreachSettings } from "../settings";
 import type { Mailbox } from "../db/schema";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
 import { replySubject, unwrapLinks, withoutSubjectLine } from "@/lib/emailLinks";
+import { closeFlagsOn } from "./flags";
 import { actorOf, BotError } from "./http";
 import { ownedLead } from "./leads";
 
@@ -112,6 +113,7 @@ export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof
     sentBy: actorOf(key),
   });
   await updateBusiness(lead.id, { lastContactAt: new Date() });
+  await closeFlagsOn(lead.id, ["client-waiting"], "Closed itself: the client got a reply.", actorOf(key));
   await record(actorOf(key), "replied", { businessId: lead.id, detail: `${subject} → ${to}${unwrapped ? ` (unwrapped ${unwrapped} link${unwrapped === 1 ? "" : "s"})` : ""}` });
   return { ok: true, to, subject, unwrappedLinks: unwrapped };
 }

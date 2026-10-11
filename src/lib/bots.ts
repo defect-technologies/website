@@ -66,7 +66,8 @@ export function canMove(bot: Bot, from: Stage, to: Stage): boolean {
 export const FLAG_PRIORITIES = ["urgent", "review", "fyi"] as const;
 export type FlagPriority = (typeof FLAG_PRIORITIES)[number];
 
-export const FLAG_STATUSES = ["open", "answered", "approved", "reversed"] as const;
+/** Answered: a founder decided. Fixed: the problem was dealt with. Closed: it cleared by itself, or a founder dismissed it. */
+export const FLAG_STATUSES = ["open", "answered", "approved", "reversed", "fixed", "closed"] as const;
 export type FlagStatus = (typeof FLAG_STATUSES)[number];
 
 /**
