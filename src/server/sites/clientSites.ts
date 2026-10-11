@@ -27,12 +27,12 @@ export async function clientSite(slug: string): Promise<ClientSiteRow | null> {
   return row ?? null;
 }
 
-export type OwnerSite = ClientSiteRow & { stripeCustomerId: string | null };
+export type OwnerSite = ClientSiteRow & { stripeCustomerId: string | null; vercelProjectId: string | null };
 
-/** The sites an owner sees in their portal, with what the portal needs to name them and open billing. */
+/** The sites an owner sees in their portal, with what the portal needs to name them, open billing and read analytics. */
 export async function sitesForOwner(email: string): Promise<OwnerSite[]> {
   return (await db())
-    .select({ ...withBusiness, stripeCustomerId: businesses.stripeCustomerId })
+    .select({ ...withBusiness, stripeCustomerId: businesses.stripeCustomerId, vercelProjectId: businesses.vercelProjectId })
     .from(clientSites)
     .leftJoin(businesses, eq(clientSites.businessId, businesses.id))
     .where(eq(clientSites.ownerEmail, email.trim().toLowerCase()))

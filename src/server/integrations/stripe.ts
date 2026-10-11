@@ -140,3 +140,40 @@ export async function billingPortalLink(customerId: string, returnUrl: string): 
   if (!session.ok) throw new Error(`Stripe refused the billing link: ${session.body.error?.message ?? "no reason given"}`);
   return session.body.url;
 }
+
+type PlanSubscription = {
+  status: string;
+  cancel_at_period_end: boolean;
+  cancel_at: number | null;
+  current_period_end?: number;
+  items: { data: { price: Price; quantity?: number; current_period_end?: number }[] };
+};
+
+export type ClientPlan = {
+  cents: number;
+  interval: "month" | "year";
+  status: string;
+  /** When the next charge happens, or when the plan ends if it's cancelled. */
+  periodEnd: Date | null;
+  ending: boolean;
+};
+
+const PLAN_STATUSES = ["active", "past_due", "trialing", "unpaid", "canceled"];
+
+/** The client's current plan from Stripe, or null when they have none. */
+export function clientPlan(customerId: string) {
+  return integration({ STRIPE_API_KEY: env.stripeKey() }, async (): Promise<ClientPlan | null> => {
+    const { data } = await stripe<{ data: PlanSubscription[] }>(`/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10`);
+    const subscription = PLAN_STATUSES.map((status) => data.find((candidate) => candidate.status === status)).find(Boolean);
+    const item = subscription?.items.data[0];
+    if (!subscription || !item) return null;
+    const periodEnd = item.current_period_end ?? subscription.current_period_end;
+    return {
+      cents: (item.price.unit_amount ?? 0) * (item.quantity ?? 1),
+      interval: item.price.recurring?.interval ?? "month",
+      status: subscription.status,
+      periodEnd: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : periodEnd ? new Date(periodEnd * 1000) : null,
+      ending: subscription.cancel_at_period_end || Boolean(subscription.cancel_at),
+    };
+  });
+}
