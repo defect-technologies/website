@@ -43,23 +43,42 @@ async function pageTitle(url: string): Promise<string> {
   }
 }
 
-/** Every preview deployment in the previews project. Production there is the placeholder and is left out. */
+/** Vercel hands deployments back 100 at a time. Five pages cover the 30 days a preview lives at 250 builds a month. */
+const DEPLOYMENT_PAGES = 5;
+
+async function allDeployments(previewProject: string): Promise<Deployment[]> {
+  const all: Deployment[] = [];
+  let until: number | null = null;
+  for (let page = 0; page < DEPLOYMENT_PAGES; page++) {
+    const before: string = until ? `&until=${until}` : "";
+    const { deployments, pagination } = await vercel<{ deployments: Deployment[]; pagination?: { next: number | null } }>(
+      `/v7/deployments?projectId=${encodeURIComponent(previewProject)}&limit=100${before}`,
+    );
+    all.push(...deployments);
+    until = pagination?.next ?? null;
+    if (!until) break;
+  }
+  return all;
+}
+
+/**
+ * Every preview deployment in the previews project. Production there is the placeholder and is left out.
+ * Deployments the builder tagged with a lead's slug skip reading the page's title.
+ */
 export function previewDeployments() {
   const { token, teamId, previewProject } = env.vercel();
   return integration({ VERCEL_TOKEN: token, VERCEL_TEAM_ID: teamId, VERCEL_PREVIEW_PROJECT: previewProject }, async () => {
-    const { deployments } = await vercel<{ deployments: Deployment[] }>(
-      `/v7/deployments?projectId=${encodeURIComponent(previewProject)}&limit=100`,
-    );
-    const previews = deployments.filter((deployment) => deployment.target !== "production" && deployment.url);
+    const previews = (await allDeployments(previewProject)).filter((deployment) => deployment.target !== "production" && deployment.url);
     return Promise.all(
       previews.map(async (deployment): Promise<PreviewDeployment> => {
         const url = `https://${deployment.url}`;
-        const title = await pageTitle(url);
+        const lead = deployment.meta?.lead ?? "";
+        const title = lead || (await pageTitle(url));
         return {
           id: deployment.uid,
           url,
           title,
-          site: deployment.meta?.lead || title,
+          site: lead || title,
           createdAt: new Date(deployment.created),
           state: deployment.readyState,
         };

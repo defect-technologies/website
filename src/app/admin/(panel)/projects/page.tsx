@@ -1,16 +1,17 @@
 import type { Icon } from "@phosphor-icons/react";
 import { CheckCircle, Clock, EnvelopeSimple, PauseCircle, Plus, Sparkle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
-import { inArray } from "drizzle-orm";
 import type { Metadata } from "next";
 import { buttonClasses } from "@/components/Button";
 import IntegrationPanel from "@/components/admin/IntegrationPanel";
-import PreviewList from "@/components/admin/PreviewList";
+import FilterBar from "@/components/admin/FilterBar";
+import PreviewList, { BUILT_WITHIN, PREVIEW_STATUSES, type PreviewFilters } from "@/components/admin/PreviewList";
 import { DisconnectButton, MakeSenderButton } from "@/components/admin/ProjectControls";
+import SiteChangeList, { CHANGE_AUTHORS, type ChangeFilters, type SiteInfo } from "@/components/admin/SiteChangeList";
 import { Card, Notice, PageHeader, SectionHeading, When } from "@/components/admin/ui";
 import { db } from "@/server/db/client";
-import { businesses, type Mailbox } from "@/server/db/schema";
+import { businesses, clientSites, type Mailbox } from "@/server/db/schema";
 import { healthChecks, type CheckStatus, type HealthCheck } from "@/server/integrations/healthchecks";
-import { recentSiteChanges, type SiteChange } from "@/server/integrations/siteChanges";
+import { recentSiteChanges } from "@/server/integrations/siteChanges";
 import { previewDeployments } from "@/server/integrations/vercel";
 import { connectedMailboxes } from "@/server/mail/outbox";
 
@@ -88,46 +89,49 @@ function Checks({ checks }: { checks: HealthCheck[] }) {
   );
 }
 
-/** "page:/about" reads as "the /about page". */
-function documentName(key: string) {
-  if (key === "theme") return "the theme";
-  if (key === "modules") return "business details";
-  return key.startsWith("page:") ? `the ${key.slice("page:".length)} page` : key;
-}
+type Search = { mailbox?: string; pq?: string; pstatus?: string; pdays?: string; cq?: string; cwho?: string; cdays?: string };
 
-function whoChanged(actor: string) {
-  return actor.startsWith("bot:") ? `${actor.slice("bot:".length).replaceAll("-", " ")} bot` : actor;
-}
+const one = (value: string | undefined, allowed?: [string, string][]) => {
+  const text = (value ?? "").trim().slice(0, 100);
+  return allowed && !allowed.some(([option]) => option === text) ? "" : text;
+};
 
-function SiteChanges({ changes }: { changes: SiteChange[] }) {
-  if (changes.length === 0) return <p className="text-ink-soft text-sm">No site has been edited yet. Every save by an owner or a bot shows up here.</p>;
-  return (
-    <ul className="flex flex-col gap-3">
-      {changes.map((change) => (
-        <li key={change.id} className="flex flex-col gap-0.5 text-sm">
-          <span className="text-pretty">
-            <span className="font-medium">{change.site}</span>: {change.action} {documentName(change.key)}
-          </span>
-          <span className="text-ink-faint">
-            {whoChanged(change.actor)}, <When date={change.at} />
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ mailbox?: string }> }) {
-  const { mailbox } = await searchParams;
+/** Client sites by slug, with the business name and every address their owner might sign in as. */
+async function siteDirectory(): Promise<Map<string, SiteInfo>> {
   const database = await db();
-  const [inboxes, checks, previews, withPreviews, siteChanges] = await Promise.all([
+  const [leads, sites] = await Promise.all([
+    database.select({ id: businesses.id, slug: businesses.slug, name: businesses.businessName, url: businesses.siteUrl, ownerEmail: businesses.ownerEmail, email: businesses.email }).from(businesses),
+    database.select().from(clientSites),
+  ]);
+  const directory = new Map<string, SiteInfo>();
+  for (const site of sites) {
+    const lead = leads.find((candidate) => candidate.id === site.businessId) ?? leads.find((candidate) => candidate.slug === site.slug);
+    directory.set(site.slug, { name: lead?.name ?? site.slug, url: site.url, ownerEmails: [site.ownerEmail, lead?.ownerEmail ?? "", lead?.email ?? ""].map((email) => email.toLowerCase()).filter(Boolean) });
+  }
+  for (const lead of leads) {
+    if (!directory.has(lead.slug)) directory.set(lead.slug, { name: lead.name, url: lead.url, ownerEmails: [lead.ownerEmail, lead.email].map((email) => email.toLowerCase()).filter(Boolean) });
+  }
+  return directory;
+}
+
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const search = await searchParams;
+  const previewFilters: PreviewFilters = { q: one(search.pq), status: one(search.pstatus, PREVIEW_STATUSES), days: one(search.pdays, BUILT_WITHIN) };
+  const changeFilters: ChangeFilters = { q: one(search.cq), who: one(search.cwho, CHANGE_AUTHORS), days: one(search.cdays, BUILT_WITHIN) };
+  const database = await db();
+  const [inboxes, checks, previews, leads, siteChanges, sites] = await Promise.all([
     connectedMailboxes(),
     healthChecks(),
     previewDeployments(),
-    database.select().from(businesses).where(inArray(businesses.stage, ["preview_built", "sent", "clicked", "replied", "lost"])),
-    recentSiteChanges(),
+    database.select({ id: businesses.id, slug: businesses.slug, businessName: businesses.businessName, previewUrl: businesses.previewUrl, stage: businesses.stage }).from(businesses),
+    recentSiteChanges(Number(changeFilters.days) || null),
+    siteDirectory(),
   ]);
-  const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;
+  const notice = search.mailbox ? MAILBOX_NOTICE[search.mailbox] : undefined;
+  const keepPreviews = { pq: previewFilters.q, pstatus: previewFilters.status, pdays: previewFilters.days };
+  const keepChanges = { cq: changeFilters.q, cwho: changeFilters.who, cdays: changeFilters.days };
+  const clearPreviews = `/admin/projects?${new URLSearchParams(Object.entries(keepChanges).filter(([, value]) => value))}`;
+  const clearChanges = `/admin/projects?${new URLSearchParams(Object.entries(keepPreviews).filter(([, value]) => value))}`;
 
   return (
     <>
@@ -142,13 +146,45 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <SectionHeading>Health checks</SectionHeading>
           <IntegrationPanel result={checks}>{(data) => <Checks checks={data} />}</IntegrationPanel>
         </Card>
-        <Card className="flex flex-col gap-4 p-5">
+        <Card className="flex flex-col gap-4 p-5" id="previews">
           <SectionHeading>Previews</SectionHeading>
-          <IntegrationPanel result={previews}>{(data) => <PreviewList previews={data} leads={withPreviews} />}</IntegrationPanel>
+          <IntegrationPanel result={previews}>
+            {(data) => (
+              <>
+                <FilterBar
+                  action="/admin/projects"
+                  search={{ name: "pq", value: previewFilters.q, placeholder: "Business name", label: "Search previews by business name" }}
+                  selects={[
+                    { name: "pstatus", label: "Status", value: previewFilters.status, options: PREVIEW_STATUSES },
+                    { name: "pdays", label: "Built", value: previewFilters.days, options: BUILT_WITHIN },
+                  ]}
+                  keep={keepChanges}
+                  clearHref={Object.values(keepPreviews).some(Boolean) ? clearPreviews : undefined}
+                />
+                <PreviewList previews={data} leads={leads} filters={previewFilters} />
+              </>
+            )}
+          </IntegrationPanel>
         </Card>
-        <Card className="flex flex-col gap-4 p-5">
+        <Card className="flex flex-col gap-4 p-5" id="site-changes">
           <SectionHeading>Site changes</SectionHeading>
-          <IntegrationPanel result={siteChanges}>{(data) => <SiteChanges changes={data} />}</IntegrationPanel>
+          <IntegrationPanel result={siteChanges}>
+            {(data) => (
+              <>
+                <FilterBar
+                  action="/admin/projects"
+                  search={{ name: "cq", value: changeFilters.q, placeholder: "Business name", label: "Search site changes by business name" }}
+                  selects={[
+                    { name: "cwho", label: "Made by", value: changeFilters.who, options: CHANGE_AUTHORS },
+                    { name: "cdays", label: "When", value: changeFilters.days, options: BUILT_WITHIN },
+                  ]}
+                  keep={keepPreviews}
+                  clearHref={Object.values(keepChanges).some(Boolean) ? clearChanges : undefined}
+                />
+                <SiteChangeList changes={data} sites={sites} filters={changeFilters} />
+              </>
+            )}
+          </IntegrationPanel>
         </Card>
       </div>
     </>
