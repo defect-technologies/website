@@ -27,7 +27,7 @@ export default function SiteNav({ page }: { page: Page }) {
           </Link>
         )}
         <Link href="/portal" className={LINK}>
-          Client sign-in
+          Portal
         </Link>
         {page !== "start" && (
           <ButtonLink href="/start" size="sm">
