@@ -3,6 +3,7 @@ import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, 
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
 import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
+import type { SpotCheckStatus } from "../../lib/spotChecks";
 import { STAGES, type Stage } from "../../lib/stages";
 
 export { STAGES, type Stage };
@@ -340,6 +341,91 @@ export const settlements = pgTable(
   (table) => [index("settlements_month").on(table.month)],
 );
 
+/**
+ * A finished preview picked at random for a founder to rate. The share picked is a
+ * setting on the Spot checks page; the notes are read back by the preview runner.
+ */
+export const spotChecks = pgTable(
+  "spot_checks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    jobId: uuid("job_id").references(() => previewJobs.id),
+    previewUrl: text("preview_url").notNull(),
+    sampledAt: timestamp("sampled_at", { withTimezone: true }).notNull().defaultNow(),
+    status: text("status").$type<SpotCheckStatus>().notNull().default("open"),
+    /** 1 to 5 each. Empty until a founder rates the preview. */
+    copyRating: integer("copy_rating"),
+    typographyRating: integer("typography_rating"),
+    layoutRating: integer("layout_rating"),
+    note: text("note").notNull().default(""),
+    reviewedBy: text("reviewed_by").notNull().default(""),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("spot_checks_preview_url").on(table.previewUrl), index("spot_checks_status").on(table.status, table.sampledAt)],
+);
+
+/**
+ * Every business the lead finder audited, whether or not it became a lead, so a
+ * new niche or area can start from what's already been collected. Only the
+ * Google place ID comes from Google; everything else is from the business's own
+ * website (02-system/lead-finder.md).
+ */
+export const prospects = pgTable(
+  "prospects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** "place:<place ID>", or "site:<domain>" for a website audited without Google. */
+    key: text("key").notNull(),
+    placeId: text("place_id"),
+    businessName: text("business_name").notNull().default(""),
+    website: text("website").notNull().default(""),
+    domain: text("domain").notNull().default(""),
+    niche: text("niche").notNull().default(""),
+    area: text("area").notNull().default(""),
+    platform: text("platform").notNull().default(""),
+    email: text("email").notNull().default(""),
+    emails: jsonb("emails").$type<string[]>().notNull().default([]),
+    instagram: text("instagram").notNull().default(""),
+    phone: text("phone").notNull().default(""),
+    address: text("address").notNull().default(""),
+    socialLinks: jsonb("social_links").$type<Record<string, string>>().notNull().default({}),
+    reviewLinks: jsonb("review_links").$type<string[]>().notNull().default([]),
+    bookingLinks: jsonb("booking_links").$type<string[]>().notNull().default([]),
+    orderingLinks: jsonb("ordering_links").$type<string[]>().notNull().default([]),
+    pageTitle: text("page_title").notNull().default(""),
+    metaDescription: text("meta_description").notNull().default(""),
+    copyrightYear: integer("copyright_year"),
+    reachable: boolean("reachable").notNull().default(false),
+    /** 0 to 100, lower is worse. Empty when the business has no website or it couldn't be read. */
+    siteScore: integer("site_score"),
+    outdatedScore: integer("outdated_score").notNull().default(0),
+    signals: text("signals").array().notNull().default(sql`'{}'::text[]`),
+    problemSummary: text("problem_summary").notNull().default(""),
+    leadType: text("lead_type").notNull().default(""),
+    pageCount: integer("page_count"),
+    serverMs: integer("server_ms"),
+    loadMs: integer("load_ms"),
+    pageBytes: integer("page_bytes"),
+    /** Everything the audit returned, including each signal's details. */
+    audit: jsonb("audit").$type<Record<string, unknown>>().notNull().default({}),
+    businessId: uuid("business_id").references(() => businesses.id),
+    foundAt: timestamp("found_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("prospects_key").on(table.key),
+    index("prospects_place_id").on(table.placeId),
+    index("prospects_domain").on(table.domain),
+    index("prospects_found_at").on(table.foundAt),
+    index("prospects_site_score").on(table.siteScore),
+    index("prospects_niche_area").on(table.niche, table.area),
+    index("prospects_signals").using("gin", table.signals),
+  ],
+);
+
 export type Business = typeof businesses.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
@@ -350,5 +436,7 @@ export type Flag = typeof flags.$inferSelect;
 export type PreviewJob = typeof previewJobs.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
+export type SpotCheck = typeof spotChecks.$inferSelect;
+export type Prospect = typeof prospects.$inferSelect;
 export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type ExpenseFrequency = RecurringExpense["frequency"];

@@ -14,6 +14,7 @@ import { ownedLead } from "../bots/leads";
 import { checkoutLink } from "../leads/buildCommand";
 import { updateBusiness } from "../leads/businesses";
 import { outreachSettings } from "../settings";
+import { maybePickForSpotCheck } from "../spotChecks";
 import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
@@ -160,7 +161,9 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
   await updateBusiness(lead.id, { previewUrl: body.previewUrl, previewBuiltAt: new Date(), ...ready });
   await closeFlagsOn(lead.id, ["build", "preview-review"], "Closed itself: a new preview was built.", ACTOR);
+  // A held preview already waits for a founder, so only the others are sampled for a spot check.
   if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
+  else await maybePickForSpotCheck(lead, body.previewUrl, job.id, ACTOR);
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   await record(ACTOR, "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
   // A launched site's changes go live by launching again: the same project, redeployed.

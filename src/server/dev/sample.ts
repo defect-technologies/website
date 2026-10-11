@@ -2,7 +2,8 @@ import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { SENT_FROM_GMAIL } from "@/lib/senders";
-import { activity, businesses, messages, previewJobs, type Business } from "../db/schema";
+import { activity, businesses, messages, previewJobs, spotChecks, type Business } from "../db/schema";
+import { upsertProspects, type ProspectInput } from "../prospects";
 import { newLinkCode } from "../leads/import";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -74,6 +75,44 @@ async function sampleActivity(bySlug: Map<string, Business>) {
   }
 }
 
+/** Two previews waiting for a spot check and three already rated. Preview links are unique, so loading again adds none. */
+async function sampleSpotChecks(bySlug: Map<string, Business>) {
+  const checks = [
+    { slug: "fern-co-dog-grooming", sampledAt: minutesAgo(30) },
+    { slug: "pine-hill-hvac", sampledAt: daysAgo(1) },
+    { slug: "linden-tattoo", sampledAt: daysAgo(7), status: "done" as const, copyRating: 4, typographyRating: 2, layoutRating: 3, note: "Headings use three different weights. The hero headline wraps to four lines on a phone.", reviewedBy: "boris.nezlobin@gmail.com", reviewedAt: daysAgo(6) },
+    { slug: "altadena-roofing", sampledAt: daysAgo(9), status: "done" as const, copyRating: 3, typographyRating: 4, layoutRating: 4, note: "Copy reads like a template: \"quality you can trust\". Use the owner's own words from the old About page.", reviewedBy: "brendan@g.studio", reviewedAt: daysAgo(8) },
+    { slug: "cedar-barbers", sampledAt: daysAgo(30), status: "done" as const, copyRating: 5, typographyRating: 5, layoutRating: 4, note: "", reviewedBy: "brendan@g.studio", reviewedAt: daysAgo(29) },
+  ];
+  for (const { slug, ...check } of checks) {
+    const business = bySlug.get(slug);
+    if (business) await (await db()).insert(spotChecks).values({ businessId: business.id, previewUrl: `https://example.com/?preview=${slug}`, ...check }).onConflictDoNothing();
+  }
+}
+
+const prospect = (name: string, fields: Partial<ProspectInput>): ProspectInput => {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return {
+    place_id: "", business_name: name, website: `https://${slug}.example.com`, niche: "plumber", area: "Pasadena, CA", platform: "WordPress", email: "", emails: [], instagram: "", phone: "",
+    address: "", social_links: {}, review_links: [], booking_links: [], ordering_links: [], page_title: name, meta_description: "", copyright_year: null, reachable: true,
+    site_score: 70, outdated_score: 30, signals: [], problem_summary: "", lead_type: "outdated-no-email", page_count: 6, server_ms: 640, load_ms: 4200, page_bytes: 2_400_000, audit: {}, ...fields,
+  };
+};
+
+/** Businesses the lead finder looked at, most of which never became leads. All on example.com. */
+async function sampleProspects() {
+  await upsertProspects([
+    prospect("Arroyo Plumbing", { email: "hello@arroyo-plumbing.example.com", emails: ["hello@arroyo-plumbing.example.com"], site_score: 35, outdated_score: 65, signals: ["copyright_4plus_years", "cut_off_on_phone", "no_https"], problem_summary: "the footer still says © 2019; on a phone part of the page is cut off; browsers mark it as \"Not secure\"", lead_type: "email-ready", phone: "(626) 555-0142", copyright_year: 2019, audit: { signal_details: [{ name: "copyright_4plus_years", points: 20, plain: "the footer still says © 2019", detail: "© 2019 in the footer" }, { name: "cut_off_on_phone", points: 15, plain: "on a phone part of the page is cut off", detail: "4 elements run past the right edge" }, { name: "no_https", points: 20, plain: "browsers mark it as \"Not secure\"" }] } }),
+    prospect("Rose Bowl Rooter", { site_score: 62, signals: ["no_mobile_layout", "old_jquery"], problem_summary: "the site doesn't adjust for phones; it runs on very old code", phone: "(626) 555-0199", address: "1200 E Colorado Blvd, Pasadena, CA 91106", platform: "Custom or unknown", review_links: ["https://www.yelp.com/biz/rose-bowl-rooter-example"] }),
+    prospect("Lake Ave Drain Co", { site_score: 92, outdated_score: 8, signals: ["no_meta_description", "no_share_preview"], lead_type: "current", email: "office@lake-ave-drain-co.example.com", emails: ["office@lake-ave-drain-co.example.com"], platform: "Squarespace" }),
+    prospect("Pasadena Heat & Air", { niche: "HVAC", site_score: 48, outdated_score: 52, signals: ["copyright_4plus_years", "broken_booking_link", "small_tap_targets"], email: "service@pasadena-heat-air.example.com", emails: ["service@pasadena-heat-air.example.com", "jobs@pasadena-heat-air.example.com"], booking_links: ["https://pasadena-heat-air.example.com/book"], lead_type: "email-ready", instagram: "pasadenaheat", social_links: { facebook: "https://facebook.com/pasadenaheatexample", instagram: "https://instagram.com/pasadenaheat" } }),
+    prospect("Glendale Comfort Systems", { niche: "HVAC", area: "Glendale, CA", site_score: 81, outdated_score: 19, signals: ["slow_server", "no_favicon", "copyright_2to3_years"], platform: "Wix", lead_type: "current" }),
+    prospect("Brand Blvd Tattoo", { niche: "tattoo studio", area: "Glendale, CA", site_score: 20, outdated_score: 80, signals: ["builder_ads", "no_mobile_layout", "flash", "copyright_4plus_years"], platform: "Weebly", instagram: "brandblvdink", lead_type: "outdated-no-email" }),
+    prospect("Colorado St Bakery", { niche: "bakery", site_score: 55, outdated_score: 45, signals: ["covid_notice", "tiny_text_on_phone", "no_images"], ordering_links: ["https://www.doordash.com/store/colorado-st-bakery-example"], email: "orders@colorado-st-bakery.example.com", emails: ["orders@colorado-st-bakery.example.com"], lead_type: "email-ready", platform: "GoDaddy" }),
+    prospect("Echo Park Plumbing", { business_name: "", area: "Los Angeles, CA", website: "", site_score: null, outdated_score: 0, reachable: false, lead_type: "no-site", place_id: "sample-place-echo-park", platform: "", page_count: null, server_ms: null, load_ms: null, page_bytes: null }),
+  ]);
+}
+
 function toRow(sample: Sample): typeof businesses.$inferInsert {
   return {
     linkCode: newLinkCode(),
@@ -112,6 +151,8 @@ export async function loadSamples() {
   const everySample = await database.select().from(businesses).where(inArray(businesses.slug, SAMPLES.map((sample) => sample.slug)));
   const allBySlug = new Map(everySample.map((b) => [b.slug, b]));
   await sampleGmailReply(allBySlug.get("altadena-roofing"));
+  await sampleSpotChecks(allBySlug);
+  await sampleProspects();
   if (!(await hasBuilds(everySample))) {
     await sampleBuilds(allBySlug);
     await sampleActivity(allBySlug);

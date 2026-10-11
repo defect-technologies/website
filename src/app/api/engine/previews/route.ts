@@ -8,6 +8,7 @@ import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { env } from "@/server/env";
 import { advanceStage, updateBusiness } from "@/server/leads/businesses";
+import { maybePickForSpotCheck } from "@/server/spotChecks";
 
 const PreviewReport = z.object({
   slug: z.string().min(1).max(80),
@@ -33,5 +34,6 @@ export async function POST(request: Request) {
   });
   await advanceStage(business.id, "preview_built");
   await record("preview builder", "preview built", { businessId: business.id, detail: preview_url });
+  await maybePickForSpotCheck(business, preview_url, null, "preview builder");
   return NextResponse.json({ ok: true, admin: new URL(`/admin/pipeline/${business.id}`, env.siteUrl()).toString() });
 }

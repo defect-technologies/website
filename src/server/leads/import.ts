@@ -6,6 +6,7 @@ import { businesses } from "../db/schema";
 import { domainOf } from "../mail/mime";
 import { blockedDomains } from "./businesses";
 import { parseCsv } from "./csv";
+import { linkProspectsToLeads } from "../prospects";
 
 type NewBusiness = typeof businesses.$inferInsert;
 type Existing = { placeIds: Set<string>; websites: Set<string>; slugs: Set<string>; armCounts: Map<string, number[]> };
@@ -128,6 +129,9 @@ export async function importLeads(csv: string): Promise<{ added: number; skipped
     remember(business, existing);
     fresh.push(business);
   }
-  if (fresh.length > 0) await (await db()).insert(businesses).values(fresh);
+  if (fresh.length > 0) {
+    await (await db()).insert(businesses).values(fresh);
+    await linkProspectsToLeads();
+  }
   return { added: fresh.length, skipped: rows.length - fresh.length };
 }

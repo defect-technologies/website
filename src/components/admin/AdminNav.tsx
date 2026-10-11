@@ -1,6 +1,6 @@
 "use client";
 
-import { Browsers, ChatsCircle, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, type Icon } from "@phosphor-icons/react";
+import { AddressBook, Browsers, ChatsCircle, Eye, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
@@ -13,15 +13,17 @@ function isCurrent(pathname: string, { href, also }: Item) {
   return pathname.startsWith(href) || Boolean(also && pathname.startsWith(also));
 }
 
-export default function AdminNav({ counts }: { counts: { outreach: number; messages: number; review: number } }) {
+export default function AdminNav({ counts }: { counts: { outreach: number; messages: number; review: number; spotChecks: number } }) {
   const pathname = usePathname();
   const items: Item[] = [
     { href: "/admin/overview", label: "Overview", icon: Table, also: "/admin/pipeline" },
     { href: "/admin", label: "Outreach", icon: PaperPlaneTilt, count: counts.outreach },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },
     { href: "/admin/review", label: "Review queue", icon: Flag, count: counts.review },
+    { href: "/admin/spot-checks", label: "Spot checks", icon: Eye, count: counts.spotChecks },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/projects", label: "Projects", icon: Gauge },
+    { href: "/admin/prospects", label: "Prospects", icon: AddressBook },
     { href: "/admin/expenses", label: "Expenses", icon: Receipt },
     { href: "/admin/bots", label: "Bots", icon: Robot },
     { href: "/admin/template", label: "Template", icon: PencilSimpleLine },
