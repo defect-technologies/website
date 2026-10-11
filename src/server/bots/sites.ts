@@ -43,10 +43,11 @@ export async function requestLaunch(key: BotKey, id: string) {
   return { ok: true, jobId: job.id, alreadyRunning: !created, status: job.status };
 }
 
-type LaunchRecord = { host: string; type: "A" | "CNAME"; name: string; value: string };
+type RecordType = "A" | "CNAME" | "TXT";
+type LaunchRecord = { host: string; type: RecordType; name: string; value: string };
 type LaunchResult = { projectId: string; liveUrl: string; records: LaunchRecord[] };
 
-async function resolves(host: string, type: "A" | "CNAME", expected: (data: string) => boolean): Promise<boolean> {
+async function resolves(host: string, type: RecordType, expected: (data: string) => boolean): Promise<boolean> {
   try {
     const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`, {
       headers: { accept: "application/dns-json" },
@@ -60,11 +61,18 @@ async function resolves(host: string, type: "A" | "CNAME", expected: (data: stri
   }
 }
 
-/** Whether the owner's domain already points at the launched site. */
+const apexOf = (host: string) => host.split(".").slice(-2).join(".");
+
+const IS_IN_PLACE: Record<RecordType, (entry: LaunchRecord) => Promise<boolean>> = {
+  A: (entry) => resolves(entry.host, "A", (data) => data === VERCEL_A),
+  CNAME: (entry) => resolves(entry.host, "CNAME", (data) => data.endsWith("vercel-dns.com")),
+  TXT: (entry) => resolves(`${entry.name}.${apexOf(entry.host)}`, "TXT", (data) => data.includes(entry.value)),
+};
+
+/** Whether the owner's domain already points at the launched site, with any ownership check Vercel asked for. */
 async function connected(records: LaunchRecord[]): Promise<boolean> {
   if (records.length === 0) return false;
-  const checks = records.map((entry) => (entry.type === "A" ? resolves(entry.host, "A", (data) => data === VERCEL_A) : resolves(entry.host, "CNAME", (data) => data.endsWith("vercel-dns.com"))));
-  return (await Promise.all(checks)).every(Boolean);
+  return (await Promise.all(records.map((entry) => IS_IN_PLACE[entry.type](entry)))).every(Boolean);
 }
 
 function jobState(job: PreviewJob | null) {

@@ -116,7 +116,7 @@ export const DoneBody = z.object({
     .object({
       projectId: z.string().trim().min(1).max(100),
       liveUrl: z.url({ protocol: /^https$/ }),
-      records: z.array(z.object({ host: z.string().max(253), type: z.enum(["A", "CNAME"]), name: z.string().max(253), value: z.string().max(253) })).max(4),
+      records: z.array(z.object({ host: z.string().max(253), type: z.enum(["A", "CNAME", "TXT"]), name: z.string().max(253), value: z.string().max(253) })).max(8),
     })
     .optional(),
 });
