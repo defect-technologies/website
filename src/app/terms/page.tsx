@@ -21,8 +21,9 @@ const PREAMBLE = (
     </p>
     <Conspicuous>
       Please read these Terms carefully. They provide that your Subscription renews automatically until you cancel (Section 4.3),
-      limit each party’s liability (Section 11) and require the parties to attempt negotiation and mediation before bringing a claim
-      in court (Section 14).
+      limit each party’s liability (Section 11), and require disputes to be resolved by binding individual arbitration rather than in
+      court or by class action, with claims brought within one year (Section 14). They also provide that you receive the files of
+      your website if your Subscription ends (Section 13.5).
     </Conspicuous>
   </>
 );
@@ -115,8 +116,8 @@ const SECTIONS: LegalSection[] = [
         body: (
           <p>
             We will design and build the Site using Client Content, principally the words, photographs and details from Client’s
-            existing website. The Site will display correctly on current mobile and desktop browsers and will be designed to conform to
-            the Web Content Accessibility Guidelines (WCAG) 2.2, Level AA.
+            existing website. The Site is designed to display correctly on current mobile and desktop browsers and is designed with the
+            goal of conforming to the Web Content Accessibility Guidelines (WCAG) 2.2, Level AA.
           </p>
         ),
       },
@@ -189,7 +190,7 @@ const SECTIONS: LegalSection[] = [
         body: (
           <p>
             We use automated systems, including artificial intelligence, to design, review and maintain websites and to answer routine
-            correspondence. Our founders supervise these systems, and Client may ask at any time to correspond with one of them directly.
+            correspondence. These systems operate under human oversight, and Client may ask at any time to correspond with a person.
           </p>
         ),
       },
@@ -264,7 +265,7 @@ const SECTIONS: LegalSection[] = [
           <p>
             If a payment fails, we will notify Client and Stripe may attempt the charge again. If the Fees remain unpaid fourteen (14) days
             after our notice, we may suspend the Services, including the availability of the Site, until all overdue Fees are paid. We will
-            restore the Services promptly once payment is received.
+            restore the Services promptly once payment is received. Client will reimburse our reasonable costs of collecting overdue Fees.
           </p>
         ),
       },
@@ -327,6 +328,17 @@ const SECTIONS: LegalSection[] = [
         ),
       },
       {
+        title: "Review and approval",
+        body: (
+          <p>
+            Client will review the Site before it is launched and after each change. Launch of the Site, or Client’s continued use of it
+            after a change is published, constitutes Client’s approval of its content. Client is solely responsible for the accuracy of the
+            content of the Site, including prices, hours, services and claims about Client’s business, and for its compliance with laws,
+            regulations and professional rules that apply to Client’s business or industry.
+          </p>
+        ),
+      },
+      {
         title: "Domain names",
         body: (
           <>
@@ -366,8 +378,9 @@ const SECTIONS: LegalSection[] = [
           ]}
         </Items>
         <p>
-          We may remove content that violates this Section 6, or suspend the Site if removal is not practicable, and will notify Client
-          when we do so.
+          We may remove content that violates this Section 6, or suspend the Site if removal is not practicable. Where we reasonably
+          believe that content creates legal, security or safety risk, we may do so immediately and without prior notice. We will notify
+          Client promptly after taking action under this Section 6.
         </p>
       </>
     ),
@@ -400,6 +413,15 @@ const SECTIONS: LegalSection[] = [
         body: (
           <p>
             If Client provides suggestions or feedback about the Services, we may use them without restriction or obligation to Client.
+          </p>
+        ),
+      },
+      {
+        title: "Portfolio",
+        body: (
+          <p>
+            We may identify Client by name as a client of Defect Technologies and display images of and links to the Site in our portfolio
+            and marketing materials. Client may withdraw this permission at any time by email to {EMAIL}.
           </p>
         ),
       },
@@ -447,7 +469,8 @@ const SECTIONS: LegalSection[] = [
         body: (
           <p>
             If Client or a visitor to the Site reports that any part of the Site does not conform to WCAG 2.2, Level AA, we will use
-            commercially reasonable efforts to correct the nonconformity promptly at no additional charge.
+            commercially reasonable efforts to correct the nonconformity promptly at no additional charge. This correction is Client’s sole
+            and exclusive remedy, and our sole obligation, with respect to the accessibility of the Site.
           </p>
         ),
       },
@@ -457,9 +480,11 @@ const SECTIONS: LegalSection[] = [
           <Conspicuous>
             Except as expressly provided in this Section 10, the Services and the Site are provided “as is” and “as available,” and we
             disclaim all other warranties, express, implied or statutory, including any implied warranties of merchantability, fitness for
-            a particular purpose, title and non-infringement. We do not warrant that the Services or the Site will be uninterrupted or
-            error-free, that they will produce any particular search ranking, traffic or revenue, or that the Site satisfies legal
-            requirements specific to Client’s business or industry, for which Client remains responsible.
+            a particular purpose, title and non-infringement. We do not guarantee any level of availability, and the Site may be
+            unavailable during maintenance or outages. We do not warrant that the Services or the Site will be uninterrupted or error-free,
+            that they will produce any particular search ranking, traffic or revenue, or that the Site complies with the Americans with
+            Disabilities Act, the California Unruh Civil Rights Act or any other accessibility law, or with any other legal requirement
+            that applies to Client’s business or industry, for which Client remains responsible.
           </Conspicuous>
         ),
       },
@@ -493,8 +518,8 @@ const SECTIONS: LegalSection[] = [
         title: "Exceptions",
         body: (
           <p>
-            Sections 11.1 and 11.2 do not limit Client’s obligation to pay Fees, either party’s obligations under Section 12, or liability
-            for fraud, gross negligence or willful misconduct.
+            Sections 11.1 and 11.2 do not limit Client’s obligation to pay Fees, Client’s obligations under Section 12.1, or liability for
+            fraud, gross negligence or willful misconduct. Our obligations under Section 12.2 are subject to Sections 11.1 and 11.2.
           </p>
         ),
       },
@@ -520,8 +545,10 @@ const SECTIONS: LegalSection[] = [
           <p>
             We will defend Client against any claim by a third party alleging that the Provider Materials, as delivered by us, infringe
             that party’s United States copyright or trademark, and will pay any damages, costs and reasonable attorneys’ fees finally
-            awarded or agreed in settlement. This obligation does not apply to claims arising from Client Content or from modifications not
-            made by us.
+            awarded or agreed in settlement, subject to the limits in Section 11. This obligation does not apply to claims arising from
+            Client Content, from content Client approved under Section 5.5, or from modifications not made by us. If the Provider Materials
+            become, or in our opinion are likely to become, the subject of such a claim, we may modify or replace them, or terminate the
+            Subscription and refund any prepaid Fees for the remaining period.
           </p>
         ),
       },
@@ -580,13 +607,14 @@ const SECTIONS: LegalSection[] = [
             <p>When a Subscription ends for any reason:</p>
             <Items>
               {[
-                "we will deliver to Client a copy of the files of the Site, including Client Content, in a standard format that another host can serve;",
-                "we will keep the Site online for not less than thirty (30) days after Client submits notice of cancellation, or through the end of the paid billing period if later, so that Client may move the Site;",
+                "provided Client has paid all undisputed Fees, we will deliver to Client a copy of the files of the Site, including Client Content, in a standard format that another host can serve;",
+                "unless we terminated these Terms under Section 13.3 or suspended the Site under Section 4.6 or Section 6, we will keep the Site online for not less than thirty (30) days after Client submits notice of cancellation, or through the end of the paid billing period if later, so that Client may move the Site;",
                 "we will provide reasonable cooperation in directing Client’s domain to a new host;",
                 "after that period, we may take the Site offline and delete Client Content from our active systems, except copies retained in routine backups or as required by law; and",
                 "any Fees accrued before termination remain payable.",
               ]}
             </Items>
+            <p>Nothing in this Section 13.5 requires us to host or deliver content that violates Section 6.</p>
           </>
         ),
       },
@@ -594,7 +622,7 @@ const SECTIONS: LegalSection[] = [
         title: "Survival",
         body: (
           <p>
-            Sections 4.7, 5.1, 7, 9, 10.3, 11, 12, 13.5, 14, 15 and 17 survive the expiration or termination of these Terms.
+            Sections 4.7, 5.1, 5.4, 5.5, 7, 9, 10.3, 11, 12, 13.5, 14, 15 and 17 survive the expiration or termination of these Terms.
           </p>
         ),
       },
@@ -614,30 +642,53 @@ const SECTIONS: LegalSection[] = [
         ),
       },
       {
-        title: "Mediation",
+        title: "Binding arbitration",
         body: (
           <p>
-            If the dispute is not resolved by negotiation, the parties will attempt non-binding mediation before a mutually agreed mediator
-            in Los Angeles County, California, sharing the mediator’s fees equally.
+            Any dispute, claim or controversy arising out of or relating to these Terms or the Services that is not resolved under Section
+            14.1 will be resolved by final and binding arbitration administered by JAMS under its Streamlined Arbitration Rules and
+            Procedures then in effect, before a single arbitrator. The arbitration will take place in Los Angeles County, California, or by
+            video conference if the parties agree. The arbitrator’s fees and the administrative fees will be allocated as the JAMS rules
+            provide. Judgment on the award may be entered in any court of competent jurisdiction. The Federal Arbitration Act governs the
+            interpretation and enforcement of this Section 14.
           </p>
         ),
       },
       {
-        title: "Venue",
+        title: "Class action waiver",
+        body: (
+          <Conspicuous>
+            Each party may bring claims against the other only in its individual capacity, and not as a plaintiff or class member in any
+            purported class, collective, consolidated or representative proceeding. The arbitrator may not consolidate the claims of more
+            than one party. If this Section 14.3 is found unenforceable as to a claim, that claim will be heard in court under Section 14.6
+            and not in arbitration.
+          </Conspicuous>
+        ),
+      },
+      {
+        title: "Exceptions",
         body: (
           <p>
-            If mediation does not resolve the dispute within sixty (60) days after it is requested, either party may bring an action in
-            the state or federal courts located in Los Angeles County, California, and each party consents to the personal jurisdiction of
-            those courts. Either party may instead bring an individual claim in small claims court.
+            Either party may bring an individual claim in small claims court if it qualifies. Either party may seek temporary or preliminary
+            injunctive relief in court to protect its intellectual property or confidential information.
           </p>
         ),
       },
       {
-        title: "Equitable relief",
+        title: "Time limit on claims",
+        body: (
+          <Conspicuous>
+            Any claim arising out of or relating to these Terms or the Services must be brought within one (1) year after the claim arises,
+            or it is permanently barred.
+          </Conspicuous>
+        ),
+      },
+      {
+        title: "Courts",
         body: (
           <p>
-            Nothing in this Section 14 prevents a party from seeking temporary or preliminary injunctive relief to protect its intellectual
-            property or confidential information.
+            Any proceeding permitted in court under this Section 14 will be brought exclusively in the state or federal courts located in Los
+            Angeles County, California, and each party consents to the personal jurisdiction of those courts.
           </p>
         ),
       },
@@ -662,7 +713,7 @@ const SECTIONS: LegalSection[] = [
         the date at the top of this page. An amendment takes effect at the start of Client’s next billing period after the notice period
         ends, and continued use of the Services after that date constitutes acceptance. If Client does not agree to an amendment, Client
         may cancel before it takes effect. An amendment does not apply to a dispute of which a party gave notice before the amendment took
-        effect.
+        effect. We keep a record of each version of these Terms and will provide Client with the version that applied to it on request.
       </p>
     ),
   },
@@ -756,5 +807,5 @@ const SECTIONS: LegalSection[] = [
 ];
 
 export default function TermsPage() {
-  return <LegalPage title="Terms of service" effective={EFFECTIVE} preamble={PREAMBLE} numbered sections={SECTIONS} />;
+  return <LegalPage title="Terms of service" effective={EFFECTIVE} preamble={PREAMBLE} sections={SECTIONS} />;
 }

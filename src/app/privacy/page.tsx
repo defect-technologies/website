@@ -1,170 +1,438 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import LegalPage, { type LegalSection } from "@/components/legal/LegalPage";
+import LegalPage, { Conspicuous, Items, Table, Term, type LegalSection } from "@/components/legal/LegalPage";
 
 export const metadata: Metadata = {
-  title: "Privacy",
-  description: "What Defect Technologies collects, why, who we share it with, and how to have it deleted.",
+  title: "Privacy policy",
+  description: "How Defect Technologies collects, uses, discloses and protects personal information.",
 };
 
 const EFFECTIVE = "October 11, 2026";
 
-const SUMMARY: [string, React.ReactNode][] = [
-  ["This site", "No cookies, no analytics, no ads."],
-  ["If you asked us for a site", "We keep what you sent so we can build it and write back. Ask and we'll delete it."],
-  ["If we emailed you", "We used what your own website publishes to build you a private preview. Reply \"no thanks\" and we'll never email you again."],
-  ["Client sites", "Clicks on Call, Book, Directions, and Email are counted without cookies. Nothing else is tracked."],
-  ["Selling data", "We never sell personal information or use it for ads."],
-  ["Questions", <a key="mail" href="mailto:hello@defect.tech">hello@defect.tech</a>],
+const EMAIL = <a href="mailto:hello@defect.tech">hello@defect.tech</a>;
+
+const PREAMBLE = (
+  <>
+    <p>
+      This Privacy Policy describes how Defect Technologies, a California general partnership (<Term>Defect Technologies</Term>,{" "}
+      <Term>we</Term>, <Term>us</Term> or <Term>our</Term>), collects, uses, discloses and protects personal information in connection
+      with the website at defect.tech, the private previews we prepare, the websites we design and operate for our clients (
+      <Term>Client Sites</Term>), the Client Portal and Site Editor, and our related services (together, the <Term>Services</Term>).
+    </p>
+    <Conspicuous>
+      We do not sell personal information, we do not share it for cross-context behavioral advertising, and our Services are not
+      designed to include third-party advertising or cross-site tracking technologies.
+    </Conspicuous>
+  </>
+);
+
+const CATEGORIES: React.ReactNode[][] = [
+  [
+    "Contact details",
+    "Name, business name, email address, telephone number and business address",
+    "You; publicly available sources",
+    "Contacting prospective clients; providing the Services; responding to inquiries",
+  ],
+  [
+    "Business information",
+    "Content published on a business’s website, such as text, photographs and descriptions of its services, and information about the website itself",
+    "Publicly available sources; you",
+    "Identifying prospective clients; preparing previews; designing and operating Client Sites",
+  ],
+  [
+    "Correspondence",
+    "Communications you send us and our replies, including website requests and Change Requests",
+    "You",
+    "Responding to you; performing the Services; maintaining records",
+  ],
+  [
+    "Account information",
+    "Email address, sign-in credentials and records of sign-in activity for the Client Portal and Site Editor",
+    "You; third-party sign-in providers",
+    "Providing access to the Client Portal and Site Editor; protecting accounts",
+  ],
+  [
+    "Billing information",
+    "Subscription and payment history. Payment card details are collected by our payment processor and are not received by us",
+    "Our payment processor; you",
+    "Billing; accounting and tax compliance",
+  ],
+  [
+    "Domain settings",
+    "The configuration of your domain name",
+    "Public records; your domain registrar",
+    "Connecting your domain to your Client Site",
+  ],
+  [
+    "Usage information",
+    "Interactions with links in our emails, information derived from IP addresses, and server logs",
+    "Collected automatically",
+    "Measuring outreach; preventing abuse; securing the Services",
+  ],
+  [
+    "Client Site analytics",
+    "Aggregate counts of visitor interactions with a Client Site",
+    "Collected automatically, without cookies",
+    "Reporting to our clients",
+  ],
 ];
 
 const SECTIONS: LegalSection[] = [
   {
-    id: "visitors",
-    title: "Visiting defect.tech",
-    body: (
-      <p>
-        This site sets no cookies and runs no analytics or ad trackers, and its fonts are served from our own domain. Vercel, which
-        hosts the site, keeps standard server logs such as your IP address and browser type so it can deliver the pages and protect
-        them from abuse.
-      </p>
-    ),
+    id: "scope",
+    title: "Scope",
+    clauses: [
+      {
+        title: "Persons covered",
+        body: (
+          <p>
+            This Privacy Policy applies to visitors to defect.tech; owners and staff of businesses that we identify and contact
+            (<Term>Prospects</Term>); persons who ask us to design a website; our clients and their authorized users; and visitors to
+            Client Sites.
+          </p>
+        ),
+      },
+      {
+        title: "Relationship to the Terms of Service",
+        body: (
+          <p>
+            Our clients’ use of the Services is also governed by our <Link href="/terms">Terms of Service</Link>. Capitalized terms not
+            defined in this Privacy Policy have the meanings given in the Terms of Service.
+          </p>
+        ),
+      },
+      {
+        title: "Client Sites",
+        body: (
+          <p>
+            We process information about visitors to a Client Site on behalf of the client that owns it. A client that collects personal
+            information through its own Client Site, for example through a contact form, is responsible for its own privacy practices.
+          </p>
+        ),
+      },
+    ],
   },
   {
-    id: "prospects",
-    title: "Businesses we contact",
+    id: "collection",
+    title: "Information we collect",
+    clauses: [
+      {
+        title: "Categories of personal information",
+        body: (
+          <>
+            <p>We collect the following categories of personal information, from the sources and for the purposes stated.</p>
+            <Table caption="Categories of personal information we collect" head={["Category", "Examples", "Source", "Purpose"]} rows={CATEGORIES} />
+          </>
+        ),
+      },
+      {
+        title: "Information about Prospects",
+        body: (
+          <p>
+            We identify prospective clients using publicly available business information, such as map listings and a business’s own
+            website. We may retain this information for businesses that we review but do not contact.
+          </p>
+        ),
+      },
+      {
+        title: "Sensitive personal information",
+        body: (
+          <p>
+            We do not request or knowingly collect sensitive personal information, such as government identifiers, financial account
+            credentials, precise geolocation or health information.
+          </p>
+        ),
+      },
+    ],
+  },
+  {
+    id: "use",
+    title: "How we use information",
     body: (
       <>
-        <p>We find businesses through Google Maps and public business directories. From Google we keep only its ID for each place. Everything else comes from the business&apos;s own website:</p>
-        <ul>
-          <li>the business name, website address, and the email address the site publishes</li>
-          <li>the site&apos;s text and photos, which we use to build a private preview of a refreshed version</li>
-          <li>the platform the site is built on, and signs that it&apos;s out of date</li>
-        </ul>
+        <p>We use personal information to:</p>
+        <Items>
+          {[
+            "identify businesses whose websites we may be able to improve, prepare private previews and contact them about our Services;",
+            "design, host, maintain and update Client Sites, and process Change Requests;",
+            "provide and secure the Client Portal and Site Editor;",
+            "bill for the Services and keep financial records;",
+            "respond to inquiries and provide support;",
+            "monitor, secure and improve the Services and prevent fraud and abuse; and",
+            "comply with law and enforce our Terms of Service.",
+          ]}
+        </Items>
         <p>
-          We send one email with a link to the preview, and one follow-up if you don&apos;t reply. The link goes through defect.tech
-          first, so we can tell whether it was opened. We keep your replies so we can answer them.
-        </p>
-        <p>
-          Previews have a private address, are hidden from search engines, and are deleted after 30 days. If you reply &ldquo;no
-          thanks,&rdquo; we keep your email domain on a do-not-contact list so nobody at your business hears from us again. To have
-          everything else about your business deleted, email us.
+          We use automated systems, including artificial intelligence, to help us carry out several of these purposes. These systems do not
+          make decisions that produce legal or similarly significant effects concerning any individual.
         </p>
       </>
     ),
   },
   {
-    id: "requests",
-    title: "If you ask us for a website",
+    id: "disclosure",
+    title: "How we disclose information",
+    clauses: [
+      {
+        title: "Service providers",
+        body: (
+          <>
+            <p>
+              We disclose personal information to service providers that process it on our behalf and only to provide their services to us,
+              in the following categories:
+            </p>
+            <Items>
+              {[
+                "website hosting and analytics providers;",
+                "database, file storage and source code hosting providers;",
+                "email and account sign-in providers;",
+                "payment processors; and",
+                "artificial intelligence service providers.",
+              ]}
+            </Items>
+            <p>A list of our current service providers is available on request at {EMAIL}.</p>
+          </>
+        ),
+      },
+      {
+        title: "Legal requirements",
+        body: (
+          <p>
+            We may disclose personal information where we believe in good faith that disclosure is required by law, subpoena or other legal
+            process, or is necessary to protect the rights, property or safety of Defect Technologies, our clients or others.
+          </p>
+        ),
+      },
+      {
+        title: "Business transfers",
+        body: (
+          <p>
+            Personal information may be transferred to an entity formed by our partners to carry on our business, or to a successor in a
+            merger, acquisition or sale of all or part of our business, subject to this Privacy Policy.
+          </p>
+        ),
+      },
+      {
+        title: "With your consent",
+        body: <p>We may disclose personal information for any other purpose with your consent.</p>,
+      },
+      {
+        title: "No sale or sharing",
+        body: (
+          <Conspicuous>
+            We do not sell personal information, we do not share it for cross-context behavioral advertising, and we have not done so in the
+            preceding twelve (12) months. We do not disclose personal information to third parties for their own direct marketing purposes.
+          </Conspicuous>
+        ),
+      },
+    ],
+  },
+  {
+    id: "cookies",
+    title: "Cookies and tracking",
+    clauses: [
+      {
+        title: "defect.tech",
+        body: (
+          <p>
+            Browsing defect.tech does not set cookies, and the site runs no analytics, advertising or third-party tracking technology. When
+            you sign in to the Client Portal, the Site Editor or our administrative tools, we set strictly necessary cookies that keep you
+            signed in and protect the sign-in process. These cookies expire when you sign out or after a fixed period.
+          </p>
+        ),
+      },
+      {
+        title: "Client Sites",
+        body: (
+          <p>
+            Client Sites measure visitor interactions using an analytics service that sets no cookies, and are not designed to include
+            advertising or cross-site tracking technologies. Client Sites may link to or display content from third-party services chosen by
+            our clients, such as booking, ordering, payment or social media services. Those services are governed by their own privacy
+            policies, and we are not responsible for their practices.
+          </p>
+        ),
+      },
+      {
+        title: "Do Not Track and Global Privacy Control",
+        body: (
+          <p>
+            We do not track visitors across third-party websites over time, and our Services are not designed to allow third parties to
+            collect personal information about visitors’ online activities over time and across websites, except as described in Section
+            5.2 for third-party services that a client chooses. Because we do not engage in such tracking, we do not change our practices in
+            response to a Do Not Track signal. We treat a Global Privacy Control signal as a request to opt out of
+            the sale or sharing of personal information, which we do not engage in.
+          </p>
+        ),
+      },
+    ],
+  },
+  {
+    id: "outreach",
+    title: "Outreach to businesses",
+    clauses: [
+      {
+        title: "Our emails",
+        body: (
+          <p>
+            We may email a Prospect about our Services, including a preview of a redesigned website. Each email identifies Defect
+            Technologies as the sender.
+          </p>
+        ),
+      },
+      {
+        title: "Previews",
+        body: (
+          <p>
+            Previews are published at a private address, are excluded from search engines and are deleted thirty (30) days after they are
+            created unless the business becomes a client.
+          </p>
+        ),
+      },
+      {
+        title: "Opting out",
+        body: (
+          <p>
+            You may opt out of further emails by replying to any of them with a request to stop. We will honor the request within ten (10)
+            business days and will not contact your business again.
+          </p>
+        ),
+      },
+    ],
+  },
+  {
+    id: "retention",
+    title: "Retention",
     body: (
       <>
-        <p>When you send the form on this site or email us, we keep:</p>
-        <ul>
-          <li>your name, your business&apos;s name, your email address, and your website&apos;s address if you gave one</li>
-          <li>what you told us about the business, which is the only source for a preview when you don&apos;t have a website yet</li>
-          <li>a scrambled form of your IP address that can&apos;t be turned back into the address, used only to stop the form being sent over and over</li>
-        </ul>
-        <p>
-          We use it to build your preview and to email you about it. If you have a website, we read it the same way we read the sites of
-          businesses we contact. We don&apos;t add you to any mailing list.
-        </p>
+        <p>We retain personal information only as long as reasonably necessary for the purposes described in this Privacy Policy:</p>
+        <Items>
+          {[
+            "previews, for thirty (30) days after they are created, unless the business becomes a client;",
+            "suppression list entries, indefinitely, so that an opt-out does not lapse;",
+            "information about Prospects, for no more than twenty-four (24) months after we last reviewed or contacted the business, or until you ask us to delete it, whichever is earlier;",
+            "client records, for the duration of the Subscription and afterward for as long as required by tax, accounting and other legal obligations;",
+            "Client Site content, as provided in Section 13.5 of our Terms of Service; and",
+            "server logs, in accordance with our hosting provider’s retention schedule.",
+          ]}
+        </Items>
       </>
-    ),
-  },
-  {
-    id: "clients",
-    title: "Clients",
-    body: (
-      <>
-        <p>When you sign up, we keep what we need to run your site and bill you:</p>
-        <ul>
-          <li>your name, business name, email address, and phone number</li>
-          <li>your site&apos;s content and every change you ask for</li>
-          <li>a copy of your domain&apos;s settings, saved before we point the domain at your new site</li>
-          <li>your plan and payment history from Stripe, which handles your card. We never see the full card number</li>
-        </ul>
-      </>
-    ),
-  },
-  {
-    id: "client-sites",
-    title: "Visitors to our clients' sites",
-    body: (
-      <>
-        <p>
-          Sites we run count clicks on their Call, Book, Directions, and Email buttons using Vercel Web Analytics. It sets no cookies.
-          Each visitor is counted with an anonymous code that is thrown away after 24 hours. The counts go into the business&apos;s
-          monthly report.
-        </p>
-        <p>The sites have no ad trackers, no session recording, no embedded maps, and no fonts loaded from other companies.</p>
-      </>
-    ),
-  },
-  {
-    id: "sharing",
-    title: "Who we share it with",
-    body: (
-      <>
-        <p>We use these companies to run the business, and each one handles data only to provide its service to us:</p>
-        <ul>
-          <li><strong>Vercel</strong> hosts this site, the previews, and our clients&apos; sites, and counts clicks on client sites</li>
-          <li><strong>Neon</strong> stores our records of businesses and emails, and the content of our clients&apos; sites</li>
-          <li><strong>Google Workspace</strong> carries our email</li>
-          <li><strong>Resend</strong> sends the sign-in links clients use to edit their sites</li>
-          <li><strong>Stripe</strong> takes payments</li>
-          <li><strong>Anthropic</strong> provides the AI model that turns a business&apos;s website text, or what its owner told us, into the words for its preview</li>
-        </ul>
-        <p>We never sell personal information, and we never share it for advertising.</p>
-      </>
-    ),
-  },
-  {
-    id: "keeping",
-    title: "How long we keep it",
-    body: (
-      <ul>
-        <li>Previews are deleted after 30 days.</li>
-        <li>Do-not-contact entries are kept for good, so an opt-out never lapses.</li>
-        <li>Client records are kept while you&apos;re a client and afterward for as long as tax and accounting rules require.</li>
-      </ul>
-    ),
-  },
-  {
-    id: "choices",
-    title: "Your choices",
-    body: (
-      <p>
-        Email <a href="mailto:hello@defect.tech">hello@defect.tech</a> to see what we have about you or your business, to correct it,
-        or to have it deleted. We&apos;ll answer within 30 days. To stop our emails, reply &ldquo;no thanks&rdquo; to any of them.
-      </p>
     ),
   },
   {
     id: "security",
     title: "Security",
     body: (
+      <>
+        <p>
+          We maintain reasonable administrative, technical and physical safeguards designed to protect personal information against loss,
+          misuse and unauthorized access, disclosure, alteration and destruction.
+        </p>
+        <p>No method of transmission or storage is completely secure, and we cannot guarantee the absolute security of personal information.</p>
+      </>
+    ),
+  },
+  {
+    id: "rights",
+    title: "Your choices and rights",
+    clauses: [
+      {
+        title: "Access, correction and deletion",
+        body: (
+          <p>
+            You may ask us to tell you what personal information we hold about you or your business, to correct it, or to delete it, by
+            emailing {EMAIL}. We will respond within forty-five (45) days, which we may extend once by an additional forty-five (45) days
+            where reasonably necessary, in which case we will tell you. We may retain information where required by law, and we retain
+            suppression list entries so that we can honor opt-outs.
+          </p>
+        ),
+      },
+      {
+        title: "Verification",
+        body: (
+          <p>
+            We may take reasonable steps to verify your identity before acting on a request, such as confirming that the request comes from an
+            email address associated with the information. An authorized agent may make a request on your behalf with your written
+            permission.
+          </p>
+        ),
+      },
+      {
+        title: "Non-discrimination",
+        body: <p>We will not deny you service, charge you a different price or otherwise discriminate against you for making a request.</p>,
+      },
+    ],
+  },
+  {
+    id: "california",
+    title: "California disclosures",
+    clauses: [
+      {
+        title: "California Online Privacy Protection Act",
+        body: (
+          <p>
+            You may review and request changes to your personal information as described in Section 9. We describe how we notify users of
+            changes in Section 13, and how we respond to Do Not Track signals in Section 5.3.
+          </p>
+        ),
+      },
+      {
+        title: "California Consumer Privacy Act",
+        body: (
+          <p>
+            Defect Technologies does not currently meet the thresholds that make a business subject to the California Consumer Privacy Act.
+            We nevertheless honor requests to know, correct and delete personal information as described in Section 9, and we do not sell or
+            share personal information or use sensitive personal information.
+          </p>
+        ),
+      },
+      {
+        title: "Shine the Light",
+        body: (
+          <p>
+            California Civil Code Section 1798.83 permits California residents to request information about disclosures of personal
+            information to third parties for their direct marketing purposes. We make no such disclosures.
+          </p>
+        ),
+      },
+    ],
+  },
+  {
+    id: "international",
+    title: "International users",
+    body: (
       <p>
-        Only the two founders can see our records, and they sign in with Google. Connections to email accounts are stored encrypted.
+        We are based in the United States, and personal information is processed and stored in the United States. Our Services are intended
+        for businesses in the United States.
       </p>
     ),
   },
   {
     id: "children",
     title: "Children",
-    body: <p>Our service is for businesses. We don&apos;t knowingly collect information from anyone under 13.</p>,
+    body: (
+      <p>
+        The Services are directed to businesses and are not directed to children. We do not knowingly collect personal information from
+        anyone under sixteen (16) years of age. If we learn that we have collected such information, we will delete it.
+      </p>
+    ),
   },
   {
     id: "changes",
-    title: "Changes to this policy",
+    title: "Changes to this Privacy Policy",
     body: (
       <p>
-        If this policy changes, we&apos;ll update the date at the top. Clients get an email first if the change affects them. Our{" "}
-        <Link href="/terms">terms of service</Link> cover the rest of our agreement with clients.
+        We may update this Privacy Policy. We will post the updated policy on this page and revise the date at the top. If a change is
+        material, we will notify our clients by email before it takes effect.
       </p>
     ),
+  },
+  {
+    id: "contact",
+    title: "Contact",
+    body: <p>Questions and requests concerning this Privacy Policy may be sent to Defect Technologies at {EMAIL}.</p>,
   },
 ];
 
 export default function PrivacyPage() {
-  return <LegalPage title="Privacy policy" effective={EFFECTIVE} summary={SUMMARY} sections={SECTIONS} />;
+  return <LegalPage title="Privacy policy" effective={EFFECTIVE} preamble={PREAMBLE} sections={SECTIONS} />;
 }
