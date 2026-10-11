@@ -76,7 +76,7 @@ function SpotCheckCard({ row }: { row: SpotCheckRow }) {
           name="note"
           id={`note-${check.id}`}
           maxLength={4000}
-          placeholder="What would you change? The builder reads these notes."
+          placeholder="What would you change?"
           hint="Say what's wrong and where, like “the hero headline wraps to four lines on a phone”."
         />
         <div className="flex flex-wrap gap-2">
@@ -156,8 +156,8 @@ export default async function SpotChecksPage() {
     <>
       <PageHeader title="Spot checks" />
       <p className="text-ink-soft -mt-4 max-w-prose text-pretty">
-        Every finished preview has a {percent(settings.share)}% chance of landing here. Rate its copy, typography and layout from 1 to 5 and say what you&apos;d change. The preview
-        runner reads the notes, so the builder can learn from them.
+        Every finished preview has a {percent(settings.share)}% chance of landing here. Rate its copy, typography and layout from 1 to 5 and say what you&apos;d change. The notes are
+        kept for tuning the builder&apos;s rules; the builder doesn&apos;t read them yet.
       </p>
       <section className="flex flex-col gap-4">
         <SectionHeading count={open.length}>Waiting</SectionHeading>
