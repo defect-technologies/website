@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { FOUNDER_EMAILS, founderName } from "@/lib/founders";
 import { FREQUENCIES, FREQUENCY_LABEL } from "@/lib/recurrence";
-import { formatCents, monthName } from "@/lib/settleUp";
+import { formatCents, monthName, todayInPacific } from "@/lib/settleUp";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { addExpense, deleteExpense, settleMonth, updateExpense } from "@/server/expenses/expenses";
@@ -44,6 +44,7 @@ export async function addExpenseAction(_previous: AddExpenseResult, form: FormDa
   if (!parsed.success) return { problems: parsed.error.issues.map((issue) => issue.message), values };
 
   const { spentOn, item, amount, paidBy, frequency } = parsed.data;
+  if (frequency === "one_time" && spentOn > todayInPacific()) return { problems: ["A one-time expense can't be dated in the future. For a subscription that starts later, pick how often it repeats."], values };
   const common = { item, amountCents: amount, paidBy, createdBy: founder.email };
   const added = frequency === "one_time" ? await addExpense({ ...common, spentOn }) : await addRecurring({ ...common, frequency, startsOn: spentOn });
   const detail = `${item}, ${formatCents(amount)} ${FREQUENCY_LABEL[frequency].toLowerCase()}, paid by ${founderName(paidBy)} from ${spentOn}`;
