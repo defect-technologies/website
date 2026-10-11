@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { record } from "../activity";
+import { closeFlagsOn } from "../bots/flags";
 import type { Founder } from "../auth/session";
 import { db } from "../db/client";
 import { businesses, messages, type Business, type Message } from "../db/schema";
@@ -114,6 +115,7 @@ export async function sendReply(businessId: string, body: string, founder: Found
       sentBy: founder.email,
     });
     await updateBusiness(businessId, { lastContactAt: new Date() });
+    await closeFlagsOn(businessId, ["client-waiting"], "Closed itself: the client got a reply.", founder.email);
     await record(founder.email, "replied", { businessId, detail: delivery.email.to });
     return { ok: true };
   } catch (error) {

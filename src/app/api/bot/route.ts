@@ -9,6 +9,7 @@ const ENDPOINTS = [
   "POST /flags",
   "GET /flags?status=",
   "GET /flags/<id>",
+  "POST /flags/<id>/close",
   "GET /activity?since=",
   "POST /heartbeat",
 ];

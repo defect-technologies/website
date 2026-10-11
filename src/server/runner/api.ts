@@ -3,18 +3,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { db } from "../db/client";
 import { MAX_FAILED_BUILDS, type JobKind } from "@/lib/previewJobs";
-import { flags, type BotKey, type Business, type PreviewJob } from "../db/schema";
+import type { BotKey, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
 import { addClientSite } from "../sites/clientSites";
+import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { checkoutLink } from "../leads/buildCommand";
 import { updateBusiness } from "../leads/businesses";
 import { outreachSettings } from "../settings";
 import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
+import { diagnose, failureLines } from "./diagnose";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
 
 const ACTOR = "bot:runner";
@@ -138,13 +139,15 @@ function results(body: Done) {
 const criticWantsRevision = (verdict: string | undefined) => /\brevise\b/i.test(verdict ?? "");
 
 async function holdForReview(lead: Business, previewUrl: string, verdict: string) {
-  await (await db()).insert(flags).values({
-    bot: "runner" satisfies Bot,
-    businessId: lead.id,
-    priority: "review",
-    whatHappened: `The design critic's verdict on ${lead.businessName}'s new preview is "${verdict}".`,
-    whatBotDid: "Deployed the preview and kept the lead out of the outreach queue.",
-    why: "The owner sees this preview in our first email, so a founder looks at it first. If it's fine, press Ready to send on the lead's page. If not, use Rebuild with a note.",
+  await raiseFlag("runner" satisfies Bot, lead.id, {
+    headline: `Check ${lead.businessName}'s preview before it's sent`,
+    needs: "decision",
+    ask: "The design critic wants changes. Is it good enough to send to the owner?",
+    options: ["Ready to send", "Rebuild with a note"],
+    fixer: "either",
+    topic: "preview-review",
+    urgent: false,
+    details: `The design critic's verdict: "${verdict}". The preview is deployed and the lead stays out of the outreach queue until a founder decides.`,
     link: previewUrl,
   });
   await record(ACTOR, "held a preview for review", { businessId: lead.id, detail: verdict });
@@ -156,6 +159,7 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
   await updateBusiness(lead.id, { previewUrl: body.previewUrl, previewBuiltAt: new Date(), ...ready });
+  await closeFlagsOn(lead.id, ["build", "preview-review"], "Closed itself: a new preview was built.", ACTOR);
   if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   await record(ACTOR, "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
@@ -174,6 +178,7 @@ async function finishLaunched(job: PreviewJob, lead: Business, body: Done) {
   await updateJob(job.id, { status: "done", step: "Live", result: body.launch, ...results(body) });
   const siteUrl = liveAddress(lead, body.launch.liveUrl);
   await updateBusiness(lead.id, { vercelProjectId: body.launch.projectId, siteUrl, launchedAt: lead.launchedAt ?? new Date() });
+  await closeFlagsOn(lead.id, ["launch"], "Closed itself: the site launched.", ACTOR);
   await addClientSite({ slug: lead.slug, ownerEmail: lead.ownerEmail || lead.email, url: siteUrl, businessId: lead.id, createdBy: ACTOR });
   const records = body.launch.records.map((entry) => `${entry.type} ${entry.name} → ${entry.value}`).join(", ");
   await record(ACTOR, "launched the site", { businessId: lead.id, detail: `${body.launch.liveUrl}; ${records}` });
@@ -205,14 +210,22 @@ async function finishFailed(job: PreviewJob, lead: Business, body: Done) {
   await retryOrGiveUp(job, lead, body);
 }
 
+const FAILED_HEADLINE: Record<JobKind, (name: string) => string> = {
+  launch: (name) => `${name} couldn't go live`,
+  preview: (name) => `${name}'s new site didn't build`,
+};
+
 async function flagFailure(job: PreviewJob, lead: Business, body: Done) {
-  await (await db()).insert(flags).values({
-    bot: "runner" satisfies Bot,
-    businessId: lead.id,
-    priority: "review",
-    whatHappened: `The preview build for ${lead.businessName} failed${body.verifyPassed === false ? " verification" : ""}.\n\n${lastLines(body.logTail ?? "", 12)}`,
-    whatBotDid: "Stopped. Nothing was deployed; the lead keeps any earlier preview.",
-    why: `A paying client's ${job.kind === "launch" ? "launch" : "build"} failed${job.kind === "launch" ? "" : " after a retry"}. Read the log on the runner machine, then use Rebuild with a note on the lead.`,
+  const log = body.logTail ?? "";
+  const kind = job.kind as JobKind;
+  await raiseFlag("runner" satisfies Bot, lead.id, {
+    headline: FAILED_HEADLINE[kind](lead.businessName),
+    needs: "fix",
+    ...diagnose(log, kind),
+    topic: kind === "launch" ? "launch" : "build",
+    urgent: false,
+    details: `Nothing was deployed, and the client still sees what they saw before.\n\n${failureLines(log)}`,
+    options: [],
   });
 }
 
