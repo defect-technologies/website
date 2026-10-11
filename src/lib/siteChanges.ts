@@ -53,6 +53,31 @@ function listOf(items: string[]): string {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
+/** site-kit's module and theme keys in words. Its change log lists the ones that changed in `summary`, comma-separated. */
+const PART_NAMES: Record<string, string> = {
+  business: "business name and description",
+  contact: "contact details",
+  hours: "hours",
+  services: "services",
+  gallery: "gallery",
+  faq: "FAQ",
+  social: "social links",
+  booking: "booking",
+  announcement: "announcement",
+  team: "team",
+  projects: "projects",
+  colors: "colors",
+  fonts: "fonts",
+  fontPair: "fonts",
+};
+
+/** "contact,hours" → "contact details and hours". Older entries hold a free sentence instead; that's kept as is. */
+export function partsInWords(summary: string): string | null {
+  const parts = summary.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0 || parts.some((part) => /\s/.test(part))) return null;
+  return listOf([...new Set(parts.map((part) => PART_NAMES[part] ?? part.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()))]);
+}
+
 /**
  * One plain sentence for a change (or a run of them saved together):
  * "Business details updated by the owner", "Draft of the about page saved by the Client care bot".
@@ -60,8 +85,9 @@ const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
 export function describeChange({ keys, action, actor, author, summary }: { keys: string[]; action: string; actor: string; author: ChangeAuthor; summary: string }): string {
   const who = authorName(actor, author);
   if (author === "launch") return keys.length > 1 ? `Launch content loaded (${keys.length} parts)` : `Launch content loaded: ${documentName(keys[0] ?? "")}`;
-  if (summary) return `${capitalize(summary)}, by ${who}`;
-  const things = listOf([...new Set(keys.map(documentName))]);
+  const parts = summary ? partsInWords(summary) : null;
+  if (summary && !parts) return `${capitalize(summary)}, by ${who}`;
+  const things = parts ?? listOf([...new Set(keys.map(documentName))]);
   if (action === "published") return `${capitalize(things)} updated by ${who}`;
   if (action === "saved a draft") return `Draft of ${things} saved by ${who}`;
   if (action === "deleted") return `${capitalize(things)} removed by ${who}`;
