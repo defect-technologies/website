@@ -36,13 +36,8 @@ const RequestInput = z
     businessName: z.string().trim().min(1, "Enter the business's name.").max(200),
     name: z.string().trim().min(1, "Enter your name so we know who to write to.").max(200),
     email: z.email("Enter an email address like name@example.com.").trim().toLowerCase().max(200),
-    hasWebsite: z.enum(["yes", "no"]),
-    website: z.string().max(500).transform(withScheme).default(""),
+    website: z.string().max(500).transform(withScheme).refine(looksLikeWebsite, "Enter your website's address, like sunrisebakery.com."),
     about: z.string().trim().max(ABOUT_LIMIT, `Keep it under ${ABOUT_LIMIT} characters.`).default(""),
-  })
-  .superRefine((input, context) => {
-    if (input.hasWebsite === "yes" && !looksLikeWebsite(input.website)) context.addIssue({ code: "custom", path: ["website"], message: "Enter your website's address, like sunrisebakery.com." });
-    if (input.hasWebsite === "no" && input.about.length < 20) context.addIssue({ code: "custom", path: ["about"], message: "Tell us what the business does and how people reach you, so we have something to build from." });
   });
 
 async function clientAddress() {
@@ -66,12 +61,12 @@ function looksAutomated(form: FormData) {
 }
 
 export async function submitRequest(_previous: RequestFormState, form: FormData): Promise<RequestFormState> {
-  const parsed = RequestInput.safeParse({ ...Object.fromEntries(form), hasWebsite: form.get("hasWebsite") ?? "yes" });
+  const parsed = RequestInput.safeParse({ ...Object.fromEntries(form), website: form.get("website") ?? "" });
   if (!parsed.success) return { state: "invalid", errors: fieldErrors(parsed.error) };
-  const { hasWebsite, ...request } = parsed.data;
+  const request = parsed.data;
   if (looksAutomated(form)) return { state: "sent", email: request.email };
   const ipHash = hashAddress(await clientAddress());
   if (await formIsBusy(ipHash)) return { state: "busy" };
-  await createFormRequest({ ...request, website: hasWebsite === "yes" ? request.website : "" }, ipHash);
+  await createFormRequest(request, ipHash);
   return { state: "sent", email: request.email };
 }

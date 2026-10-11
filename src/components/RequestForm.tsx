@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle, PaperPlaneTilt } from "@phosphor-icons/react";
-import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useRef, type FormEvent } from "react";
 import { submitRequest, type RequestField, type RequestFormState } from "@/app/start/actions";
 import { ABOUT_LIMIT } from "@/lib/inbound";
 import { TextAreaField, TextField } from "./admin/fields";
@@ -26,24 +26,6 @@ function Steps({ current }: { current: number }) {
         );
       })}
     </ol>
-  );
-}
-
-function WebsiteChoice({ hasWebsite, onChange }: { hasWebsite: boolean; onChange: (value: boolean) => void }) {
-  const option = (value: boolean, label: string) => (
-    <label className="bg-paper-shade text-ink-soft has-[:checked]:bg-ink has-[:checked]:text-paper has-[:focus-visible]:outline-ink flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-full px-4 font-medium transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
-      <input type="radio" name="hasWebsite" value={value ? "yes" : "no"} checked={hasWebsite === value} onChange={() => onChange(value)} className="sr-only" />
-      {label}
-    </label>
-  );
-  return (
-    <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-sm font-medium">Does the business have a website?</legend>
-      <div className="flex gap-2">
-        {option(true, "Yes")}
-        {option(false, "Not yet")}
-      </div>
-    </fieldset>
   );
 }
 
@@ -83,13 +65,9 @@ function useFirstErrorFocus(form: React.RefObject<HTMLFormElement | null>, state
   }, [form, state]);
 }
 
-/**
- * Submitted from code rather than through the form's action, because React resets a form after its action runs:
- * the website choice would jump back to "Yes" while the fields still showed "Not yet".
- */
+/** Submitted from code rather than through the form's action, so the time spent on the form can go with it. */
 export default function RequestForm() {
   const [state, action, pending] = useActionState(submitRequest, { state: "idle" } as RequestFormState);
-  const [hasWebsite, setHasWebsite] = useState(true);
   const form = useRef<HTMLFormElement>(null);
   const openedAt = useRef(0);
   useFirstErrorFocus(form, state);
@@ -121,17 +99,17 @@ export default function RequestForm() {
               <TextField label="Your name" name="name" autoComplete="name" error={errors.name} required />
               <TextField label="Email" name="email" type="email" autoComplete="email" inputMode="email" placeholder="name@example.com" error={errors.email} required />
             </div>
-            <WebsiteChoice hasWebsite={hasWebsite} onChange={setHasWebsite} />
-            {hasWebsite && <TextField label="Website" name="website" inputMode="url" autoComplete="url" placeholder="sunrisebakery.com" error={errors.website} required />}
-            <TextAreaField
-              label={hasWebsite ? "Anything we should know? (optional)" : "Tell us about the business"}
-              name="about"
-              rows={hasWebsite ? 3 : 6}
-              maxLength={ABOUT_LIMIT}
-              error={errors.about}
-              required={!hasWebsite}
-              hint={hasWebsite ? undefined : "What you do, where you are, your phone number and hours. The site only says what you tell us here."}
+            <TextField
+              label="Current website"
+              name="website"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="sunrisebakery.com"
+              error={errors.website}
+              required
+              hint="We rebuild existing websites, so we can't take a business that doesn't have one yet."
             />
+            <TextAreaField label="Anything we should know? (optional)" name="about" rows={3} maxLength={ABOUT_LIMIT} error={errors.about} />
             {state.state === "busy" && <Notice tone="bad">Too many requests came from your connection in the last hour. Email us at hello@defect.tech instead.</Notice>}
             <div>
               <SubmitButton variant="solid" pending={pending} icon={<PaperPlaneTilt size={18} weight="bold" aria-hidden="true" />}>
