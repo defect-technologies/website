@@ -5,8 +5,8 @@ export const PLACEHOLDERS = {
   business: "The business name",
   problem: "The problem on their current site, as the preview builder wrote it",
   link: "The link to their preview",
-  price: "59 or 79, from the lead's price arm",
-  offer: "At $59, a sentence saying it's a limited-time price instead of our usual $79, kept while they stay. Empty at $79",
+  price: "Our usual price, 79. Every lead sees it",
+  offer: "For a lead on the $59 offer, the sentence offering to lock in $59 a month if they sign up now. Empty at $79",
   sender: "Who the email is from",
   address: "The mailing address CAN-SPAM requires",
 } as const;
@@ -16,10 +16,10 @@ export type Placeholder = keyof typeof PLACEHOLDERS;
 /** Our price. $59 is a limited-time offer some leads get; they keep it for as long as they stay. A $79 lead never hears about it. */
 export const REGULAR_MONTHLY_PRICE = 79;
 
-/** Follows the price sentence for a lead on the offer, and is empty for everyone else. */
+/** Follows the $79 price sentence for a lead on the offer, and is empty for everyone else. */
 export function offerSentence(priceArm: number | null): string {
   if (!priceArm || priceArm >= REGULAR_MONTHLY_PRICE) return "";
-  return ` That's a limited-time price instead of our usual $${REGULAR_MONTHLY_PRICE}, and it stays $${priceArm} for as long as you're with us.`;
+  return ` We had so much fun redesigning your site that we'd love to give you a limited-time offer: sign up now and you'll lock in $${priceArm} a month instead of $${REGULAR_MONTHLY_PRICE}, for as long as you're with us.`;
 }
 export type TemplateValues = Record<Placeholder, string>;
 
