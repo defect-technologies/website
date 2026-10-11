@@ -6,7 +6,7 @@ export type PriceRow = {
 };
 
 export const FREELANCER: PriceRow = { who: "A freelancer", upFront: [1500, 8000], monthly: [50, 200] };
-export const DEFECT: PriceRow = { who: "defect.tech", upFront: [0, 0], monthly: [59, 59] };
+export const DEFECT: PriceRow = { who: "defect.tech", upFront: [0, 0], monthly: [79, 79] };
 
 export const FREELANCER_SOURCE = {
   label: "Surmado",

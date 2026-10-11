@@ -21,7 +21,7 @@ const body = Geist({
 
 export const metadata: Metadata = {
   title: { default: "defect.tech", template: "%s · defect.tech" },
-  description: "We rebuild small-business websites and keep them current for $59 a month.",
+  description: "We rebuild small-business websites and keep them current for $79 a month.",
 };
 
 /** Lets CSS hide the plain text under each painting only when scripts can lay the painting down. */

@@ -9,7 +9,7 @@ import KnifeStroke from "./admin/KnifeStroke";
 import SubmitButton from "./admin/SubmitButton";
 import { Card, Notice } from "./admin/ui";
 
-const STEPS = ["You tell us about the business", "We build its new website", "We email you the link", "You keep it for $59 a month, or you don't"];
+const STEPS = ["You tell us about the business", "We build its new website", "We email you the link", "You keep it for $79 a month, or you don't"];
 
 /** The knife stroke marks where the visitor is: on the form while they fill it in, on the build once it's sent. */
 function Steps({ current }: { current: number }) {
