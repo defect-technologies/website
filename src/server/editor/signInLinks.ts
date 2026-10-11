@@ -1,16 +1,13 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, gte, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { SignJWT } from "jose";
 import { db } from "../db/client";
 import { businesses, clientSites, editorLinks, type ClientSite } from "../db/schema";
 import { env, isDevelopment } from "../env";
-import { clientSite, clientSitesOwnedBy } from "../sites/clientSites";
 import { signInLinkSender } from "./linkSender";
 
 export const LINK_MINUTES = 10;
-/** One click on a site's /edit emails its owner, so a site gets at most this many links per LINK_MINUTES. */
-const LINKS_PER_WINDOW = 3;
 /** How long the token handed to the client site lives. It only travels in the redirect, never in an email. */
 const ENTER_SECONDS = 60;
 
@@ -32,7 +29,7 @@ export function linksReady(): boolean {
  * The URL site-kit's /edit/enter route accepts: an HS256 token signed with the
  * EDITOR_SECRET every client site shares, naming the owner and this one site.
  */
-async function enterUrl(site: Pick<ClientSite, "slug" | "url">, email: string): Promise<string> {
+export async function enterUrl(site: Pick<ClientSite, "slug" | "url">, email: string): Promise<string> {
   const key = editorSecret();
   if (!key) throw new Error("EDITOR_SECRET is not set.");
   const token = await new SignJWT({ site: site.slug, typ: "sign-in" })
@@ -116,57 +113,9 @@ export async function spendSignInLink(code: string): Promise<string | null> {
   return enterUrl(site, used.email);
 }
 
-export type LinkRequest = "sent" | "not-ready";
-
-/**
- * Emails a link for every site the address owns, but always answers the same
- * way, so the form can't be used to find out who our clients are.
- */
-export async function requestSignInLinks(rawEmail: string): Promise<LinkRequest> {
-  if (!linksReady()) return "not-ready";
-  for (const site of await clientSitesOwnedBy(rawEmail)) {
-    try {
-      await emailSignInLink(site);
-    } catch (error) {
-      // A different answer here would tell a stranger this address owns a site.
-      console.error(`[editor] Sign-in email for ${site.slug} failed to send`, error);
-    }
-  }
-  return "sent";
-}
-
 /** b•••@g.studio: enough for the owner to recognize their address, too little for a stranger to learn it. */
 export function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
   return `${local.slice(0, 1)}•••@${domain}`;
 }
 
-async function linksSentRecently(siteId: string): Promise<number> {
-  const since = new Date(Date.now() - LINK_MINUTES * 60 * 1000);
-  const [row] = await (await db())
-    .select({ count: sql<number>`count(*)::int` })
-    .from(editorLinks)
-    .where(and(eq(editorLinks.siteId, siteId), gte(editorLinks.createdAt, since)));
-  return row?.count ?? 0;
-}
-
-export type SiteLinkRequest = { status: "sent"; maskedEmail: string } | { status: "not-ready" | "unknown" | "failed" };
-
-/**
- * The button on a site's /edit: emails a link to that site's owner, so nobody types an address.
- * Clicking again while a recent link is still good sends nothing new.
- */
-export async function requestLinkForSite(slug: string): Promise<SiteLinkRequest> {
-  if (!linksReady()) return { status: "not-ready" };
-  const site = await clientSite(slug);
-  if (!site) return { status: "unknown" };
-  const sent = { status: "sent", maskedEmail: maskEmail(site.ownerEmail) } as const;
-  if ((await linksSentRecently(site.id)) >= LINKS_PER_WINDOW) return sent;
-  try {
-    await emailSignInLink(site);
-    return sent;
-  } catch (error) {
-    console.error(`[editor] Sign-in email for ${site.slug} failed to send`, error);
-    return { status: "failed" };
-  }
-}

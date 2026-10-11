@@ -24,6 +24,8 @@ export const env = {
       .split(",")
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
+  /** On once the Google sign-in consent screen is published, so owners outside the test-user list can use it. */
+  portalGoogle: () => optional("PORTAL_GOOGLE_SIGN_IN") === "1",
   signInClient: () => ({ id: optional("GOOGLE_SIGNIN_CLIENT_ID"), secret: optional("GOOGLE_SIGNIN_CLIENT_SECRET") }),
   mailClient: () => ({ id: optional("GOOGLE_MAIL_CLIENT_ID"), secret: optional("GOOGLE_MAIL_CLIENT_SECRET") }),
   engineToken: () => optional("ENGINE_TOKEN"),

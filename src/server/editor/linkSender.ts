@@ -42,25 +42,34 @@ function signInEmailText({ siteName, editUrl, url, expiresInMinutes }: SignInEma
  * "Defect Technologies <sign-in@send.defect.tech>". Until both are set, and
  * EDITOR_SECRET too, /edit/sign-in says email sign-in isn't switched on yet.
  */
+export type PlainEmail = { to: string; subject: string; text: string };
+
+/** Sends one plain-text email from the sign-in address, replies going to hello@. Prints it instead under `next dev`. */
+export async function sendPlainEmail({ to, subject, text }: PlainEmail) {
+  if (isDevelopment) {
+    console.info(`\n[email] To ${to}: ${subject}\n${text}\n`);
+    return;
+  }
+  const { apiKey, from } = env.signInEmail();
+  const response = await fetch(RESEND_EMAILS_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [to], reply_to: "hello@defect.tech", subject, text }),
+  });
+  if (!response.ok) throw new Error(`Resend refused the email (${response.status}): ${await response.text()}`);
+}
+
+export function emailReady(): boolean {
+  const { apiKey, from } = env.signInEmail();
+  return isDevelopment || Boolean(apiKey && from);
+}
+
 const resendSender: SignInLinkSender = {
   get ready() {
-    const { apiKey, from } = env.signInEmail();
-    return Boolean(apiKey && from);
+    return emailReady();
   },
   async send(email) {
-    const { apiKey, from } = env.signInEmail();
-    const response = await fetch(RESEND_EMAILS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from,
-        to: [email.to],
-        reply_to: "hello@defect.tech",
-        subject: `Your link to edit ${email.siteName}`,
-        text: signInEmailText(email),
-      }),
-    });
-    if (!response.ok) throw new Error(`Resend refused the sign-in email (${response.status}): ${await response.text()}`);
+    await sendPlainEmail({ to: email.to, subject: `Your link to edit ${email.siteName}`, text: signInEmailText(email) });
   },
 };
 

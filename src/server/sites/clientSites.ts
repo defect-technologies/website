@@ -27,6 +27,18 @@ export async function clientSite(slug: string): Promise<ClientSiteRow | null> {
   return row ?? null;
 }
 
+export type OwnerSite = ClientSiteRow & { stripeCustomerId: string | null };
+
+/** The sites an owner sees in their portal, with what the portal needs to name them and open billing. */
+export async function sitesForOwner(email: string): Promise<OwnerSite[]> {
+  return (await db())
+    .select({ ...withBusiness, stripeCustomerId: businesses.stripeCustomerId })
+    .from(clientSites)
+    .leftJoin(businesses, eq(clientSites.businessId, businesses.id))
+    .where(eq(clientSites.ownerEmail, email.trim().toLowerCase()))
+    .orderBy(asc(clientSites.slug));
+}
+
 export async function clientSitesOwnedBy(email: string): Promise<ClientSite[]> {
   return (await db()).select().from(clientSites).where(eq(clientSites.ownerEmail, email.trim().toLowerCase()));
 }
