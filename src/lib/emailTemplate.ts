@@ -6,11 +6,21 @@ export const PLACEHOLDERS = {
   problem: "The problem on their current site, as the preview builder wrote it",
   link: "The link to their preview",
   price: "59 or 79, from the lead's price arm",
+  offer: "At $59, a sentence saying it's a limited-time price instead of our usual $79, kept while they stay. Empty at $79",
   sender: "Who the email is from",
   address: "The mailing address CAN-SPAM requires",
 } as const;
 
 export type Placeholder = keyof typeof PLACEHOLDERS;
+
+/** Our price. $59 is a limited-time offer some leads get; they keep it for as long as they stay. A $79 lead never hears about it. */
+export const REGULAR_MONTHLY_PRICE = 79;
+
+/** Follows the price sentence for a lead on the offer, and is empty for everyone else. */
+export function offerSentence(priceArm: number | null): string {
+  if (!priceArm || priceArm >= REGULAR_MONTHLY_PRICE) return "";
+  return ` That's a limited-time price instead of our usual $${REGULAR_MONTHLY_PRICE}, and it stays $${priceArm} for as long as you're with us.`;
+}
 export type TemplateValues = Record<Placeholder, string>;
 
 export type OutreachSettings = {
@@ -34,7 +44,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
     "",
     "I rebuilt your site from your own photos and text so you can see it before deciding anything: {link}",
     "",
-    "If you like it, we'll host it and keep it up to date for ${price} a month, with no setup fee. When something changes, like your hours or a price, you just email us and it's usually live the same day.",
+    "If you like it, we'll host it and keep it up to date for ${price} a month, with no setup fee.{offer} When something changes, like your hours or a price, you just email us and it's usually live the same day.",
     "",
     "If that's less than you pay to keep your current site running, it might be worth a look.",
     "",
@@ -48,7 +58,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
     "",
     "Here's the fresh version of {business}'s site again: {link}",
     "",
-    "It's ${price} a month to keep it live and current, and you can cancel anytime.",
+    "It's ${price} a month to keep it live and current, and you can cancel anytime.{offer}",
     "",
     "Warmly,",
     "{sender}",
@@ -59,7 +69,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
   requestEmail: [
     "Hi {first_name}, thanks for asking us to build a website for {business}. Here it is: {link}",
     "",
-    "If you like it, we'll put it live and keep it up to date for ${price} a month, with no setup fee. When something changes, like your hours or a price, you just email us and it's usually live the same day.",
+    "If you like it, we'll put it live and keep it up to date for ${price} a month, with no setup fee.{offer} When something changes, like your hours or a price, you just email us and it's usually live the same day.",
     "",
     "Warmly,",
     "The Defect Technologies team",

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const EFFECTIVE = "October 8, 2026";
 
 const SUMMARY: [string, React.ReactNode][] = [
-  ["Price", "$0 to set up. Then $59 or $79 a month, or $590 or $790 a year, as shown on your checkout page."],
+  ["Price", "$0 to set up. Then the monthly or yearly price on your checkout page."],
   ["Changes", "Email us a change and it's usually live the same day. Small content changes are unlimited within reason."],
   ["Ownership", "Your domain and your content stay yours."],
   ["Cancelling", "Cancel anytime. You get your site files, and your site stays online for at least 30 days."],
@@ -63,8 +63,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          There&apos;s no setup fee. Your price is the one on the checkout page you paid through: $59 or $79 a month, or $590 or $790 a
-          year. Stripe takes the payment, and we never see your full card number.
+          There&apos;s no setup fee. Your price is the one on the checkout page you paid through. Stripe takes the payment, and we never see your full card number.
         </p>
         <p>
           You pay at the start of each month or year, and the plan renews automatically until you cancel. If you think a charge is

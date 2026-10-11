@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import TemplateEditor from "@/components/admin/TemplateEditor";
 import { PageHeader } from "@/components/admin/ui";
-import type { TemplateValues } from "@/lib/emailTemplate";
+import { offerSentence, type TemplateValues } from "@/lib/emailTemplate";
 import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { templateValues } from "@/server/outreach/compose";
@@ -16,6 +16,7 @@ const MADE_UP: TemplateValues = {
   problem: "your site still says © 2021 and gets cut off on phones",
   link: "https://defect.tech/p/k3m9q2xa",
   price: "59",
+  offer: offerSentence(59),
   sender: "",
   address: "",
 };

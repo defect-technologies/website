@@ -7,7 +7,7 @@ import { CONVERSATION } from "@/content/headlines";
 
 export const metadata: Metadata = {
   title: "Request a website",
-  description: "Tell us about your business and we'll build it a new website. If you like it, it's $59 a month to keep it live.",
+  description: "Tell us about your business and we'll build it a new website. If you like it, it's $79 a month to keep it live.",
 };
 
 /** The home page's conversation opens with this question; here the visitor answers it. */
