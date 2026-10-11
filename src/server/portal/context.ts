@@ -12,4 +12,4 @@ export async function portalContext(slug?: string): Promise<PortalContext> {
 }
 
 /** The Vercel project a live site's analytics are recorded under: saved at launch, or the name promote gives it. */
-export const analyticsProject = (site: OwnerSite) => site.vercelProjectId || `site-${site.slug}`;
+export const analyticsProject = (site: Pick<OwnerSite, "slug" | "vercelProjectId">) => site.vercelProjectId || `site-${site.slug}`;

@@ -131,6 +131,24 @@ async function loadCounts(projectId: string, days: RangeDays): Promise<SiteAnaly
   };
 }
 
+/**
+ * Events Vercel bills for on one project between two days: page views plus tracked clicks.
+ * `off` says Web Analytics was never switched on, so nothing is being counted.
+ */
+export async function billableEvents(projectId: string, since: string, until: string): Promise<{ events: number; off: boolean }> {
+  const period = { since, until };
+  try {
+    const [visits, events] = await Promise.all([
+      query(projectId, { dataset: "visits", by: "environment", period }),
+      query(projectId, { dataset: "events", by: "eventName", period, limit: 100 }),
+    ]);
+    return { events: sum(visits, "pageviews") + sum(events, "count"), off: false };
+  } catch (error) {
+    if (error instanceof AnalyticsOff) return { events: 0, off: true };
+    throw error;
+  }
+}
+
 /** A live site's visitors and clicks over the last `days` days, cached for ten minutes. */
 export function siteAnalytics(projectId: string, days: RangeDays): Promise<Integration<SiteAnalytics>> {
   const { token, teamId } = env.vercel();

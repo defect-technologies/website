@@ -3,6 +3,7 @@
   "git": { "deploymentEnabled": false },
   "crons": [
     { "path": "/api/cron/sync", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/digest", "schedule": "0 2 * * *" }
+    { "path": "/api/cron/digest", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/analytics-spend", "schedule": "0 16 * * *" }
   ]
 }
