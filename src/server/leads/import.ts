@@ -4,7 +4,8 @@ import { PRICE_ARMS } from "@/lib/stages";
 import { db } from "../db/client";
 import { businesses } from "../db/schema";
 import { domainOf } from "../mail/mime";
-import { blockedDomains } from "./businesses";
+import { blockedContacts } from "./businesses";
+import { isBlocked } from "./contactKeys";
 import { parseCsv } from "./csv";
 import { linkProspectsToLeads } from "../prospects";
 
@@ -79,7 +80,7 @@ function textColumns(column: (name: string) => string) {
 
 function toBusiness(row: Record<string, string>, existing: Existing, blocked: Set<string>): NewBusiness {
   const column = (name: string) => row[name] ?? "";
-  const optedOut = blocked.has(domainOf(column("email")));
+  const optedOut = isBlocked(blocked, { email: column("email"), website: column("website"), placeId: column("place_id") });
   return {
     ...textColumns(column),
     placeId: column("place_id") || null,
@@ -121,7 +122,7 @@ function remember(row: NewBusiness, existing: Existing) {
 export async function importLeads(csv: string): Promise<{ added: number; skipped: number }> {
   const rows = parseCsv(csv).filter((row) => row.business_name);
   const existing = await loadExisting();
-  const blocked = await blockedDomains();
+  const blocked = await blockedContacts();
   const fresh: NewBusiness[] = [];
   for (const row of rows) {
     if (isDuplicate(row, existing)) continue;

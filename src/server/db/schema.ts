@@ -121,7 +121,7 @@ export const messages = pgTable(
   (table) => [uniqueIndex("messages_gmail_id").on(table.gmailId), index("messages_business").on(table.businessId)],
 );
 
-/** Opted-out email domains. Nobody at one of these is emailed again. */
+/** What opt-outs block, one key per row: a company email domain, an exact address at a shared provider like Gmail, a website domain, or "place:" and a Google place ID. See leads/contactKeys.ts. */
 export const doNotContact = pgTable("do_not_contact", {
   domain: text("domain").primaryKey(),
   reason: text("reason").notNull().default(""),

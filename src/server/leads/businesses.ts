@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { stagesBefore } from "@/lib/stages";
 import { db } from "../db/client";
 import { businesses, doNotContact, type Business, type Stage } from "../db/schema";
-import { domainOf } from "../mail/mime";
+import { contactKeys, isSharedDomainKey } from "./contactKeys";
 
 export async function businessById(id: string): Promise<Business | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
@@ -28,16 +28,24 @@ export async function updateBusiness(id: string, fields: Partial<Business>) {
     .where(eq(businesses.id, id));
 }
 
-export async function blockedDomains(): Promise<Set<string>> {
-  const rows = await (await db()).select({ domain: doNotContact.domain }).from(doNotContact);
-  return new Set(rows.map((row) => row.domain));
+/**
+ * Everything an opt-out blocks, checked with `isBlocked`. Opted-out leads count even if their keys never reached the table,
+ * and a bare shared domain saved by an older opt-out is ignored, so one Gmail opt-out doesn't block every Gmail user.
+ */
+export async function blockedContacts(): Promise<Set<string>> {
+  const database = await db();
+  const [saved, optedOut] = await Promise.all([
+    database.select({ key: doNotContact.domain }).from(doNotContact),
+    database.select({ email: businesses.email, website: businesses.website, placeId: businesses.placeId }).from(businesses).where(eq(businesses.stage, "opted_out")),
+  ]);
+  const keys = saved.map((row) => row.key).filter((key) => !isSharedDomainKey(key));
+  return new Set([...keys, ...optedOut.flatMap(contactKeys)]);
 }
 
-/** Opt-outs are permanent: the lead, and everyone else at that email domain. */
+/** Opt-outs are permanent: the business, by its email (its domain unless that's a shared provider), its website and its Google place. */
 export async function optOut(business: Business, reason: string) {
-  const domain = domainOf(business.email);
-  const database = await db();
-  if (domain) await database.insert(doNotContact).values({ domain, reason }).onConflictDoNothing();
+  const rows = contactKeys(business).map((domain) => ({ domain, reason }));
+  if (rows.length > 0) await (await db()).insert(doNotContact).values(rows).onConflictDoNothing();
   await updateBusiness(business.id, { stage: "opted_out" });
 }
 

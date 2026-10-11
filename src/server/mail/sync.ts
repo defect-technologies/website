@@ -7,16 +7,11 @@ import { businesses, mailboxes, messages, type Business, type Mailbox } from "..
 import { recordUnmatchedEmail } from "../inbound/requests";
 import { advanceStage, updateBusiness } from "../leads/businesses";
 import { mailSince, MailboxNeedsReconnect, type IncomingEmail } from "./gmail";
+import { SHARED_MAIL_DOMAINS } from "../leads/contactKeys";
 import { domainOf } from "./mime";
 import { connectedMailboxes } from "./outbox";
 
 const FIRST_SYNC_WINDOW = 14 * 24 * 60 * 60 * 1000;
-
-/** Matching on these domains would tie every Gmail user to whichever lead happens to use Gmail. */
-const SHARED_MAIL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "me.com",
-  "aol.com", "comcast.net", "att.net", "sbcglobal.net", "verizon.net", "msn.com", "proton.me", "protonmail.com",
-]);
 
 const OPT_OUT_WORDS = /\b(no thanks|no thank you|unsubscribe|remove me|stop emailing|not interested)\b/i;
 

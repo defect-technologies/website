@@ -3,7 +3,7 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "dri
 import type { OutreachSettings, TemplateValues } from "@/lib/emailTemplate";
 import { db } from "../db/client";
 import { businesses, messages, type Business } from "../db/schema";
-import { blockedDomains } from "../leads/businesses";
+import { blockedContacts } from "../leads/businesses";
 import { outreachSettings } from "../settings";
 import { requestThreads } from "../inbound/threads";
 import { blockers, composeBody, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread } from "./compose";
@@ -87,7 +87,7 @@ function toItem(kind: EmailKind, business: Business, { settings, blocked, firstS
 
 export async function outreachQueue() {
   const settings = await outreachSettings();
-  const [ready, due, blocked, sent] = await Promise.all([readyForFirstEmail(), dueForFollowUp(settings), blockedDomains(), sentToday()]);
+  const [ready, due, blocked, sent] = await Promise.all([readyForFirstEmail(), dueForFollowUp(settings), blockedContacts(), sentToday()]);
   const requested = ready.filter((b) => firstKindFor(b) === "requested");
   const [subjects, threads] = await Promise.all([firstSubjects(due.map((b) => b.id)), requestThreads(requested.map((b) => b.id))]);
   return {

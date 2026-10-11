@@ -3,7 +3,7 @@ import { asClause, fillTemplate, offerSentence, REGULAR_MONTHLY_PRICE, unfilledP
 import { replySubject } from "@/lib/emailLinks";
 import type { Business } from "../db/schema";
 import { env } from "../env";
-import { domainOf } from "../mail/mime";
+import { isBlocked } from "../leads/contactKeys";
 
 /** first and follow_up are cold email; requested goes to a business that asked us, from hello@defect.tech. */
 export type EmailKind = "first" | "follow_up" | "requested";
@@ -54,7 +54,7 @@ type Check = { failed: (b: Business, s: OutreachSettings, blocked: Set<string>) 
 /** Reasons an email can't go yet, each written as what to do about it. */
 const CHECKS: Check[] = [
   { failed: (b) => !b.email, fix: "Add an email address for this business." },
-  { failed: (b, _s, blocked) => blocked.has(domainOf(b.email)), fix: "This domain opted out. Nobody there can be emailed." },
+  { failed: (b, _s, blocked) => isBlocked(blocked, b), fix: "This business opted out, so it can't be emailed." },
   { failed: (b) => !b.previewUrl, fix: "Build and deploy the preview first." },
   { failed: (b) => !b.priceArm, fix: "Pick $59 or $79 for this lead." },
   { failed: (b) => !(b.emailProblem || b.problemSummary), fix: "Write the problem line.", coldOnly: true },

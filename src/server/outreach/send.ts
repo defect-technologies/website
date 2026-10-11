@@ -4,7 +4,7 @@ import { record } from "../activity";
 import type { Founder } from "../auth/session";
 import { db } from "../db/client";
 import { businesses, messages, type Business, type Mailbox } from "../db/schema";
-import { advanceStage, blockedDomains, businessById, updateBusiness } from "../leads/businesses";
+import { advanceStage, blockedContacts, businessById, updateBusiness } from "../leads/businesses";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
 import { withSignerHtml } from "../mail/teamSignature";
@@ -47,7 +47,7 @@ async function firstSubject(business: Business) {
 type Prepared = { business: Business; subject: string; body: string; thread: RequestThread | null };
 
 async function prepare(kind: EmailKind, id: string, problem?: string): Promise<Prepared | string> {
-  const [business, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedDomains(), sentToday()]);
+  const [business, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
   if (!business) return "That business no longer exists.";
   if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit on the Template page, or send tomorrow.`;
   const body = composeBody(kind, business, settings, problem);
