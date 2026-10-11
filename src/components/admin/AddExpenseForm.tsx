@@ -56,7 +56,7 @@ export default function AddExpenseForm({ founders, signedIn, today }: { founders
       <Problems problems={state.problems} />
       <Card key={state.addedId ?? "first"} className="flex flex-col gap-4 p-5">
         <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-[9.5rem_minmax(0,1fr)_8rem]">
-          <TextField label="Date" name="spentOn" type="date" required defaultValue={values.spentOn} hint="For a repeating expense, the first charge. It can be in the future." />
+          <TextField label="Date" name="spentOn" type="date" required defaultValue={values.spentOn} />
           <TextField label="What it was for" name="item" required defaultValue={values.item} placeholder="Vercel Pro" autoComplete="off" autoFocus={Boolean(state.addedId)} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor="amount" className="text-sm font-medium">
