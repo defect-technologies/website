@@ -282,18 +282,25 @@ const SECTIONS: LegalSection[] = [
       {
         title: "Previews",
         body: (
-          <p>
-            Previews are published at a private address, are excluded from search engines and are deleted thirty (30) days after they are
-            created unless the business becomes a client.
-          </p>
+          <>
+            <p>
+              Previews are published at a private address, are excluded from search engines and are deleted automatically thirty (30) days
+              after they are created unless the business becomes a client.
+            </p>
+            <p>
+              You may ask us to delete a preview of your business’s website sooner at any time, by replying to our email or writing to{" "}
+              {EMAIL} with the name or website of your business. We will delete it within five (5) business days of your request.
+            </p>
+          </>
         ),
       },
       {
         title: "Opting out",
         body: (
           <p>
-            You may opt out of further emails by replying to any of them with a request to stop. We will honor the request within ten (10)
-            business days and will not contact your business again.
+            You may opt out of further emails by replying to any of them with a request to stop. We will stop emailing the address that
+            made the request within ten (10) business days, and we will make reasonable efforts not to contact your business again at any
+            other address.
           </p>
         ),
       },
@@ -343,6 +350,16 @@ const SECTIONS: LegalSection[] = [
             emailing {EMAIL}. We will respond within forty-five (45) days, which we may extend once by an additional forty-five (45) days
             where reasonably necessary, in which case we will tell you. We may retain information where required by law, and we retain
             suppression list entries so that we can honor opt-outs.
+          </p>
+        ),
+      },
+      {
+        title: "Limits on requests",
+        body: (
+          <p>
+            We are not required to provide access to personal information more than twice for the same person in any twelve (12) month
+            period. We may decline, or charge a reasonable fee for, a request that is manifestly unfounded, excessive or repetitive, and
+            will explain our reasons if we do.
           </p>
         ),
       },

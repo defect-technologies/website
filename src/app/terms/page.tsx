@@ -22,7 +22,7 @@ const PREAMBLE = (
     <Conspicuous>
       Please read these Terms carefully. They provide that your Subscription renews automatically until you cancel (Section 4.3),
       limit each party’s liability (Section 11), and require disputes to be resolved by binding individual arbitration rather than in
-      court or by class action, with claims brought within one year (Section 14). They also provide that you receive the files of
+      court or by class action, with claims brought within one year (Section 14). They also explain how you can obtain the files of
       your website if your Subscription ends (Section 13.5).
     </Conspicuous>
   </>
@@ -233,10 +233,12 @@ const SECTIONS: LegalSection[] = [
         title: "Automatic renewal",
         body: (
           <Conspicuous>
-            Your Subscription renews automatically at the end of each billing period for a further period of the same length, and the
-            Fees then in effect will be charged to your payment method at the start of each renewal period, until you cancel in
-            accordance with Section 13.2. You may cancel at any time from the billing page in the Client Portal or by email to
-            hello@defect.tech.
+            Your Subscription is a continuing service that renews automatically at the end of each billing period, monthly or yearly as
+            you selected at checkout, for a further period of the same length until you cancel. At the start of each renewal period, we
+            will charge your payment method the Fees for that period, which are the amount shown on your checkout page unless changed
+            under Section 4.5. There is no minimum term. You may cancel at any time, online from the billing page in the Client Portal or
+            by email to hello@defect.tech, and cancellation takes effect at the end of the billing period in progress, as provided in
+            Section 13.2.
           </Conspicuous>
         ),
       },
@@ -595,7 +597,7 @@ const SECTIONS: LegalSection[] = [
         body: (
           <p>
             If we discontinue the Services or cease operations, we will give Client at least twenty-one (21) days’ written notice, deliver
-            the files of the Site to Client in accordance with Section 13.5, and refund any Fees prepaid for a yearly Subscription
+            the files of the Site to Client without charge, and refund any Fees prepaid for a yearly Subscription
             attributable to full months remaining after the Services end.
           </p>
         ),
@@ -607,7 +609,8 @@ const SECTIONS: LegalSection[] = [
             <p>When a Subscription ends for any reason:</p>
             <Items>
               {[
-                "provided Client has paid all undisputed Fees, we will deliver to Client a copy of the files of the Site, including Client Content, in a standard format that another host can serve;",
+                "we will return Client Content to Client on request;",
+                "if Client has paid all undisputed Fees, and either Client’s Subscription has been active for a total of at least twelve (12) months or Client pays a one-time buyout fee of nine hundred forty-eight dollars ($948), we will deliver to Client a copy of the files of the Site in a standard format that another host can serve;",
                 "unless we terminated these Terms under Section 13.3 or suspended the Site under Section 4.6 or Section 6, we will keep the Site online for not less than thirty (30) days after Client submits notice of cancellation, or through the end of the paid billing period if later, so that Client may move the Site;",
                 "we will provide reasonable cooperation in directing Client’s domain to a new host;",
                 "after that period, we may take the Site offline and delete Client Content from our active systems, except copies retained in routine backups or as required by law; and",
