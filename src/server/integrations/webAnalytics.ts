@@ -22,11 +22,18 @@ function periods(days: RangeDays, now = new Date()): { current: Period; previous
   return { current: { since: isoDay(since), until: isoDay(until) }, previous: { since: isoDay(previousSince), until: isoDay(previousUntil) } };
 }
 
+/** Web Analytics was never switched on for the project, so there is nothing to count yet. */
+class AnalyticsOff extends Error {}
+
 async function query(projectId: string, { dataset, by, period, limit }: Query): Promise<Row[]> {
   const { token, teamId } = env.vercel();
   const params = new URLSearchParams({ projectId, teamId, by, since: period.since, until: period.until, ...(limit ? { limit: String(limit) } : {}) });
   const response = await fetch(`${API}/${dataset}/aggregate?${params}`, { headers: { Authorization: `Bearer ${token}` }, next: { revalidate: CACHE_SECONDS } });
-  if (!response.ok) throw new Error(`Vercel Web Analytics answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 200);
+    if (detail.includes("web_analytics_not_enabled")) throw new AnalyticsOff(projectId);
+    throw new Error(`Vercel Web Analytics answered ${response.status}: ${detail}`);
+  }
   const body = (await response.json()) as { data?: Row[] };
   return Array.isArray(body.data) ? body.data : [];
 }
@@ -79,7 +86,31 @@ function ranked(rows: Row[], field: string, label: (value: string) => string): R
   return [...merged].map(([name, visitors]) => ({ label: name, visitors })).sort((a, b) => b.visitors - a.visitors).slice(0, 5);
 }
 
+const nothing: Compared = { now: 0, before: 0 };
+
+/** Every chart and count at zero, for a site whose visits aren't being counted yet. */
+function emptyAnalytics(period: Period): SiteAnalytics {
+  return {
+    days: fillDays([], period),
+    visitors: nothing,
+    pageviews: nothing,
+    actions: Object.fromEntries(ACTIONS.map((action) => [action, nothing])) as Record<Action, Compared>,
+    pages: [],
+    sources: [],
+  };
+}
+
 async function load(projectId: string, days: RangeDays): Promise<SiteAnalytics> {
+  try {
+    return await loadCounts(projectId, days);
+  } catch (error) {
+    if (!(error instanceof AnalyticsOff)) throw error;
+    console.warn(`[analytics] Web Analytics is off for ${projectId}. Switch it on in the project's Analytics tab on Vercel, then redeploy.`);
+    return emptyAnalytics(periods(days).current);
+  }
+}
+
+async function loadCounts(projectId: string, days: RangeDays): Promise<SiteAnalytics> {
   const { current, previous } = periods(days);
   const [daily, total, totalBefore, events, eventsBefore, pages, sources] = await Promise.all([
     query(projectId, { dataset: "visits", by: "day", period: current }),

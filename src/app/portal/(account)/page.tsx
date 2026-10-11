@@ -1,8 +1,8 @@
-import { ArrowUpRight, EnvelopeSimple } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, Clock, EnvelopeSimple } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { buttonClasses } from "@/components/Button";
 import { Notice } from "@/components/admin/ui";
-import { ActionTiles, NoVisitsYet, RangePicker, RankedList, VisitorsCard } from "@/components/portal/Dashboard";
+import { ActionTiles, RangePicker, RankedList, VisitorsCard } from "@/components/portal/Dashboard";
 import PortalShell from "@/components/portal/PortalShell";
 import { hasAnyData, parseRange } from "@/lib/siteAnalytics";
 import { siteName } from "@/server/editor/signInLinks";
@@ -36,14 +36,19 @@ export default async function PortalDashboard({ searchParams }: { searchParams: 
         <RangePicker days={days} site={several ? site.slug : undefined} />
       </div>
       {analytics.state !== "ok" && <Notice tone="warn">Your numbers can&apos;t be loaded right now. Check back in a little while.</Notice>}
-      {analytics.state === "ok" && !hasAnyData(analytics.data) && <NoVisitsYet />}
-      {analytics.state === "ok" && hasAnyData(analytics.data) && (
+      {analytics.state === "ok" && !hasAnyData(analytics.data) && (
+        <p className="text-ink-soft flex items-start gap-2 text-pretty">
+          <Clock size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
+          No data yet. Your numbers fill in here as people find and use your website.
+        </p>
+      )}
+      {analytics.state === "ok" && (
         <>
           <ActionTiles analytics={analytics.data} days={days} />
           <VisitorsCard analytics={analytics.data} days={days} />
           <div className="grid gap-6 lg:grid-cols-2">
-            <RankedList title="Most visited pages" rows={analytics.data.pages} empty="No pages viewed in this period." />
-            <RankedList title="Where visitors came from" rows={analytics.data.sources} empty="No visitors in this period." />
+            <RankedList title="Most visited pages" rows={analytics.data.pages} empty="No data yet" />
+            <RankedList title="Where visitors came from" rows={analytics.data.sources} empty="No data yet" />
           </div>
         </>
       )}
