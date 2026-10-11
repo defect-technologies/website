@@ -1,21 +1,18 @@
 "use client";
 
-import { EnvelopeSimple, PaperPlaneTilt } from "@phosphor-icons/react";
+import { PaperPlaneTilt } from "@phosphor-icons/react";
 import { useActionState } from "react";
 import { requestLinkAction, type LinkRequestState } from "@/app/edit/actions";
 import { TextField } from "@/components/admin/fields";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { Notice } from "@/components/admin/ui";
+import LinkSentNotice from "./LinkSentNotice";
 
 function SentNotice({ email }: { email: string }) {
   return (
-    <div role="status" className="bg-surface shadow-card flex w-full flex-col items-center gap-3 rounded-2xl px-6 py-8 text-center">
-      <EnvelopeSimple size={32} className="text-ink" aria-hidden="true" />
-      <p className="text-lg font-semibold text-balance">Check your email</p>
-      <p className="text-ink-soft text-pretty">
-        If <span className="text-ink font-medium break-all">{email}</span> is the address on your account, a sign-in link is on its way. It opens the editor on your site once, within 10 minutes.
-      </p>
-    </div>
+    <LinkSentNotice>
+      If <span className="text-ink font-medium break-all">{email}</span> is the address on your account, a sign-in link is on its way. It opens the editor on your site once, within 10 minutes.
+    </LinkSentNotice>
   );
 }
 

@@ -7,7 +7,7 @@ import { MAX_FAILED_BUILDS, type JobKind } from "@/lib/previewJobs";
 import type { BotKey, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
-import { addClientSite } from "../sites/clientSites";
+import { saveLaunchedSite } from "../sites/clientSites";
 import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
@@ -182,7 +182,7 @@ async function finishLaunched(job: PreviewJob, lead: Business, body: Done) {
   const siteUrl = liveAddress(lead, body.launch.liveUrl);
   await updateBusiness(lead.id, { vercelProjectId: body.launch.projectId, siteUrl, launchedAt: lead.launchedAt ?? new Date() });
   await closeFlagsOn(lead.id, ["launch"], "Closed itself: the site launched.", ACTOR);
-  await addClientSite({ slug: lead.slug, ownerEmail: lead.ownerEmail || lead.email, url: siteUrl, businessId: lead.id, createdBy: ACTOR });
+  await saveLaunchedSite({ slug: lead.slug, ownerEmail: lead.ownerEmail || lead.email, url: siteUrl, businessId: lead.id, createdBy: ACTOR });
   const records = body.launch.records.map((entry) => `${entry.type} ${entry.name} → ${entry.value}`).join(", ");
   await record(ACTOR, "launched the site", { businessId: lead.id, detail: `${body.launch.liveUrl}; ${records}` });
 }
