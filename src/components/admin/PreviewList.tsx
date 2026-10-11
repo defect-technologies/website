@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, ArrowSquareOut, CaretRight, CheckCircle, Kanban } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, CaretRight, CheckCircle, Kanban } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { switchPreviewVersionAction } from "@/app/admin/(panel)/projects/actions";
 import type { Business, Stage } from "@/server/db/schema";
@@ -49,11 +49,11 @@ function daysLeft(created: Date) {
   return Math.max(0, PREVIEW_LIFETIME_DAYS - Math.floor((Date.now() - created.getTime()) / 86_400_000));
 }
 
-function Lifetime({ createdAt }: { createdAt: Date }) {
+/** Only a preview about to be cleaned up says so; every other one has weeks left, and saying so on each row is noise. */
+function Expiry({ createdAt }: { createdAt: Date }) {
   const left = daysLeft(createdAt);
-  return (
-    <span className={`whitespace-nowrap tabular-nums ${left <= EXPIRING_DAYS ? "text-warn font-medium" : "text-ink-faint"}`}>{left === 0 ? "Goes at the next cleanup" : `${left} days left`}</span>
-  );
+  if (left > EXPIRING_DAYS) return null;
+  return <span className="text-warn text-xs font-medium whitespace-nowrap">{left === 0 ? "Expires today" : left === 1 ? "Expires tomorrow" : `Expires in ${left} days`}</span>;
 }
 
 function InEmails() {
@@ -114,42 +114,66 @@ function EarlierVersions({ site }: { site: PreviewSite }) {
   );
 }
 
+/**
+ * One column template for the header and every row, so each column lines up down the whole list,
+ * across the folded "Show more" part too. Below 26rem the row stacks: name and links, then the facts.
+ */
+const COLUMNS = "@[26rem]:grid-cols-[minmax(0,1fr)_7rem_6.5rem_4.5rem]";
+const ROW = `grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 ${COLUMNS}`;
+
+function PreviewHeader() {
+  return (
+    <div className={`${ROW} text-ink-faint border-ink/10 hidden border-b pb-2 text-xs font-medium @[26rem]:grid`} aria-hidden="true">
+      <span>Business</span>
+      <span>Status</span>
+      <span>Built</span>
+      <span className="text-right">Links</span>
+    </div>
+  );
+}
+
 function PreviewRow({ site }: { site: PreviewSite }) {
   const latest = site.versions[0];
   const linked = isLinked(site.owner, latest);
-  const extras = (linked && site.versions.length > 1) || (site.owner && !linked) || site.versions.length > 1;
+  const notInEmails = site.owner && !linked;
   return (
-    <li className="border-ink/8 flex flex-col gap-1 border-b pb-2.5 last:border-b-0 last:pb-0">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <a href={latest.url} target="_blank" rel="noreferrer" className="group min-w-0 font-medium hover:underline">
+    <li className={`${ROW} border-ink/8 border-b py-2.5 last:border-b-0`}>
+      <div className="flex min-w-0 flex-col gap-1">
+        <a href={latest.url} target="_blank" rel="noreferrer" className="min-w-0 font-medium hover:underline">
           {site.name}
-          <ArrowSquareOut size={14} className="text-ink-faint group-hover:text-ink ml-1 inline-block align-[-2px]" aria-hidden="true" />
           <span className="sr-only"> preview (opens in a new tab)</span>
         </a>
-        {site.owner ? <StageChip stage={site.owner.stage} /> : <span className="bg-paper-shade text-ink-faint rounded-full px-2.5 py-0.5 text-sm">No lead</span>}
-        <span className="ml-auto flex items-center gap-x-3 text-sm">
+        {(notInEmails || site.versions.length > 1) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {notInEmails && (
+              <span className="-ms-3">
+                <UseVersionButton owner={site.owner!} url={latest.url} />
+              </span>
+            )}
+            <EarlierVersions site={site} />
+          </div>
+        )}
+      </div>
+      <span className="col-start-1 row-start-2 flex flex-wrap items-center gap-x-3 text-sm @[26rem]:contents">
+        <span>{site.owner ? <StageChip stage={site.owner.stage} /> : <span className="bg-paper-shade text-ink-faint inline-flex rounded-full px-2.5 py-0.5 text-sm">No lead</span>}</span>
+        <span className="flex flex-col text-sm leading-tight">
           <span className="text-ink-soft whitespace-nowrap">
             <When date={latest.createdAt} />
           </span>
-          <Lifetime createdAt={latest.createdAt} />
-          <span className="flex items-center">
-            <CopyLinkButton url={latest.url} />
-            {site.owner && (
-              <Link href={`/admin/pipeline/${site.owner.id}`} title="Open the lead" className="text-ink-faint hover:text-ink hover:bg-paper-shade grid size-9 place-items-center rounded-full">
-                <Kanban size={18} aria-hidden="true" />
-                <span className="sr-only">Open {site.name} in the pipeline</span>
-              </Link>
-            )}
-          </span>
+          <Expiry createdAt={latest.createdAt} />
         </span>
-      </div>
-      {extras && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          {linked && site.versions.length > 1 && <InEmails />}
-          {site.owner && !linked && <UseVersionButton owner={site.owner} url={latest.url} />}
-          <EarlierVersions site={site} />
-        </div>
-      )}
+      </span>
+      <span className="col-start-2 row-start-1 flex items-center justify-end @[26rem]:col-start-auto @[26rem]:row-start-auto">
+        <CopyLinkButton url={latest.url} />
+        {site.owner ? (
+          <Link href={`/admin/pipeline/${site.owner.id}`} title="Open the lead" className="text-ink-faint hover:text-ink hover:bg-paper-shade grid size-9 place-items-center rounded-full">
+            <Kanban size={18} aria-hidden="true" />
+            <span className="sr-only">Open {site.name} in the pipeline</span>
+          </Link>
+        ) : (
+          <span className="size-9" aria-hidden="true" />
+        )}
+      </span>
     </li>
   );
 }
@@ -204,7 +228,10 @@ export default function PreviewList({ previews, leads, filters }: { previews: Pr
       {shown.length === 0 ? (
         <p className="text-ink-soft text-sm">No preview matches. Try fewer filters.</p>
       ) : (
-        <ShowMore items={shown.map((site) => <PreviewRow key={site.key} site={site} />)} />
+        <div className="@container">
+          <PreviewHeader />
+          <ShowMore className="flex flex-col" items={shown.map((site) => <PreviewRow key={site.key} site={site} />)} />
+        </div>
       )}
     </div>
   );
