@@ -41,6 +41,15 @@ export async function addClientSite(input: { slug: string; ownerEmail: string; u
   return row ?? null;
 }
 
+/** A launch records where the site now lives, replacing the address it had before it went live. The owner stays as is. */
+export async function saveLaunchedSite(input: { slug: string; ownerEmail: string; url: string; businessId: string; createdBy: string }) {
+  const url = input.url.replace(/\/$/, "");
+  await (await db())
+    .insert(clientSites)
+    .values({ ...input, ownerEmail: input.ownerEmail.trim().toLowerCase(), url })
+    .onConflictDoUpdate({ target: clientSites.slug, set: { url, businessId: input.businessId } });
+}
+
 export async function changeSiteOwner(slug: string, ownerEmail: string) {
   const [row] = await (await db())
     .update(clientSites)

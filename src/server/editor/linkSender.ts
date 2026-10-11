@@ -1,7 +1,7 @@
 import "server-only";
 import { env, isDevelopment } from "../env";
 
-export type SignInEmail = { to: string; siteAddress: string; url: string; expiresInMinutes: number };
+export type SignInEmail = { to: string; siteName: string; editUrl: string; url: string; expiresInMinutes: number };
 
 /** The one way the editor sends email. Swap the implementation; nothing else changes. */
 export interface SignInLinkSender {
@@ -12,21 +12,21 @@ export interface SignInLinkSender {
 /** Prints the link in the terminal running `next dev`. Nothing leaves the laptop. */
 const consoleSender: SignInLinkSender = {
   ready: true,
-  async send({ to, siteAddress, url, expiresInMinutes }) {
-    console.info(`\n[editor] Sign-in link for ${to} to edit ${siteAddress} (works for ${expiresInMinutes} minutes):\n${url}\n`);
+  async send({ to, siteName, url, expiresInMinutes }) {
+    console.info(`\n[editor] Sign-in link for ${to} to edit ${siteName} (works for ${expiresInMinutes} minutes):\n${url}\n`);
   },
 };
 
 const RESEND_EMAILS_URL = "https://api.resend.com/emails";
 
-function signInEmailText({ siteAddress, url, expiresInMinutes }: SignInEmail): string {
+function signInEmailText({ siteName, editUrl, url, expiresInMinutes }: SignInEmail): string {
   return [
     "Hi,",
     "",
-    `Here's your link to edit ${siteAddress}. It works once, within the next ${expiresInMinutes} minutes:`,
+    `Here's your link to edit ${siteName}. It works once, within the next ${expiresInMinutes} minutes:`,
     url,
     "",
-    "If it expires, ask for a new one at https://defect.tech/edit/sign-in.",
+    `If it expires, get a new one at ${editUrl}`,
     "",
     "If you didn't ask for this, you can ignore this email and nothing will change.",
     "",
@@ -56,7 +56,7 @@ const resendSender: SignInLinkSender = {
         from,
         to: [email.to],
         reply_to: "hello@defect.tech",
-        subject: `Your link to edit ${email.siteAddress}`,
+        subject: `Your link to edit ${email.siteName}`,
         text: signInEmailText(email),
       }),
     });

@@ -1,14 +1,16 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, gte, isNull, sql } from "drizzle-orm";
 import { SignJWT } from "jose";
 import { db } from "../db/client";
-import { clientSites, editorLinks, type ClientSite } from "../db/schema";
+import { businesses, clientSites, editorLinks, type ClientSite } from "../db/schema";
 import { env, isDevelopment } from "../env";
-import { clientSitesOwnedBy } from "../sites/clientSites";
+import { clientSite, clientSitesOwnedBy } from "../sites/clientSites";
 import { signInLinkSender } from "./linkSender";
 
 export const LINK_MINUTES = 10;
+/** One click on a site's /edit emails its owner, so a site gets at most this many links per LINK_MINUTES. */
+const LINKS_PER_WINDOW = 3;
 /** How long the token handed to the client site lives. It only travels in the redirect, never in an email. */
 const ENTER_SECONDS = 60;
 
@@ -44,31 +46,54 @@ async function enterUrl(site: Pick<ClientSite, "slug" | "url">, email: string): 
   return url.toString();
 }
 
+/** What the owner calls their site: "G Studio Website", or its address when it has no business on file. */
+export function siteName(businessName: string | null, url: string): string {
+  return businessName ? `${businessName} Website` : new URL(url).host;
+}
+
+async function businessNameOf(businessId: string | null): Promise<string | null> {
+  if (!businessId) return null;
+  const [row] = await (await db()).select({ name: businesses.businessName }).from(businesses).where(eq(businesses.id, businessId));
+  return row?.name || null;
+}
+
 /** Stores a new one-time code for the site's owner and emails the link. Throws if the email service refuses it. */
-export async function emailSignInLink(site: Pick<ClientSite, "id" | "url" | "ownerEmail">) {
+export async function emailSignInLink(site: Pick<ClientSite, "id" | "url" | "ownerEmail" | "businessId">) {
   const code = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + LINK_MINUTES * 60 * 1000);
   await (await db()).insert(editorLinks).values({ codeHash: hash(code), siteId: site.id, email: site.ownerEmail, expiresAt });
   const url = new URL("/edit/open", env.siteUrl());
   url.searchParams.set("code", code);
-  await signInLinkSender().send({ to: site.ownerEmail, siteAddress: new URL(site.url).host, url: url.toString(), expiresInMinutes: LINK_MINUTES });
+  const name = siteName(await businessNameOf(site.businessId), site.url);
+  await signInLinkSender().send({ to: site.ownerEmail, siteName: name, editUrl: `${site.url}/edit`, url: url.toString(), expiresInMinutes: LINK_MINUTES });
 }
 
-export type LinkState = { state: "ready"; siteAddress: string } | { state: "used" | "expired" | "unknown" };
+export type LinkState = { state: "ready"; siteName: string } | { state: "used" | "expired"; slug: string } | { state: "unknown" };
 
-function stateOf(link: { usedAt: Date | null; expiresAt: Date; email: string; ownerEmail: string; url: string }): LinkState {
-  if (link.usedAt) return { state: "used" };
-  if (link.expiresAt <= new Date() || link.email !== link.ownerEmail) return { state: "expired" };
-  return { state: "ready", siteAddress: new URL(link.url).host };
+type InspectedLink = { usedAt: Date | null; expiresAt: Date; email: string; ownerEmail: string; url: string; slug: string; businessName: string | null };
+
+function stateOf(link: InspectedLink): LinkState {
+  if (link.usedAt) return { state: "used", slug: link.slug };
+  if (link.expiresAt <= new Date() || link.email !== link.ownerEmail) return { state: "expired", slug: link.slug };
+  return { state: "ready", siteName: siteName(link.businessName, link.url) };
 }
 
 /** Looks at a link without using it, so an email scanner opening the page doesn't spend it. */
 export async function inspectSignInLink(code: string): Promise<LinkState> {
   if (!code) return { state: "unknown" };
   const [link] = await (await db())
-    .select({ usedAt: editorLinks.usedAt, expiresAt: editorLinks.expiresAt, email: editorLinks.email, ownerEmail: clientSites.ownerEmail, url: clientSites.url })
+    .select({
+      usedAt: editorLinks.usedAt,
+      expiresAt: editorLinks.expiresAt,
+      email: editorLinks.email,
+      ownerEmail: clientSites.ownerEmail,
+      url: clientSites.url,
+      slug: clientSites.slug,
+      businessName: businesses.businessName,
+    })
     .from(editorLinks)
     .innerJoin(clientSites, eq(editorLinks.siteId, clientSites.id))
+    .leftJoin(businesses, eq(clientSites.businessId, businesses.id))
     .where(eq(editorLinks.codeHash, hash(code)));
   return link ? stateOf(link) : { state: "unknown" };
 }
@@ -108,4 +133,40 @@ export async function requestSignInLinks(rawEmail: string): Promise<LinkRequest>
     }
   }
   return "sent";
+}
+
+/** b•••@g.studio: enough for the owner to recognize their address, too little for a stranger to learn it. */
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  return `${local.slice(0, 1)}•••@${domain}`;
+}
+
+async function linksSentRecently(siteId: string): Promise<number> {
+  const since = new Date(Date.now() - LINK_MINUTES * 60 * 1000);
+  const [row] = await (await db())
+    .select({ count: sql<number>`count(*)::int` })
+    .from(editorLinks)
+    .where(and(eq(editorLinks.siteId, siteId), gte(editorLinks.createdAt, since)));
+  return row?.count ?? 0;
+}
+
+export type SiteLinkRequest = { status: "sent"; maskedEmail: string } | { status: "not-ready" | "unknown" | "failed" };
+
+/**
+ * The button on a site's /edit: emails a link to that site's owner, so nobody types an address.
+ * Clicking again while a recent link is still good sends nothing new.
+ */
+export async function requestLinkForSite(slug: string): Promise<SiteLinkRequest> {
+  if (!linksReady()) return { status: "not-ready" };
+  const site = await clientSite(slug);
+  if (!site) return { status: "unknown" };
+  const sent = { status: "sent", maskedEmail: maskEmail(site.ownerEmail) } as const;
+  if ((await linksSentRecently(site.id)) >= LINKS_PER_WINDOW) return sent;
+  try {
+    await emailSignInLink(site);
+    return sent;
+  } catch (error) {
+    console.error(`[editor] Sign-in email for ${site.slug} failed to send`, error);
+    return { status: "failed" };
+  }
 }
