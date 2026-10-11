@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { ButtonLink } from "./Button";
 
-type Page = "home" | "team" | "other";
+type Page = "home" | "team" | "start" | "other";
 
 const LINK = "text-ink rounded-md px-2 py-1 text-base font-medium hover:bg-paper-shade focus-visible:outline-2 focus-visible:outline-ink";
 
@@ -15,15 +16,22 @@ export default function SiteNav({ page }: { page: Page }) {
           defect.tech
         </Link>
       )}
-      {page === "home" ? (
-        <Link href="/team" className={LINK}>
-          Team
-        </Link>
-      ) : (
-        <Link href="/" className={LINK}>
-          Home
-        </Link>
-      )}
+      <div className="flex items-center gap-2">
+        {page === "home" ? (
+          <Link href="/team" className={LINK}>
+            Team
+          </Link>
+        ) : (
+          <Link href="/" className={LINK}>
+            Home
+          </Link>
+        )}
+        {page !== "start" && (
+          <ButtonLink href="/start" size="sm">
+            Request a website
+          </ButtonLink>
+        )}
+      </div>
     </nav>
   );
 }

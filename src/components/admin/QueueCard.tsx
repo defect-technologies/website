@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { sendFromQueue, skipFromQueue, undoSkip } from "@/app/admin/(panel)/outreachActions";
 import { asClause, type TemplateValues } from "@/lib/emailTemplate";
 import type { Business } from "@/server/db/schema";
+import type { EmailKind } from "@/server/outreach/compose";
 import { Button } from "../Button";
 import Letter from "./Letter";
 import PreviewThumb from "./PreviewThumb";
@@ -14,7 +15,7 @@ import { ArmChip, Card, Notice } from "./ui";
 
 type QueueCardProps = {
   business: Business;
-  kind: "first" | "follow_up";
+  kind: EmailKind;
   subject: string;
   template: string;
   values: TemplateValues;
@@ -83,6 +84,8 @@ function SkippedRow({ name, onUndo, pending }: { name: string; onUndo: () => voi
   );
 }
 
+const KIND_CHIP: Record<EmailKind, string> = { first: "", follow_up: "Follow-up", requested: "From hello@" };
+
 function Header({ business, kind }: { business: Business; kind: QueueCardProps["kind"] }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -92,7 +95,7 @@ function Header({ business, kind }: { business: Business; kind: QueueCardProps["
         </Link>
       </h3>
       <div className="flex items-center gap-3">
-        {kind === "follow_up" && <span className="bg-ink/8 rounded-full px-2.5 py-0.5 text-sm font-medium">Follow-up</span>}
+        {kind !== "first" && <span className="bg-ink/8 rounded-full px-2.5 py-0.5 text-sm font-medium">{KIND_CHIP[kind]}</span>}
         <ArmChip arm={business.priceArm} />
       </div>
       <p className="text-ink-faint w-full text-sm">To {business.email || "no address yet"}</p>

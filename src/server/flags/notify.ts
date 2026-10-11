@@ -11,7 +11,7 @@ import { spentToday } from "../runner/jobs";
 
 const reviewLink = (flag?: Flag) => `${env.siteUrl()}/admin/review${flag ? `#flag-${flag.id}` : ""}`;
 
-async function emailFounders(subject: string, body: string) {
+export async function emailFounders(subject: string, body: string) {
   const to = env.founderEmails().join(", ");
   if (!to) throw new Error("ADMIN_EMAILS is empty, so there's nobody to tell.");
   await deliver((from) => ({ from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" }, to, subject, body }), await studioMailboxId());

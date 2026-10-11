@@ -2,7 +2,7 @@ import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { SENT_FROM_GMAIL } from "@/lib/senders";
-import { activity, businesses, messages, previewJobs, spotChecks, type Business } from "../db/schema";
+import { activity, businesses, inboundRequests, messages, previewJobs, spotChecks, type Business } from "../db/schema";
 import { upsertProspects, type ProspectInput } from "../prospects";
 import { newLinkCode } from "../leads/import";
 
@@ -113,6 +113,27 @@ async function sampleProspects() {
   ]);
 }
 
+/** What the form and hello@ bring in: one request with a website, one without, and emails for Client care to sort. All made up. */
+async function sampleInbound() {
+  const database = await db();
+  await database
+    .insert(inboundRequests)
+    .values([
+      { source: "email", kind: "unsorted", email: "owner@mesa-auto.example.com", subject: "Website?", body: "Hi, a friend said you rebuilt her bakery's site. Our shop's site is mesa-auto.example.com and it's a mess. Can you do ours?", gmailId: "sample-inbound-1", threadId: "sample-inbound-thread-1", at: minutesAgo(15) },
+      { source: "email", kind: "unsorted", email: "kim@harbor-dental.example.com", subject: "Price question", body: "Is the $59 a month for one location or both of ours?", gmailId: "sample-inbound-4", threadId: "sample-inbound-thread-4", at: minutesAgo(25) },
+      { source: "email", kind: "founder", email: "reporter@local-news.example.com", subject: "Interview request", body: "I'm writing about small businesses and AI. Could one of the founders talk this week?", reason: "A press request; a founder should decide.", sortedBy: "bot:client_care", gmailId: "sample-inbound-2", at: daysAgo(1) },
+      { source: "email", kind: "ignore", status: "closed", email: "deals@seo-blast.example.com", subject: "Rank #1 on Google GUARANTEED", body: "Get to page one in 30 days.", reason: "SEO spam.", sortedBy: "bot:client_care", gmailId: "sample-inbound-3", at: daysAgo(2) },
+    ])
+    .onConflictDoNothing();
+  const forms = await database.select({ email: inboundRequests.email }).from(inboundRequests).where(eq(inboundRequests.source, "form"));
+  const has = new Set(forms.map((row) => row.email));
+  const formSamples = [
+    { source: "form" as const, kind: "request" as const, name: "Rosa Diaz", email: "rosa@tamale-cart.example.com", businessName: "Rosa's Tamales", about: "We sell tamales from a cart on Figueroa St near USC, Tuesday to Saturday 7am to 1pm. Pork, chicken and rajas con queso. Call or text (213) 555-0187 for catering orders.", at: minutesAgo(40) },
+    { source: "form" as const, kind: "request" as const, name: "Glen Park", email: "glen@park-piano.example.com", businessName: "Park Piano Studio", website: "https://park-piano.example.com", about: "Our site still lists 2019 recital dates.", at: minutesAgo(180) },
+  ].filter((sample) => !has.has(sample.email));
+  if (formSamples.length > 0) await database.insert(inboundRequests).values(formSamples);
+}
+
 function toRow(sample: Sample): typeof businesses.$inferInsert {
   return {
     linkCode: newLinkCode(),
@@ -153,6 +174,7 @@ export async function loadSamples() {
   await sampleGmailReply(allBySlug.get("altadena-roofing"));
   await sampleSpotChecks(allBySlug);
   await sampleProspects();
+  await sampleInbound();
   if (!(await hasBuilds(everySample))) {
     await sampleBuilds(allBySlug);
     await sampleActivity(allBySlug);

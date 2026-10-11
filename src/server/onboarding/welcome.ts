@@ -7,7 +7,7 @@ import { TEAM_SIGNATURE_TEXT, withTeamSignatureHtml } from "../mail/teamSignatur
 
 const SUBJECT = "Welcome to Defect Technologies";
 /** Clients hear from the studio inbox, never from a cold-email domain. */
-const STUDIO_INBOX = "hello@defect.tech";
+export const STUDIO_INBOX = "hello@defect.tech";
 /** The studio inbox writes as the team; founders' names are for cold email only. */
 export const STUDIO_NAME = "Defect Technologies";
 

@@ -7,10 +7,11 @@ export const metadata: Metadata = {
   description: "What Defect Technologies collects, why, who we share it with, and how to have it deleted.",
 };
 
-const EFFECTIVE = "October 8, 2026";
+const EFFECTIVE = "October 11, 2026";
 
 const SUMMARY: [string, React.ReactNode][] = [
   ["This site", "No cookies, no analytics, no ads."],
+  ["If you asked us for a site", "We keep what you sent so we can build it and write back. Ask and we'll delete it."],
   ["If we emailed you", "We used what your own website publishes to build you a private preview. Reply \"no thanks\" and we'll never email you again."],
   ["Client sites", "Clicks on Call, Book, Directions, and Email are counted without cookies. Nothing else is tracked."],
   ["Selling data", "We never sell personal information or use it for ads."],
@@ -48,6 +49,24 @@ const SECTIONS: LegalSection[] = [
           Previews have a private address, are hidden from search engines, and are deleted after 30 days. If you reply &ldquo;no
           thanks,&rdquo; we keep your email domain on a do-not-contact list so nobody at your business hears from us again. To have
           everything else about your business deleted, email us.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "requests",
+    title: "If you ask us for a website",
+    body: (
+      <>
+        <p>When you send the form on this site or email us, we keep:</p>
+        <ul>
+          <li>your name, your business&apos;s name, your email address, and your website&apos;s address if you gave one</li>
+          <li>what you told us about the business, which is the only source for a preview when you don&apos;t have a website yet</li>
+          <li>a scrambled form of your IP address that can&apos;t be turned back into the address, used only to stop the form being sent over and over</li>
+        </ul>
+        <p>
+          We use it to build your preview and to email you about it. If you have a website, we read it the same way we read the sites of
+          businesses we contact. We don&apos;t add you to any mailing list.
         </p>
       </>
     ),
@@ -93,7 +112,7 @@ const SECTIONS: LegalSection[] = [
           <li><strong>Google Workspace</strong> carries our email</li>
           <li><strong>Resend</strong> sends the sign-in links clients use to edit their sites</li>
           <li><strong>Stripe</strong> takes payments</li>
-          <li><strong>Anthropic</strong> provides the AI model that turns a business&apos;s website text into the words for its preview</li>
+          <li><strong>Anthropic</strong> provides the AI model that turns a business&apos;s website text, or what its owner told us, into the words for its preview</li>
         </ul>
         <p>We never sell personal information, and we never share it for advertising.</p>
       </>

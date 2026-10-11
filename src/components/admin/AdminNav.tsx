@@ -1,6 +1,6 @@
 "use client";
 
-import { AddressBook, Browsers, ChatsCircle, Eye, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, type Icon } from "@phosphor-icons/react";
+import { AddressBook, Browsers, ChatsCircle, Eye, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, Tray, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
@@ -13,11 +13,12 @@ function isCurrent(pathname: string, { href, also }: Item) {
   return pathname.startsWith(href) || Boolean(also && pathname.startsWith(also));
 }
 
-export default function AdminNav({ counts }: { counts: { outreach: number; messages: number; review: number; spotChecks: number } }) {
+export default function AdminNav({ counts }: { counts: { outreach: number; requests: number; messages: number; review: number; spotChecks: number } }) {
   const pathname = usePathname();
   const items: Item[] = [
     { href: "/admin/overview", label: "Overview", icon: Table, also: "/admin/pipeline" },
     { href: "/admin", label: "Outreach", icon: PaperPlaneTilt, count: counts.outreach },
+    { href: "/admin/requests", label: "Requests", icon: Tray, count: counts.requests },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },
     { href: "/admin/review", label: "Review queue", icon: Flag, count: counts.review },
     { href: "/admin/spot-checks", label: "Spot checks", icon: Eye, count: counts.spotChecks },

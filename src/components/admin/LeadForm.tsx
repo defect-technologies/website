@@ -31,14 +31,18 @@ export default function LeadForm({ business }: { business: Business }) {
           ))}
         </SelectField>
         <TextField label="Preview link" name="previewUrl" type="url" defaultValue={business.previewUrl} hint="Filled in by the preview builder." />
-        <div className="sm:col-span-2">
-          <TextField
-            label="Problem line"
-            name="emailProblem"
-            defaultValue={business.emailProblem}
-            hint={`Follows "Hi ${business.ownerFirstName || "there"}," in the first email.${business.problemSummary ? ` The lead finder found: ${business.problemSummary}.` : ""}`}
-          />
-        </div>
+        {business.source === "request" ? (
+          <input type="hidden" name="emailProblem" value={business.emailProblem} />
+        ) : (
+          <div className="sm:col-span-2">
+            <TextField
+              label="Problem line"
+              name="emailProblem"
+              defaultValue={business.emailProblem}
+              hint={`Follows "Hi ${business.ownerFirstName || "there"}," in the first email.${business.problemSummary ? ` The lead finder found: ${business.problemSummary}.` : ""}`}
+            />
+          </div>
+        )}
       </fieldset>
       <fieldset className="grid gap-4 sm:grid-cols-2">
         <legend className="mb-2 text-lg font-semibold">After they pay</legend>

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
 import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
+import type { InboundKind, InboundSource, InboundStatus } from "../../lib/inbound";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
 import type { SpotCheckStatus } from "../../lib/spotChecks";
 import { STAGES, type Stage } from "../../lib/stages";
@@ -10,7 +11,7 @@ export { STAGES, type Stage };
 
 export const stage = pgEnum("stage", STAGES);
 export const direction = pgEnum("direction", ["out", "in"]);
-export const messageKind = pgEnum("message_kind", ["first", "follow_up", "reply", "inbound", "welcome"]);
+export const messageKind = pgEnum("message_kind", ["first", "follow_up", "reply", "inbound", "welcome", "requested"]);
 
 /** One row per business, from the lead finder's CSV through to a paying client. */
 export const businesses = pgTable(
@@ -65,6 +66,10 @@ export const businesses = pgTable(
     dnsBackup: text("dns_backup").notNull().default(""),
     /** Where the site launches when it isn't the domain of the lead's old website, such as a defect.tech subdomain. Set by a founder. */
     launchDomain: text("launch_domain").notNull().default(""),
+    /** "lead_finder" for leads we found, "request" for businesses that asked us through the form or by email. */
+    source: text("source").$type<LeadSource>().notNull().default("lead_finder"),
+    /** For a business with no website: what the owner told us about it, which the builder works from instead of a crawl. */
+    brief: text("brief").notNull().default(""),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -426,7 +431,55 @@ export const prospects = pgTable(
   ],
 );
 
+export type LeadSource = "lead_finder" | "request";
+
+/**
+ * People asking us for a website through the form on defect.tech, and emails to hello@defect.tech from
+ * addresses that match no lead. The Client care bot sorts the emails; a founder approves every request.
+ */
+export const inboundRequests = pgTable(
+  "inbound_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    source: text("source").$type<InboundSource>().notNull(),
+    kind: text("kind").$type<InboundKind>().notNull().default("unsorted"),
+    status: text("status").$type<InboundStatus>().notNull().default("open"),
+    name: text("name").notNull().default(""),
+    email: text("email").notNull(),
+    businessName: text("business_name").notNull().default(""),
+    website: text("website").notNull().default(""),
+    /** What they told us about the business: the form's text box, or the bot's summary of an email. */
+    about: text("about").notNull().default(""),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    gmailId: text("gmail_id"),
+    threadId: text("thread_id"),
+    headerMessageId: text("header_message_id").notNull().default(""),
+    mailboxId: uuid("mailbox_id").references(() => mailboxes.id),
+    /** The bot's one-line reason for how it sorted the email. */
+    reason: text("reason").notNull().default(""),
+    sortedBy: text("sorted_by").notNull().default(""),
+    sortedAt: timestamp("sorted_at", { withTimezone: true }),
+    flagId: uuid("flag_id").references(() => flags.id),
+    businessId: uuid("business_id").references(() => businesses.id),
+    decidedBy: text("decided_by").notNull().default(""),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    replyBody: text("reply_body").notNull().default(""),
+    repliedBy: text("replied_by").notNull().default(""),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    /** A keyed hash of the form sender's IP address, kept only to limit how often one address can send the form. */
+    ipHash: text("ip_hash").notNull().default(""),
+  },
+  (table) => [
+    uniqueIndex("inbound_requests_gmail_id").on(table.gmailId),
+    index("inbound_requests_status").on(table.status, table.kind),
+    index("inbound_requests_ip").on(table.ipHash, table.at),
+  ],
+);
+
 export type Business = typeof businesses.$inferSelect;
+export type InboundRequest = typeof inboundRequests.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
 export type Activity = typeof activity.$inferSelect;

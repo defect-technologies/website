@@ -14,6 +14,8 @@ const Settings = z.object({
   subject: z.string().trim().min(1).max(200),
   firstEmail: z.string().trim().min(1).max(2000),
   followUp: z.string().trim().min(1).max(2000),
+  requestSubject: z.string().trim().min(1).max(200),
+  requestEmail: z.string().trim().min(1).max(2000),
   senderName: z.string().trim().min(1).max(80),
   mailingAddress: z.string().trim().max(200),
   checkout59: stripeLink,

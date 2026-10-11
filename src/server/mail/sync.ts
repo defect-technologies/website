@@ -1,9 +1,10 @@
 import "server-only";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { SENT_FROM_GMAIL } from "@/lib/senders";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, mailboxes, messages, type Business, type Mailbox } from "../db/schema";
+import { recordUnmatchedEmail } from "../inbound/requests";
 import { advanceStage, updateBusiness } from "../leads/businesses";
 import { mailSince, MailboxNeedsReconnect, type IncomingEmail } from "./gmail";
 import { domainOf } from "./mime";
@@ -76,13 +77,22 @@ async function noteReply(business: Business, email: IncomingEmail) {
   await record("mail sync", "reply received", { businessId: business.id, detail });
 }
 
-async function syncInbox(mailbox: Mailbox, index: Index): Promise<number> {
+type InboxIndexes = { replying: Index; everyone: Index };
+
+/** Mail from a lead that isn't replying to us is another bot's, so only mail matching no lead at all goes to the inbound list. */
+async function storeUnmatched(mailbox: Mailbox, email: IncomingEmail, everyone: Index): Promise<number> {
+  if (matchBusiness(email.threadId, email.from, everyone)) return 0;
+  return (await recordUnmatchedEmail(mailbox, email)) ? 1 : 0;
+}
+
+async function syncInbox(mailbox: Mailbox, { replying, everyone }: InboxIndexes): Promise<number> {
   const since = mailbox.lastSyncedAt ?? new Date(Date.now() - FIRST_SYNC_WINDOW);
   const startedAt = new Date();
   const incoming = (await mailSince(mailbox, "inbox", since)).filter((email) => email.from !== mailbox.email);
   let stored = 0;
   for (const email of incoming) {
-    const business = matchBusiness(email.threadId, email.from, index);
+    const business = matchBusiness(email.threadId, email.from, replying);
+    if (!business) stored += await storeUnmatched(mailbox, email, everyone);
     if (!business || !(await store(mailbox, email, business, "in"))) continue;
     await noteReply(business, email);
     stored += 1;
@@ -123,21 +133,25 @@ const REPLYING_STAGES: Business["stage"][] = ["sent", "clicked", "replied", "pai
 /** Mail we send can go to a lead before its first tracked email, so Sent also matches leads with a built preview. */
 const EMAILED_STAGES: Business["stage"][] = ["preview_built", ...REPLYING_STAGES];
 
-async function syncMailbox(mailbox: Mailbox, inbound: Index, outbound: Index): Promise<number> {
+async function syncMailbox(mailbox: Mailbox, inbound: InboxIndexes, outbound: Index): Promise<number> {
   return (await syncInbox(mailbox, inbound)) + (await syncSent(mailbox, outbound));
 }
 
 export async function syncMail(): Promise<MailSyncResult> {
   const all = await connectedMailboxes();
   const database = await db();
-  const [leads, threads] = await Promise.all([
-    database.select().from(businesses).where(inArray(businesses.stage, EMAILED_STAGES)),
+  const [allLeads, threads] = await Promise.all([
+    database.select().from(businesses),
     database.selectDistinct({ threadId: messages.threadId, businessId: messages.businessId }).from(messages),
   ]);
-  const inbound = indexBusinesses(
-    leads.filter((lead) => REPLYING_STAGES.includes(lead.stage)),
-    threads,
-  );
+  const leads = allLeads.filter((lead) => EMAILED_STAGES.includes(lead.stage));
+  const inbound: InboxIndexes = {
+    replying: indexBusinesses(
+      leads.filter((lead) => REPLYING_STAGES.includes(lead.stage)),
+      threads,
+    ),
+    everyone: indexBusinesses(allLeads, threads),
+  };
   const outbound = indexBusinesses(leads, threads);
   const result: MailSyncResult = { mailboxes: all.length, newMessages: 0, errors: [] };
   for (const mailbox of all) {

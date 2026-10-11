@@ -31,12 +31,24 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
   );
 }
 
-function facts(business: Business): [string, React.ReactNode][] {
-  const rows: [string, React.ReactNode][] = [
-    ["Website", business.website ? <ExternalLink href={business.website}>{business.website.replace(/^https?:\/\//, "")}</ExternalLink> : "None"],
+/** A business that asked us has no audit; what it told us stands in for one. */
+function originRows(business: Business): [string, React.ReactNode][] {
+  if (business.source === "request") {
+    const rows: [string, React.ReactNode][] = [["Came from", <Link key="requests" href="/admin/requests" className="underline decoration-ink/30 underline-offset-4 hover:decoration-ink">A website request</Link>]];
+    if (business.brief) rows.push(["What they told us", <span key="brief" className="whitespace-pre-wrap">{business.brief}</span>]);
+    return rows;
+  }
+  return [
     ["Platform", business.platform || "Unknown"],
     ["Outdated", business.outdatedSignals || `Score ${business.outdatedScore}`],
     ["Niche and area", [business.niche, business.area].filter(Boolean).join(", ") || "Unknown"],
+  ];
+}
+
+function facts(business: Business): [string, React.ReactNode][] {
+  const rows: [string, React.ReactNode][] = [
+    ["Website", business.website ? <ExternalLink href={business.website}>{business.website.replace(/^https?:\/\//, "")}</ExternalLink> : "None"],
+    ...originRows(business),
     ["Link in emails", <span key="link" className="font-mono text-sm">{previewLink(business)}</span>],
     ["Clicks", business.clickCount > 0 ? <>{business.clickCount}, first <When date={business.clickedAt} /></> : "None yet"],
   ];

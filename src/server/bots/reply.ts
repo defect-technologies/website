@@ -20,7 +20,7 @@ export const ReplyBody = z.object({ body: z.string().trim().min(1).max(10_000) }
 
 const RAW_PREVIEW = /https?:\/\/[a-z0-9-]+\.vercel\.app\S*/i;
 
-function checkBody(body: string) {
+export function checkBody(body: string) {
   if (RAW_PREVIEW.test(body)) throw new BotError(422, "The email links a raw vercel.app address. Use the previewLink or siteUrl from the admin API instead.");
   if (/urldefense\.(?:com|proofpoint\.com)/i.test(body)) throw new BotError(422, "The email has a urldefense link copied from another email. Use links from the admin API.");
 }
@@ -43,7 +43,7 @@ function recipientOf(message: Message, lead: Business): string {
 }
 
 /** HTML with the graphic signature when the body ends with the team's sign-off; plain text alone otherwise. */
-function htmlFor(body: string): string | undefined {
+export function htmlFor(body: string): string | undefined {
   const lines = body.trimEnd().split("\n").map((line) => line.trim());
   const endsWithSignature = TEAM_SIGNATURE_TEXT.every((line, index) => lines[lines.length - TEAM_SIGNATURE_TEXT.length + index] === line);
   return endsWithSignature ? withTeamSignatureHtml(body) : undefined;
@@ -62,8 +62,9 @@ async function studioSender(): Promise<Sender> {
   return { mailboxId: await studioMailboxId(), compose: (from, reply) => ({ ...threaded(from, STUDIO_NAME, reply), html: htmlFor(reply.body) }) };
 }
 
-/** Prospects hear from the cold inbox their thread is on, as the founder, with the cold signature and a way out. */
+/** Prospects hear from the cold inbox their thread is on, as the founder, with the cold signature and a way out. A business that asked us hears from hello@ as the team. */
 async function outreachSender(lead: Business, answering: Message): Promise<Sender> {
+  if (lead.source === "request") return studioSender();
   const mailboxId = answering.mailboxId ?? lead.mailboxId;
   // Never let a prospect's reply fall back to hello@defect.tech, which only clients hear from.
   if (!mailboxId) throw new BotError(409, "This prospect's thread isn't on a cold inbox the admin knows. Reply with the Gmail tool this once and flag it.");
@@ -93,7 +94,7 @@ export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof
   const lead = await ownedLead(key, id);
   const { text: body, unwrapped } = unwrapLinks(withoutSubjectLine(input.body));
   checkBody(body);
-  const answering = await threadToAnswer(lead, key.bot === "outreach" ? lead.mailboxId : null);
+  const answering = await threadToAnswer(lead, key.bot === "outreach" && lead.source !== "request" ? lead.mailboxId : null);
   const to = recipientOf(answering, lead);
   const subject = replySubject(answering.subject);
   const sender = await senderFor(lead, answering);

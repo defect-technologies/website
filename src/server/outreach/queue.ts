@@ -5,7 +5,8 @@ import { db } from "../db/client";
 import { businesses, messages, type Business } from "../db/schema";
 import { blockedDomains } from "../leads/businesses";
 import { outreachSettings } from "../settings";
-import { blockers, composeBody, composeSubject, templateValues, type EmailKind } from "./compose";
+import { requestThreads } from "../inbound/threads";
+import { blockers, composeBody, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread } from "./compose";
 
 export type QueueItem = {
   business: Business;
@@ -24,7 +25,7 @@ function startOfToday() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-/** First emails and follow-ups both count toward the daily limit. */
+/** First emails and follow-ups both count toward the daily limit. Request emails don't: those businesses asked us. */
 export async function sentToday(): Promise<number> {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
@@ -53,6 +54,7 @@ async function dueForFollowUp(settings: OutreachSettings) {
         lte(businesses.firstSentAt, cutoff),
         isNull(businesses.followUpSentAt),
         isNull(businesses.repliedAt),
+        eq(businesses.source, "lead_finder"),
         or(eq(businesses.stage, "sent"), eq(businesses.stage, "clicked")),
       ),
     )
@@ -68,27 +70,31 @@ async function firstSubjects(ids: string[]): Promise<Map<string, string>> {
   return new Map(rows.map((row) => [row.businessId, row.subject]));
 }
 
-function toItem(kind: EmailKind, business: Business, settings: OutreachSettings, blocked: Set<string>, firstSubject = ""): QueueItem {
+type ItemContext = { settings: OutreachSettings; blocked: Set<string>; firstSubject?: string; thread?: RequestThread };
+
+function toItem(kind: EmailKind, business: Business, { settings, blocked, firstSubject = "", thread }: ItemContext): QueueItem {
   const body = composeBody(kind, business, settings);
   return {
     business,
     kind,
-    subject: composeSubject(kind, business, settings, firstSubject),
+    subject: composeSubject(kind, business, settings, firstSubject, thread),
     body,
-    template: kind === "first" ? settings.firstEmail : settings.followUp,
+    template: templateFor(kind, settings),
     values: templateValues(business, settings),
-    blockers: blockers(business, settings, blocked, body),
+    blockers: blockers(business, settings, blocked, body, kind),
   };
 }
 
 export async function outreachQueue() {
   const settings = await outreachSettings();
   const [ready, due, blocked, sent] = await Promise.all([readyForFirstEmail(), dueForFollowUp(settings), blockedDomains(), sentToday()]);
-  const subjects = await firstSubjects(due.map((b) => b.id));
+  const requested = ready.filter((b) => firstKindFor(b) === "requested");
+  const [subjects, threads] = await Promise.all([firstSubjects(due.map((b) => b.id)), requestThreads(requested.map((b) => b.id))]);
   return {
     settings,
     sentToday: sent,
-    followUps: due.map((b) => toItem("follow_up", b, settings, blocked, subjects.get(b.id))),
-    firstEmails: ready.map((b) => toItem("first", b, settings, blocked)),
+    requested: requested.map((b) => toItem("requested", b, { settings, blocked, thread: threads.get(b.id) })),
+    followUps: due.map((b) => toItem("follow_up", b, { settings, blocked, firstSubject: subjects.get(b.id) })),
+    firstEmails: ready.filter((b) => firstKindFor(b) === "first").map((b) => toItem("first", b, { settings, blocked })),
   };
 }

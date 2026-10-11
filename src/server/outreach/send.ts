@@ -8,14 +8,18 @@ import { advanceStage, blockedDomains, businessById, updateBusiness } from "../l
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
 import { withSignerHtml } from "../mail/teamSignature";
+import { htmlFor } from "../bots/reply";
+import { requestThreads } from "../inbound/threads";
+import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
 import { outreachSettings } from "../settings";
-import { blockers, composeBody, composeSubject, type EmailKind } from "./compose";
+import { blockers, composeBody, composeSubject, type EmailKind, type RequestThread } from "./compose";
 import { sentToday } from "./queue";
 
 export type SendResult = { ok: true; to: string } | { ok: false; error: string };
 
-const CLAIM_COLUMN = { first: businesses.firstSentAt, follow_up: businesses.followUpSentAt } as const;
-const CLAIM_FIELD = { first: "firstSentAt", follow_up: "followUpSentAt" } as const;
+const CLAIM_COLUMN = { first: businesses.firstSentAt, follow_up: businesses.followUpSentAt, requested: businesses.firstSentAt } as const;
+const CLAIM_FIELD = { first: "firstSentAt", follow_up: "followUpSentAt", requested: "firstSentAt" } as const;
+const isCold = (kind: EmailKind) => kind !== "requested";
 
 /** Marks the email as going out in one statement, so a double click or both founders at once can't send it twice. */
 async function claim(kind: EmailKind, id: string): Promise<boolean> {
@@ -40,19 +44,35 @@ async function firstSubject(business: Business) {
   return first?.subject ?? "";
 }
 
-type Prepared = { business: Business; subject: string; body: string };
+type Prepared = { business: Business; subject: string; body: string; thread: RequestThread | null };
 
 async function prepare(kind: EmailKind, id: string, problem?: string): Promise<Prepared | string> {
   const [business, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedDomains(), sentToday()]);
   if (!business) return "That business no longer exists.";
-  if (sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit on the Template page, or send tomorrow.`;
+  if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit on the Template page, or send tomorrow.`;
   const body = composeBody(kind, business, settings, problem);
-  const problems = blockers(business, settings, blocked, body);
+  const problems = blockers(business, settings, blocked, body, kind);
   if (problems.length > 0) return problems[0];
-  return { business, subject: composeSubject(kind, business, settings, await firstSubject(business)), body };
+  const thread = kind === "requested" ? ((await requestThreads([business.id])).get(business.id) ?? null) : null;
+  return { business, subject: composeSubject(kind, business, settings, await firstSubject(business), thread), body, thread };
 }
 
-function outgoing(kind: EmailKind, { business, subject, body }: Prepared, from: Mailbox | null, senderName: string): OutgoingEmail {
+/** A business that asked us hears from hello@defect.tech as the team, in the thread they asked in. */
+function requestedEmail({ business, subject, body, thread }: Prepared, from: Mailbox | null): OutgoingEmail {
+  return {
+    from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" },
+    to: business.email,
+    subject,
+    body,
+    html: htmlFor(body),
+    threadId: thread?.threadId ?? null,
+    inReplyTo: thread?.headerMessageId || null,
+  };
+}
+
+function outgoing(kind: EmailKind, prepared: Prepared, from: Mailbox | null, senderName: string): OutgoingEmail {
+  if (kind === "requested") return requestedEmail(prepared, from);
+  const { business, subject, body } = prepared;
   const email = from?.email ?? "outbox@dev.localhost";
   return {
     from: { name: senderName, email },
@@ -83,12 +103,16 @@ async function remember(kind: EmailKind, prepared: Prepared, delivery: Awaited<R
     body: delivery.email.body,
     sentBy: founder.email,
   });
-  const firstFields = kind === "first" ? { threadId: delivery.threadId, firstMessageHeaderId: delivery.headerMessageId, mailboxId: delivery.mailbox?.id ?? null } : {};
+  const firstFields = kind !== "follow_up" ? { threadId: delivery.threadId, firstMessageHeaderId: delivery.headerMessageId, mailboxId: delivery.mailbox?.id ?? null } : {};
   const problemField = problem ? { emailProblem: problem } : {};
   await updateBusiness(business.id, { ...firstFields, ...problemField, lastContactAt: now });
   await advanceStage(business.id, "sent");
-  await record(founder.email, kind === "first" ? "sent first email" : "sent follow-up", { businessId: business.id, detail: business.email });
+  await record(founder.email, SENT_ACTION[kind], { businessId: business.id, detail: business.email });
 }
+
+const SENT_ACTION: Record<EmailKind, string> = { first: "sent first email", follow_up: "sent follow-up", requested: "sent the preview they asked for" };
+
+const mailboxFor = async (kind: EmailKind, business: Business) => (isCold(kind) ? business.mailboxId : await studioMailboxId());
 
 export async function sendOutreach(kind: EmailKind, id: string, founder: Founder, problem?: string): Promise<SendResult> {
   const prepared = await prepare(kind, id, problem);
@@ -96,7 +120,7 @@ export async function sendOutreach(kind: EmailKind, id: string, founder: Founder
   if (!(await claim(kind, id))) return { ok: false, error: "This one already went out. The queue was out of date." };
   const { senderName } = await outreachSettings();
   try {
-    const delivery = await deliver((from) => outgoing(kind, prepared, from, senderName), prepared.business.mailboxId);
+    const delivery = await deliver((from) => outgoing(kind, prepared, from, senderName), await mailboxFor(kind, prepared.business));
     await remember(kind, prepared, delivery, founder, problem);
     return { ok: true, to: prepared.business.email };
   } catch (error) {

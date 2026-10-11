@@ -45,7 +45,7 @@ function NothingToSend({ waitingOnPreview }: { waitingOnPreview: number }) {
 export default async function OutreachPage() {
   const [queue, counts] = await Promise.all([outreachQueue(), stageCounts()]);
   const limitReached = queue.sentToday >= queue.settings.dailyLimit;
-  const empty = queue.followUps.length + queue.firstEmails.length === 0;
+  const empty = queue.requested.length + queue.followUps.length + queue.firstEmails.length === 0;
 
   return (
     <>
@@ -59,6 +59,7 @@ export default async function OutreachPage() {
         <NothingToSend waitingOnPreview={counts.new ?? 0} />
       ) : (
         <>
+          <QueueSection title="They asked us" items={queue.requested} limitReached={false} />
           <QueueSection title="Follow-ups due" items={queue.followUps} limitReached={limitReached} />
           <QueueSection title="Ready to send" items={queue.firstEmails} limitReached={limitReached} />
         </>

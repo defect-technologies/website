@@ -29,7 +29,7 @@ function slugify(name: string) {
   );
 }
 
-function uniqueSlug(name: string, taken: Set<string>) {
+export function uniqueSlug(name: string, taken: Set<string>) {
   const base = slugify(name);
   let slug = base;
   for (let n = 2; taken.has(slug); n += 1) slug = `${base}-${n}`;

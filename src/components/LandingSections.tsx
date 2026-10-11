@@ -124,9 +124,14 @@ export function Closing() {
   return (
     <section className={`${SECTION} flex flex-col items-center gap-12 pb-[20vh] text-center`}>
       <PaintedHeadline as="h2" headline={CLOSING} style={{ fontSize: "clamp(1.75rem, 6vw, 5rem)" }} />
-      <ButtonLink href="/team" icon={<ArrowRight size={20} weight="bold" aria-hidden="true" />}>
-        Meet the team
-      </ButtonLink>
+      <div className="flex flex-wrap justify-center gap-3">
+        <ButtonLink href="/start" icon={<ArrowRight size={20} weight="bold" aria-hidden="true" />}>
+          Request a website
+        </ButtonLink>
+        <ButtonLink href="/team" variant="soft">
+          Meet the team
+        </ButtonLink>
+      </div>
     </section>
   );
 }

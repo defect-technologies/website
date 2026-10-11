@@ -11,7 +11,7 @@ import { addClientSite } from "../sites/clientSites";
 import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
-import { checkoutLink } from "../leads/buildCommand";
+import { buildBrief, checkoutLink } from "../leads/buildCommand";
 import { updateBusiness } from "../leads/businesses";
 import { outreachSettings } from "../settings";
 import { maybePickForSpotCheck } from "../spotChecks";
@@ -62,7 +62,7 @@ function launchPayload(job: PreviewJob, lead: Business) {
 function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string) {
   return {
     job: { id: job.id, attempt: job.attempts, note: job.note, kind: job.kind },
-    lead: { id: lead.id, slug: lead.slug, businessName: lead.businessName, website: lead.website, priceArm: lead.priceArm ?? 59, checkoutUrl },
+    lead: { id: lead.id, slug: lead.slug, businessName: lead.businessName, website: lead.website, brief: buildBrief(lead), priceArm: lead.priceArm ?? 59, checkoutUrl },
     ...launchPayload(job, lead),
   };
 }

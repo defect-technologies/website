@@ -78,10 +78,13 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
   const [firstEmail, setFirstEmail] = useState(settings.firstEmail);
   const [followUp, setFollowUp] = useState(settings.followUp);
   const [subject, setSubject] = useState(settings.subject);
+  const [requestEmail, setRequestEmail] = useState(settings.requestEmail);
+  const [requestSubject, setRequestSubject] = useState(settings.requestSubject);
   const [senderName, setSenderName] = useState(settings.senderName);
   const [address, setAddress] = useState(settings.mailingAddress);
   const values = { ...sample, sender: senderName, address: address || "{address}" };
-  const filledSubject = subject.replace(/\{(\w+)\}/g, (m, name: Placeholder) => values[name] ?? m);
+  const fill = (text: string) => text.replace(/\{(\w+)\}/g, (m, name: Placeholder) => values[name] ?? m);
+  const filledSubject = fill(subject);
 
   return (
     <form action={action} className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -89,6 +92,18 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
         <TextField label="Subject" name="subject" value={subject} onChange={(e) => setSubject(e.target.value)} required />
         <TemplateArea id="firstEmail" label="First email" value={firstEmail} onChange={setFirstEmail} />
         <TemplateArea id="followUp" label="Follow-up" value={followUp} onChange={setFollowUp} />
+        <fieldset className="flex flex-col gap-4">
+          <legend className="mb-2 text-lg font-semibold">To a business that asked us</legend>
+          <TextField
+            label="Subject"
+            name="requestSubject"
+            value={requestSubject}
+            onChange={(e) => setRequestSubject(e.target.value)}
+            required
+            hint="Used when they asked through the form. When they emailed us, it answers in their thread instead."
+          />
+          <TemplateArea id="requestEmail" label="Email with their preview" value={requestEmail} onChange={setRequestEmail} />
+        </fieldset>
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-2 text-lg font-semibold">Sender</legend>
           <TextField label="Name" name="senderName" value={senderName} onChange={(e) => setSenderName(e.target.value)} required />
@@ -113,6 +128,7 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
         <Card className="flex flex-col gap-4 p-4">
           <Letter subject={filledSubject} template={firstEmail} values={values} />
           <Letter subject={`Re: ${filledSubject}`} template={followUp} values={values} />
+          <Letter subject={fill(requestSubject)} template={requestEmail} values={values} />
         </Card>
       </div>
     </form>
