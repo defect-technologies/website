@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
   firstEmail: [
     "Hi {first_name}, {problem}.",
     "",
-    "I rebuilt your site from your own photos and text so you can see it before deciding anything: {link}",
+    "I redesigned your site using your own photos and text so you can see it before deciding anything: {link}",
     "",
     "If you like it, we'll host it and keep it up to date for ${price} a month, with no setup fee.{offer} When something changes, like your hours or a price, you just email us and it's usually live the same day.",
     "",

@@ -14,7 +14,7 @@ export function WebsitesSection() {
       <div className="flex flex-col gap-8">
         <PaintedHeadline as="h2" headline={WEBSITES} style={{ fontSize: "clamp(3rem, 9vw, 7rem)" }} />
         <p className={BODY}>
-          We rebuild small-business websites. When something changes, email us and we&rsquo;ll have it up by the next business
+          We design beautiful, interactive websites for small businesses, for a fraction of what an agency charges. When something changes, email us and we&rsquo;ll have it up by the next business
           day.
         </p>
       </div>

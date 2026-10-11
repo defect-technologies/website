@@ -107,7 +107,7 @@ export default function RequestForm() {
               placeholder="sunrisebakery.com"
               error={errors.website}
               required
-              hint="We rebuild existing websites, so we can't take a business that doesn't have one yet."
+              hint="We redesign existing websites, so we can't take a business that doesn't have one yet."
             />
             <TextAreaField label="Anything we should know? (optional)" name="about" rows={3} maxLength={ABOUT_LIMIT} error={errors.about} />
             {state.state === "busy" && <Notice tone="bad">Too many requests came from your connection in the last hour. Email us at hello@defect.tech instead.</Notice>}

@@ -119,7 +119,7 @@ async function sampleInbound() {
   await database
     .insert(inboundRequests)
     .values([
-      { source: "email", kind: "unsorted", email: "owner@mesa-auto.example.com", subject: "Website?", body: "Hi, a friend said you rebuilt her bakery's site. Our shop's site is mesa-auto.example.com and it's a mess. Can you do ours?", gmailId: "sample-inbound-1", threadId: "sample-inbound-thread-1", at: minutesAgo(15) },
+      { source: "email", kind: "unsorted", email: "owner@mesa-auto.example.com", subject: "Website?", body: "Hi, a friend said you redesigned her bakery's site. Our shop's site is mesa-auto.example.com and it's a mess. Can you do ours?", gmailId: "sample-inbound-1", threadId: "sample-inbound-thread-1", at: minutesAgo(15) },
       { source: "email", kind: "unsorted", email: "kim@harbor-dental.example.com", subject: "Price question", body: "Is the $59 a month for one location or both of ours?", gmailId: "sample-inbound-4", threadId: "sample-inbound-thread-4", at: minutesAgo(25) },
       { source: "email", kind: "founder", email: "reporter@local-news.example.com", subject: "Interview request", body: "I'm writing about small businesses and AI. Could one of the founders talk this week?", reason: "A press request; a founder should decide.", sortedBy: "bot:client_care", gmailId: "sample-inbound-2", at: daysAgo(1) },
       { source: "email", kind: "ignore", status: "closed", email: "deals@seo-blast.example.com", subject: "Rank #1 on Google GUARANTEED", body: "Get to page one in 30 days.", reason: "SEO spam.", sortedBy: "bot:client_care", gmailId: "sample-inbound-3", at: daysAgo(2) },
@@ -156,7 +156,7 @@ export async function loadSamples() {
     await database.insert(messages).values({
       businessId: business.id, direction: "out", kind: "first", threadId: thread(business.slug), gmailId: `sample-out-${business.slug}`,
       fromAddress: "brendan@sending.example.com", toAddress: business.email, subject: `${business.businessName}'s website`,
-      body: `Hi ${business.ownerFirstName || "there"}, ${business.emailProblem}.\nI rebuilt it from your current photos and text: https://defect.tech/p/${business.linkCode}`,
+      body: `Hi ${business.ownerFirstName || "there"}, ${business.emailProblem}.\nI redesigned it using your current photos and text: https://defect.tech/p/${business.linkCode}`,
       sentBy: "sample", at: business.firstSentAt ?? new Date(),
     });
     await database.update(businesses).set({ threadId: thread(business.slug) }).where(eq(businesses.id, business.id));
