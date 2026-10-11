@@ -40,9 +40,27 @@ export async function sitesForOwner(email: string): Promise<OwnerSite[]> {
 }
 
 /** Every live site with the Vercel project its launch recorded, for counting analytics across all of them. */
-export async function sitesWithProjects(): Promise<{ slug: string; businessId: string | null; businessName: string | null; vercelProjectId: string | null }[]> {
+export type SiteWithProject = {
+  slug: string;
+  url: string;
+  ownerEmail: string;
+  ownerFirstName: string | null;
+  businessId: string | null;
+  businessName: string | null;
+  vercelProjectId: string | null;
+};
+
+export async function sitesWithProjects(): Promise<SiteWithProject[]> {
   return (await db())
-    .select({ slug: clientSites.slug, businessId: clientSites.businessId, businessName: businesses.businessName, vercelProjectId: businesses.vercelProjectId })
+    .select({
+      slug: clientSites.slug,
+      url: clientSites.url,
+      ownerEmail: clientSites.ownerEmail,
+      ownerFirstName: businesses.ownerFirstName,
+      businessId: clientSites.businessId,
+      businessName: businesses.businessName,
+      vercelProjectId: businesses.vercelProjectId,
+    })
     .from(clientSites)
     .leftJoin(businesses, eq(clientSites.businessId, businesses.id))
     .orderBy(asc(clientSites.slug));

@@ -1,5 +1,5 @@
 import "server-only";
-import { ACTIONS, type Action, type Compared, type Day, type RangeDays, type Ranked, type SiteAnalytics } from "@/lib/siteAnalytics";
+import { ACTIONS, type Action, type Compared, type Day, type RangeDays, type Ranked, type SiteAnalytics, type WeekGrid } from "@/lib/siteAnalytics";
 import { env } from "../env";
 import { integration, type Integration } from "./result";
 
@@ -8,8 +8,12 @@ const CACHE_SECONDS = 600;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Row = Record<string, string | number | null | undefined>;
-type Period = { since: string; until: string };
-type Query = { dataset: "visits" | "events"; by: string; period: Period; limit?: number };
+export type Period = { since: string; until: string };
+type Query = { dataset: "visits" | "events"; by: string; period: Period; limit?: number; filter?: string };
+
+/** Every client is a Los Angeles business for now; the busiest-times grid reads hours in this zone. */
+const BUSINESS_TIME_ZONE = "America/Los_Angeles";
+const ACTION_FILTER = `eventName in (${ACTIONS.map((action) => `'${action}'`).join(",")})`;
 
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -25,9 +29,9 @@ function periods(days: RangeDays, now = new Date()): { current: Period; previous
 /** Web Analytics was never switched on for the project, so there is nothing to count yet. */
 class AnalyticsOff extends Error {}
 
-async function query(projectId: string, { dataset, by, period, limit }: Query): Promise<Row[]> {
+async function query(projectId: string, { dataset, by, period, limit, filter }: Query): Promise<Row[]> {
   const { token, teamId } = env.vercel();
-  const params = new URLSearchParams({ projectId, teamId, by, since: period.since, until: period.until, ...(limit ? { limit: String(limit) } : {}) });
+  const params = new URLSearchParams({ projectId, teamId, by, since: period.since, until: period.until, ...(limit ? { limit: String(limit) } : {}), ...(filter ? { filter } : {}) });
   const response = await fetch(`${API}/${dataset}/aggregate?${params}`, { headers: { Authorization: `Bearer ${token}` }, next: { revalidate: CACHE_SECONDS } });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 200);
@@ -68,22 +72,40 @@ const SOURCE_NAMES: [RegExp, string][] = [
   [/(^|\.)duckduckgo\.com$/, "DuckDuckGo"],
 ];
 
-/** "www.google.com" reads as "Google"; no referrer means the visitor typed the address or used a bookmark. */
+/** "www.google.com" reads as "Google"; no referrer ("direct" from site-kit) means the visitor typed the address or used a bookmark. */
 export function sourceName(hostname: string): string {
   const host = hostname.trim().toLowerCase().replace(/^www\./, "");
-  if (!host) return "Typed in or bookmarked";
+  if (!host || host === "direct") return "Typed in or bookmarked";
   return SOURCE_NAMES.find(([pattern]) => pattern.test(host))?.[1] ?? host;
 }
 
-function ranked(rows: Row[], field: string, label: (value: string) => string): Ranked[] {
+const pageName = (path: string) => (!path || path === "/" ? "Home page" : path);
+
+/** Rows grouped by `field`, merged under their readable label and counted by `metric`, top five first. */
+function ranked(rows: Row[], field: string, label: (value: string) => string, metric = "visitors"): Ranked[] {
   const merged = new Map<string, number>();
   for (const row of rows) {
     const value = String(row[field] ?? "");
     if (value === "Others") continue;
     const name = label(value);
-    merged.set(name, (merged.get(name) ?? 0) + numberOf(row, "visitors"));
+    merged.set(name, (merged.get(name) ?? 0) + numberOf(row, metric));
   }
-  return [...merged].map(([name, visitors]) => ({ label: name, visitors })).sort((a, b) => b.visitors - a.visitors).slice(0, 5);
+  return [...merged].map(([name, count]) => ({ label: name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+}
+
+const hourParts = new Intl.DateTimeFormat("en-US", { timeZone: BUSINESS_TIME_ZONE, weekday: "short", hour: "numeric", hourCycle: "h23" });
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Hourly visitor rows folded into one week: visitors by weekday and hour, in the business's time zone. */
+function weekGrid(rows: Row[]): WeekGrid {
+  const grid = WEEKDAYS.map(() => Array.from({ length: 24 }, () => 0));
+  for (const row of rows) {
+    const time = new Date(String(row.timestamp ?? ""));
+    if (Number.isNaN(time.getTime())) continue;
+    const parts = Object.fromEntries(hourParts.formatToParts(time).map((part) => [part.type, part.value]));
+    grid[WEEKDAYS.indexOf(parts.weekday)][Number(parts.hour) % 24] += numberOf(row, "visitors");
+  }
+  return grid;
 }
 
 const nothing: Compared = { now: 0, before: 0 };
@@ -97,37 +119,46 @@ function emptyAnalytics(period: Period): SiteAnalytics {
     actions: Object.fromEntries(ACTIONS.map((action) => [action, nothing])) as Record<Action, Compared>,
     pages: [],
     sources: [],
+    actionPages: [],
+    actionSources: [],
+    week: weekGrid([]),
   };
 }
 
-async function load(projectId: string, days: RangeDays): Promise<SiteAnalytics> {
+/** Visitors, taps and where they came from in `current`, compared with `previous`. A project with analytics off reads as all zeros. */
+async function load(projectId: string, current: Period, previous: Period): Promise<SiteAnalytics> {
   try {
-    return await loadCounts(projectId, days);
+    return await loadCounts(projectId, current, previous);
   } catch (error) {
     if (!(error instanceof AnalyticsOff)) throw error;
     console.warn(`[analytics] Web Analytics is off for ${projectId}. Switch it on in the project's Analytics tab on Vercel, then redeploy.`);
-    return emptyAnalytics(periods(days).current);
+    return emptyAnalytics(current);
   }
 }
 
-async function loadCounts(projectId: string, days: RangeDays): Promise<SiteAnalytics> {
-  const { current, previous } = periods(days);
-  const [daily, total, totalBefore, events, eventsBefore, pages, sources] = await Promise.all([
+async function loadCounts(projectId: string, current: Period, previous: Period): Promise<SiteAnalytics> {
+  const [daily, total, totalBefore, events, eventsBefore, pages, sources, actionPages, actionSources, hourly] = await Promise.all([
     query(projectId, { dataset: "visits", by: "day", period: current }),
     query(projectId, { dataset: "visits", by: "environment", period: current }),
     query(projectId, { dataset: "visits", by: "environment", period: previous }),
     query(projectId, { dataset: "events", by: "eventName", period: current, limit: 20 }),
     query(projectId, { dataset: "events", by: "eventName", period: previous, limit: 20 }),
-    query(projectId, { dataset: "visits", by: "requestPath", period: current, limit: 6 }),
+    query(projectId, { dataset: "visits", by: "requestPath", period: current, limit: 10 }),
     query(projectId, { dataset: "visits", by: "referrerHostname", period: current, limit: 10 }),
+    query(projectId, { dataset: "events", by: "eventData/page", period: current, limit: 10, filter: ACTION_FILTER }),
+    query(projectId, { dataset: "events", by: "eventData/source", period: current, limit: 10, filter: ACTION_FILTER }),
+    query(projectId, { dataset: "visits", by: "hour", period: current }),
   ]);
   return {
     days: fillDays(daily, current),
     visitors: { now: sum(total, "visitors"), before: sum(totalBefore, "visitors") },
     pageviews: { now: sum(total, "pageviews"), before: sum(totalBefore, "pageviews") },
     actions: actionCounts(events, eventsBefore),
-    pages: ranked(pages, "requestPath", (path) => (!path || path === "/" ? "Home page" : path)),
+    pages: ranked(pages, "requestPath", pageName),
     sources: ranked(sources, "referrerHostname", sourceName),
+    actionPages: ranked(actionPages, "eventData", pageName, "count"),
+    actionSources: ranked(actionSources, "eventData", sourceName, "count"),
+    week: weekGrid(hourly),
   };
 }
 
@@ -151,6 +182,12 @@ export async function billableEvents(projectId: string, since: string, until: st
 
 /** A live site's visitors and clicks over the last `days` days, cached for ten minutes. */
 export function siteAnalytics(projectId: string, days: RangeDays): Promise<Integration<SiteAnalytics>> {
+  const { current, previous } = periods(days);
+  return analyticsBetween(projectId, current, previous);
+}
+
+/** The same numbers for any two periods, such as last month against the month before. */
+export function analyticsBetween(projectId: string, current: Period, previous: Period): Promise<Integration<SiteAnalytics>> {
   const { token, teamId } = env.vercel();
-  return integration({ VERCEL_TOKEN: token, VERCEL_TEAM_ID: teamId }, () => load(projectId, days));
+  return integration({ VERCEL_TOKEN: token, VERCEL_TEAM_ID: teamId }, () => load(projectId, current, previous));
 }

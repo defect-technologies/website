@@ -2,9 +2,9 @@ import { ArrowUpRight, Clock, EnvelopeSimple } from "@phosphor-icons/react/dist/
 import type { Metadata } from "next";
 import { buttonClasses } from "@/components/Button";
 import { Notice } from "@/components/admin/ui";
-import { ActionTiles, RangePicker, RankedList, VisitorsCard } from "@/components/portal/Dashboard";
+import { BusiestTimes, InsightCards, RangePicker, RankedList, ReachedYou, VisitorsCard } from "@/components/portal/Dashboard";
 import PortalShell from "@/components/portal/PortalShell";
-import { hasAnyData, parseRange } from "@/lib/siteAnalytics";
+import { hasAnyData, insights, parseRange } from "@/lib/siteAnalytics";
 import { siteName } from "@/server/editor/signInLinks";
 import { siteAnalytics } from "@/server/integrations/webAnalytics";
 import { analyticsProject, portalContext } from "@/server/portal/context";
@@ -44,12 +44,18 @@ export default async function PortalDashboard({ searchParams }: { searchParams: 
       )}
       {analytics.state === "ok" && (
         <>
-          <ActionTiles analytics={analytics.data} days={days} />
+          <InsightCards items={insights(analytics.data, days)} />
+          <ReachedYou analytics={analytics.data} days={days} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <RankedList title="Pages people reached you from" rows={analytics.data.actionPages} unit="people" />
+            <RankedList title="Where those customers came from" rows={analytics.data.actionSources} unit="people" />
+          </div>
           <VisitorsCard analytics={analytics.data} days={days} />
           <div className="grid gap-6 lg:grid-cols-2">
-            <RankedList title="Most visited pages" rows={analytics.data.pages} empty="No data yet" />
-            <RankedList title="Where visitors came from" rows={analytics.data.sources} empty="No data yet" />
+            <RankedList title="Most visited pages" rows={analytics.data.pages} unit="visitors" />
+            <RankedList title="Where visitors came from" rows={analytics.data.sources} unit="visitors" />
           </div>
+          <BusiestTimes week={analytics.data.week} />
         </>
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
