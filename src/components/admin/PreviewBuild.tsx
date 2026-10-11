@@ -43,7 +43,7 @@ function LaunchButton({ lead }: { lead: Business }) {
   );
 }
 
-/** The design critic held this preview back. A founder sends it on once they've looked. */
+/** The outside reviewer didn't pass this preview, so it's held back. A founder sends it on once they've looked. */
 function ApproveButton({ lead }: { lead: Business }) {
   return (
     <form action={approvePreviewAction} className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -98,7 +98,7 @@ export default function PreviewBuild({ lead, job, command, missingCheckout }: { 
     <section className="flex flex-col gap-3">
       <SectionHeading>{lead.previewUrl ? "Preview" : "Build the preview"}</SectionHeading>
       {missingCheckout && <Notice tone="warn">Add the ${lead.priceArm} Stripe payment link on the Template page, or the preview&apos;s button won&apos;t lead anywhere.</Notice>}
-      {heldBack && <Notice tone="warn">The design critic asked for changes, so this preview isn&apos;t in the outreach queue.</Notice>}
+      {heldBack && <Notice tone="warn">The outside reviewer still wanted changes, so this preview isn&apos;t in the outreach queue. Look at it, then approve it or rebuild with a note.</Notice>}
       {heldBack && <ApproveButton lead={lead} />}
       {!job && canLaunch && <LaunchButton lead={lead} />}
       {job ? <Queued job={job} /> : <RequestButton lead={lead} primary={!canLaunch && !heldBack} />}
