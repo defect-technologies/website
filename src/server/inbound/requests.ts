@@ -11,6 +11,7 @@ import { emailFounders } from "../flags/notify";
 import { resolveFlag } from "../bots/flags";
 import { htmlFor } from "../bots/reply";
 import { businessById, updateBusiness } from "../leads/businesses";
+import { SHARED_MAIL_DOMAINS } from "../leads/contactKeys";
 import { newLinkCode, uniqueSlug } from "../leads/import";
 import type { IncomingEmail } from "../mail/gmail";
 import { domainOf } from "../mail/mime";
@@ -122,8 +123,6 @@ export async function waitingRequestCount(): Promise<number> {
     .where(and(eq(inboundRequests.status, "open"), eq(inboundRequests.kind, "request")));
   return row?.count ?? 0;
 }
-
-const SHARED_MAIL_DOMAINS = new Set(["gmail.com", "googlemail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "me.com", "aol.com", "proton.me"]);
 
 export type LeadMatcher = (fields: Pick<InboundRequest, "email" | "website">) => Business | null;
 
