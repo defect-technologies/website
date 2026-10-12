@@ -159,3 +159,14 @@ export async function syncMail(): Promise<MailSyncResult> {
   }
   return result;
 }
+
+export const BOT_READ_FRESH_MS = 2 * 60 * 1000;
+
+/**
+ * The bots run more often than the half-hourly sync, so a bot read first pulls in new mail when any
+ * inbox was last read more than freshForMs ago. An interested prospect hears back on the next run.
+ */
+export async function syncMailIfStale(freshForMs: number) {
+  const stale = (await connectedMailboxes()).some((mailbox) => !mailbox.lastSyncedAt || Date.now() - mailbox.lastSyncedAt.getTime() >= freshForMs);
+  if (stale) await syncMail().catch((error) => console.error("[mail] sync before a bot read", error));
+}

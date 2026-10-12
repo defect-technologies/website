@@ -8,6 +8,7 @@ import { db } from "../db/client";
 import { activity, businesses, messages, type Business, type BotKey } from "../db/schema";
 import { businessById, optOut, updateBusiness } from "../leads/businesses";
 import { domainFacts } from "../integrations/domain";
+import { BOT_READ_FRESH_MS, syncMailIfStale } from "../mail/sync";
 import { previewLink, welcomeLink } from "../outreach/compose";
 import { actorOf, BotError } from "./http";
 import { buildAndLaunchState } from "./sites";
@@ -84,6 +85,7 @@ async function ownedElsewhere(key: BotKey, query: z.infer<typeof LeadQuery>) {
 }
 
 export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
+  await syncMailIfStale(BOT_READ_FRESH_MS);
   const [rows, elsewhere] = await Promise.all([
     (await db())
       .select()
