@@ -5,6 +5,7 @@ import type { Founder } from "../auth/session";
 import { db } from "../db/client";
 import { businesses, messages, type Business, type Mailbox } from "../db/schema";
 import { advanceStage, blockedContacts, businessById, updateBusiness } from "../leads/businesses";
+import { isBlocked } from "../leads/contactKeys";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
 import { withSignerHtml } from "../mail/teamSignature";
@@ -17,8 +18,12 @@ import { sentToday } from "./queue";
 
 export type SendResult = { ok: true; to: string } | { ok: false; error: string };
 
+export type Recipients = { to: string[]; cc: string[]; bcc: string[] };
+
 /** The email as the founder rewrote it on the queue card, sent in place of the template. */
-export type EmailEdits = { to: string; subject: string; body: string };
+export type EmailEdits = Recipients & { subject: string; body: string };
+
+const everyone = ({ to, cc, bcc }: Recipients) => [...to, ...cc, ...bcc];
 
 const CLAIM_COLUMN = { first: businesses.firstSentAt, follow_up: businesses.followUpSentAt, requested: businesses.firstSentAt } as const;
 const CLAIM_FIELD = { first: "firstSentAt", follow_up: "followUpSentAt", requested: "firstSentAt" } as const;
@@ -47,26 +52,36 @@ async function firstSubject(business: Business) {
   return first?.subject ?? "";
 }
 
-type Prepared = { business: Business; subject: string; body: string; thread: RequestThread | null };
+type Prepared = { business: Business; recipients: Recipients; subject: string; body: string; thread: RequestThread | null };
+
+function optedOutRecipient(edits: EmailEdits | undefined, blocked: Set<string>) {
+  const address = edits && everyone(edits).find((email) => isBlocked(blocked, { email }));
+  return address ? `${address} opted out, so it can't be emailed.` : null;
+}
 
 async function prepare(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<Prepared | string> {
   const [stored, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
   if (!stored) return "That business no longer exists.";
   if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit on the Template page, or send tomorrow.`;
-  const business = edits ? { ...stored, email: edits.to } : stored;
+  const optedOut = optedOutRecipient(edits, blocked);
+  if (optedOut) return optedOut;
+  const business = edits ? { ...stored, email: edits.to[0] } : stored;
   const body = edits?.body ?? composeBody(kind, business, settings, problem);
   const problems = blockers(business, settings, blocked, body, { kind, edited: Boolean(edits) });
   if (problems.length > 0) return problems[0];
   const thread = kind === "requested" ? ((await requestThreads([business.id])).get(business.id) ?? null) : null;
   const subject = edits?.subject ?? composeSubject(kind, business, settings, await firstSubject(business), thread);
-  return { business, subject, body, thread };
+  const recipients = edits ? { to: edits.to, cc: edits.cc, bcc: edits.bcc } : { to: [business.email], cc: [], bcc: [] };
+  return { business, recipients, subject, body, thread };
 }
 
 /** A business that asked us hears from hello@defect.tech as the team, in the thread they asked in. */
-function requestedEmail({ business, subject, body, thread }: Prepared, from: Mailbox | null): OutgoingEmail {
+const addressed = ({ to, cc, bcc }: Recipients) => ({ to: to.join(", "), cc, bcc });
+
+function requestedEmail({ recipients, subject, body, thread }: Prepared, from: Mailbox | null): OutgoingEmail {
   return {
     from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" },
-    to: business.email,
+    ...addressed(recipients),
     subject,
     body,
     html: htmlFor(body),
@@ -77,11 +92,11 @@ function requestedEmail({ business, subject, body, thread }: Prepared, from: Mai
 
 function outgoing(kind: EmailKind, prepared: Prepared, from: Mailbox | null, senderName: string): OutgoingEmail {
   if (kind === "requested") return requestedEmail(prepared, from);
-  const { business, subject, body } = prepared;
+  const { business, recipients, subject, body } = prepared;
   const email = from?.email ?? "outbox@dev.localhost";
   return {
     from: { name: senderName, email },
-    to: business.email,
+    ...addressed(recipients),
     subject,
     body,
     html: withSignerHtml(body, { name: senderName, line: "Defect Technologies", email }) ?? undefined,
@@ -110,9 +125,9 @@ async function remember(kind: EmailKind, prepared: Prepared, delivery: Awaited<R
   });
   const firstFields = kind !== "follow_up" ? { threadId: delivery.threadId, firstMessageHeaderId: delivery.headerMessageId, mailboxId: delivery.mailbox?.id ?? null } : {};
   const problemField = problem ? { emailProblem: problem } : {};
-  await updateBusiness(business.id, { ...firstFields, ...problemField, email: business.email, lastContactAt: now });
+  await updateBusiness(business.id, { ...firstFields, ...problemField, email: business.email, emailDraft: null, lastContactAt: now });
   await advanceStage(business.id, "sent");
-  await record(founder.email, SENT_ACTION[kind], { businessId: business.id, detail: business.email });
+  await record(founder.email, SENT_ACTION[kind], { businessId: business.id, detail: everyone(prepared.recipients).join(", ") });
 }
 
 const SENT_ACTION: Record<EmailKind, string> = { first: "sent first email", follow_up: "sent follow-up", requested: "sent the preview they asked for" };
@@ -127,7 +142,7 @@ export async function sendOutreach(kind: EmailKind, id: string, founder: Founder
   try {
     const delivery = await deliver((from) => outgoing(kind, prepared, from, senderName), await mailboxFor(kind, prepared.business));
     await remember(kind, prepared, delivery, founder, problem);
-    return { ok: true, to: prepared.business.email };
+    return { ok: true, to: prepared.recipients.to.join(", ") };
   } catch (error) {
     await release(kind, id);
     return { ok: false, error: `Nothing was sent. ${(error as Error).message}` };

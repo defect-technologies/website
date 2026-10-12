@@ -1,14 +1,14 @@
 "use client";
 
-import { ArrowCounterClockwise, CheckCircle, PaperPlaneTilt, PencilSimple, PencilSimpleLine } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Check, CheckCircle, FloppyDisk, PaperPlaneTilt, PencilSimple, PencilSimpleLine, Plus } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition, type ReactNode } from "react";
-import { sendFromQueue, skipFromQueue, undoSkip } from "@/app/admin/(panel)/outreachActions";
+import { discardDraft, saveDraft, sendFromQueue, skipFromQueue, undoSkip } from "@/app/admin/(panel)/outreachActions";
+import type { EmailDraft } from "@/lib/emailDraft";
 import { asClause, fillTemplate, type TemplateValues } from "@/lib/emailTemplate";
 import type { Business } from "@/server/db/schema";
 import type { EmailKind } from "@/server/outreach/compose";
-import type { EmailEdits } from "@/server/outreach/send";
 import { Button } from "../Button";
 import { TextAreaField, TextField } from "./fields";
 import Letter from "./Letter";
@@ -132,19 +132,92 @@ function EditableLetter({ subject, template, values, line }: { subject: string; 
   );
 }
 
-function useEmailEdits(business: Business, subject: string, composedBody: () => string) {
-  const [edits, setEdits] = useState<EmailEdits | null>(null);
-  const start = () => setEdits({ to: business.email, subject, body: composedBody() });
-  const change = (field: keyof EmailEdits, value: string) => setEdits((current) => current && { ...current, [field]: value });
-  return { edits, start, change, discard: () => setEdits(null) };
+const DRAFT_FIELDS = ["to", "cc", "bcc", "subject", "body"] as const;
+
+function savedDraftFor(business: Business, kind: EmailKind): EmailDraft | null {
+  const saved = business.emailDraft;
+  if (saved?.kind !== kind) return null;
+  return { to: saved.to, cc: saved.cc, bcc: saved.bcc, subject: saved.subject, body: saved.body };
+}
+
+const sameDraft = (draft: EmailDraft, saved: EmailDraft | null) => DRAFT_FIELDS.every((field) => draft[field] === saved?.[field]);
+
+/** A saved draft opens the card straight into editing, as the founder left it. */
+function useEmailEdits(business: Business, kind: EmailKind, subject: string, composedBody: () => string) {
+  const [saved, setSaved] = useState(() => savedDraftFor(business, kind));
+  const [edits, setEdits] = useState<EmailDraft | null>(saved);
+  const [saving, startSaving] = useTransition();
+  const start = () => setEdits({ to: business.email, cc: "", bcc: "", subject, body: composedBody() });
+  const change = (field: keyof EmailDraft, value: string) => setEdits((current) => current && { ...current, [field]: value });
+  const save = () =>
+    startSaving(async () => {
+      if (edits && (await saveDraft(kind, business.id, edits)).ok) setSaved(edits);
+    });
+  const discard = () =>
+    startSaving(async () => {
+      setEdits(null);
+      if (!saved) return;
+      setSaved(null);
+      await discardDraft(business.id);
+    });
+  return { edits, start, change, save, discard, saving, unsaved: edits !== null && !sameDraft(edits, saved) };
 }
 
 type EmailEditing = ReturnType<typeof useEmailEdits>;
 
-function EmailEditor({ id, edits, onChange }: { id: string; edits: EmailEdits; onChange: EmailEditing["change"] }) {
+type CopyField = "cc" | "bcc";
+
+const COPY_LABEL: Record<CopyField, string> = { cc: "Cc", bcc: "Bcc" };
+
+type EditorProps = { id: string; edits: EmailDraft; onChange: EmailEditing["change"] };
+
+function AddressField({ id, field, label, edits, onChange, autoFocus, hint }: EditorProps & { field: "to" | CopyField; label: string; autoFocus?: boolean; hint?: string }) {
+  return (
+    <TextField
+      id={`${id}-${field}`}
+      label={label}
+      hint={hint}
+      inputMode="email"
+      autoCapitalize="none"
+      spellCheck={false}
+      autoComplete="off"
+      autoFocus={autoFocus}
+      value={edits[field]}
+      onChange={(event) => onChange(field, event.target.value)}
+    />
+  );
+}
+
+function CopyFields(props: EditorProps) {
+  const [open, setOpen] = useState<CopyField[]>(() => (["cc", "bcc"] as const).filter((field) => props.edits[field] !== ""));
+  const [opened, setOpened] = useState<CopyField | null>(null);
+  const closed = (["cc", "bcc"] as const).filter((field) => !open.includes(field));
+  return (
+    <>
+      {open.map((field) => (
+        <AddressField key={field} {...props} field={field} label={COPY_LABEL[field]} autoFocus={field === opened} />
+      ))}
+      {closed.length > 0 && (
+        <div className="-mt-2 flex gap-1">
+          {closed.map((field) => (
+            <Button key={field} size="sm" variant="ghost" onClick={() => {
+                setOpen([...open, field]);
+                setOpened(field);
+              }} icon={<Plus size={14} weight="bold" aria-hidden="true" />}>
+              Add {COPY_LABEL[field]}
+            </Button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function EmailEditor({ id, edits, onChange }: EditorProps) {
   return (
     <div className="bg-paper flex flex-col gap-4 rounded-xl p-4 sm:p-5">
-      <TextField id={`${id}-to`} label="To" type="email" autoComplete="off" value={edits.to} onChange={(event) => onChange("to", event.target.value)} />
+      <AddressField id={id} edits={edits} onChange={onChange} field="to" label="To" hint="Separate several addresses with commas." />
+      <CopyFields id={id} edits={edits} onChange={onChange} />
       <TextField id={`${id}-subject`} label="Subject" value={edits.subject} onChange={(event) => onChange("subject", event.target.value)} />
       <TextAreaField
         id={`${id}-body`}
@@ -158,24 +231,38 @@ function EmailEditor({ id, edits, onChange }: { id: string; edits: EmailEdits; o
   );
 }
 
-function EditToggle({ editing, pending, onStart, onDiscard }: { editing: boolean; pending: boolean; onStart: () => void; onDiscard: () => void }) {
-  if (editing) {
-    return (
-      <Button variant="ghost" onClick={onDiscard} disabled={pending} icon={<ArrowCounterClockwise size={18} aria-hidden="true" />}>
-        Go back to the template
-      </Button>
-    );
-  }
+function SaveDraftButton({ editing, busy }: { editing: EmailEditing; busy: boolean }) {
+  const label = editing.saving ? "Saving" : editing.unsaved ? "Save draft" : "Saved";
+  const icon = editing.unsaved ? <FloppyDisk size={18} aria-hidden="true" /> : <Check size={18} weight="bold" aria-hidden="true" />;
   return (
-    <Button variant="ghost" onClick={onStart} disabled={pending} icon={<PencilSimpleLine size={18} aria-hidden="true" />}>
-      Edit email
+    <Button variant="soft" onClick={editing.save} disabled={busy || !editing.unsaved} aria-busy={editing.saving} icon={icon}>
+      {label}
     </Button>
   );
 }
 
-type ActionsProps = { blockers: string[]; error: string; cannotSend: boolean; pending: boolean; onSend: () => void; onSkip: () => void; editToggle: ReactNode };
+function EditControls({ editing, pending, onStart, onDiscard }: { editing: EmailEditing; pending: boolean; onStart: () => void; onDiscard: () => void }) {
+  const busy = pending || editing.saving;
+  if (!editing.edits) {
+    return (
+      <Button variant="ghost" onClick={onStart} disabled={busy} icon={<PencilSimpleLine size={18} aria-hidden="true" />}>
+        Edit email
+      </Button>
+    );
+  }
+  return (
+    <>
+      <SaveDraftButton editing={editing} busy={busy} />
+      <Button variant="ghost" onClick={onDiscard} disabled={busy} icon={<ArrowCounterClockwise size={18} aria-hidden="true" />}>
+        Go back to the template
+      </Button>
+    </>
+  );
+}
 
-function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip, editToggle }: ActionsProps) {
+type ActionsProps = { blockers: string[]; error: string; cannotSend: boolean; pending: boolean; onSend: () => void; onSkip: () => void; editControls: ReactNode };
+
+function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip, editControls }: ActionsProps) {
   return (
     <>
       {blockers.length > 0 && (
@@ -192,7 +279,7 @@ function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip, ed
         <Button variant="solid" onClick={onSend} disabled={cannotSend || pending} aria-busy={pending} icon={<PaperPlaneTilt size={18} weight="bold" aria-hidden="true" />}>
           {pending ? "Sending" : "Send"}
         </Button>
-        {editToggle}
+        {editControls}
         <Button variant="ghost" onClick={onSkip} disabled={pending}>
           Skip
         </Button>
@@ -207,7 +294,7 @@ export default function QueueCard({ business, kind, subject, template, values, b
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<Outcome>({ state: "idle" });
   const line = useProblemLine(business);
-  const editing = useEmailEdits(business, subject, () => fillTemplate(template, { ...values, problem: asClause(line.problem) }));
+  const editing = useEmailEdits(business, kind, subject, () => fillTemplate(template, { ...values, problem: asClause(line.problem) }));
   const shownBlockers = editing.edits ? editBlockers : blockers;
 
   const toggleEditing = (change: () => void) => () => {
@@ -254,7 +341,7 @@ export default function QueueCard({ business, kind, subject, template, values, b
           pending={pending}
           onSend={send}
           onSkip={skip}
-          editToggle={<EditToggle editing={Boolean(editing.edits)} pending={pending} onStart={toggleEditing(editing.start)} onDiscard={toggleEditing(editing.discard)} />}
+          editControls={<EditControls editing={editing} pending={pending} onStart={toggleEditing(editing.start)} onDiscard={toggleEditing(editing.discard)} />}
         />
       </div>
       <PreviewThumb url={business.previewUrl} name={business.businessName} />

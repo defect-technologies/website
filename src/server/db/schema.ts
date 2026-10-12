@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
+import type { SavedDraft } from "../../lib/emailDraft";
 import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
 import type { InboundKind, InboundSource, InboundStatus } from "../../lib/inbound";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
@@ -41,6 +42,7 @@ export const businesses = pgTable(
 
     previewUrl: text("preview_url").notNull().default(""),
     emailProblem: text("email_problem").notNull().default(""),
+    emailDraft: jsonb("email_draft").$type<SavedDraft>(),
     previewBuiltAt: timestamp("preview_built_at", { withTimezone: true }),
     previewRequestedAt: timestamp("preview_requested_at", { withTimezone: true }),
     previewRequestedBy: text("preview_requested_by").notNull().default(""),

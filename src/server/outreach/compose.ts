@@ -59,8 +59,16 @@ const CHECKS: Check[] = [
   { failed: (b) => !b.previewUrl, fix: "Build and deploy the preview first." },
   { failed: (b) => !b.priceArm, fix: "Pick $59 or $79 for this lead." },
   { failed: (b) => !(b.emailProblem || b.problemSummary), fix: "Write the problem line.", coldOnly: true, fixedByEditing: true },
-  { failed: (_b, s) => !s.mailingAddress, fix: "Add the mailing address on the Template page. The law requires it.", coldOnly: true },
+  { failed: (_b, s) => !s.mailingAddress, fix: "Add the mailing address on the Template page. The law requires it." },
   { failed: (_b, s) => !s.senderName, fix: "Add the sender's name on the Template page.", coldOnly: true },
+];
+
+const OPT_OUT_NOTICE = /no thanks|unsubscribe|opt out/i;
+
+/** CAN-SPAM: every sales email carries the sender's postal address and says how to stop the emails. */
+const BODY_CHECKS: { failed: (body: string, s: OutreachSettings) => boolean; fix: string }[] = [
+  { failed: (body, s) => Boolean(s.mailingAddress.trim()) && !body.includes(s.mailingAddress.trim()), fix: "Put the mailing address back in the email. The law requires it in every sales email." },
+  { failed: (body) => !OPT_OUT_NOTICE.test(body), fix: 'Say how to stop the emails, such as: Not interested? Reply "no thanks" and we won\'t email again.' },
 ];
 
 type CheckOptions = { kind?: EmailKind; edited?: boolean };
@@ -72,7 +80,7 @@ export function failingChecks(business: Business, settings: OutreachSettings, bl
 }
 
 export function blockers(business: Business, settings: OutreachSettings, blocked: Set<string>, body: string, options: CheckOptions = {}): string[] {
-  const failing = failingChecks(business, settings, blocked, options);
+  const failing = [...failingChecks(business, settings, blocked, options), ...BODY_CHECKS.filter((check) => check.failed(body, settings)).map((check) => check.fix)];
   const leftovers = unfilledPlaceholders(body);
   if (leftovers.length > 0 && failing.length === 0) failing.push(`The email has unfilled placeholders: ${leftovers.join(", ")}.`);
   return failing;
