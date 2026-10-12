@@ -113,7 +113,7 @@ export default async function WelcomePage({ params }: Props) {
           <IncludedList />
         </section>
         <section className={SECTION} aria-labelledby="questions">
-          <SectionHeading id="questions">Questions</SectionHeading>
+          <SectionHeading id="questions">FAQs</SectionHeading>
           <QuestionList />
         </section>
         <section id="checkout" className={`${SECTION} scroll-mt-16 pb-[16vh]`} aria-labelledby="start">
