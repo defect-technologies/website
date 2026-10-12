@@ -13,10 +13,11 @@ import SignUpSteps from "@/components/welcome/SignUpSteps";
 import SitePreviewFrame from "@/components/welcome/SitePreviewFrame";
 import WelcomeVideo from "@/components/welcome/WelcomeVideo";
 import { WELCOME } from "@/content/headlines";
-import { WELCOME_VIDEO } from "@/content/welcome";
+import { afterSignUp, WELCOME_VIDEO } from "@/content/welcome";
 import { REGULAR_MONTHLY_PRICE } from "@/lib/emailTemplate";
 import type { Business } from "@/server/db/schema";
 import { env } from "@/server/env";
+import { launchDomainOf } from "@/server/integrations/domain";
 import { monthlyPriceOf } from "@/server/integrations/stripe";
 import { businessByLinkCode } from "@/server/leads/businesses";
 
@@ -30,16 +31,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: business ? `${business.businessName}'s new website` : "defect.tech",
     robots: { index: false, follow: false },
   };
-}
-
-/** The address the owner will recognize: where the site is going, else where it is now. */
-function domainOf(business: Business) {
-  if (business.launchDomain) return business.launchDomain;
-  try {
-    return new URL(business.website).hostname.replace(/^www\./, "");
-  } catch {
-    return `${business.slug}.defect.tech`;
-  }
 }
 
 function Hero({ business, price }: { business: Business; price: number }) {
@@ -60,7 +51,7 @@ function Hero({ business, price }: { business: Business; price: number }) {
           </a>
         </div>
       </div>
-      <SitePreviewFrame previewUrl={business.previewUrl} businessName={business.businessName} domain={domainOf(business)} />
+      <SitePreviewFrame previewUrl={business.previewUrl} businessName={business.businessName} domain={launchDomainOf(business) ?? `${business.slug}.defect.tech`} />
     </section>
   );
 }
@@ -115,7 +106,7 @@ export default async function WelcomePage({ params }: Props) {
         )}
         <section className={SECTION} aria-labelledby="after">
           <SectionHeading id="after">After you sign up</SectionHeading>
-          <SignUpSteps />
+          <SignUpSteps steps={afterSignUp(launchDomainOf(business))} />
         </section>
         <section className={SECTION} aria-labelledby="plan">
           <SectionHeading id="plan">Your plan</SectionHeading>

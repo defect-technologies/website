@@ -6,12 +6,14 @@
 
 export type Step = { title: string; detail: string };
 
-export const AFTER_SIGN_UP: Step[] = [
-  { title: "We email you within a business day", detail: "Tell us anything you'd like changed on the new site." },
-  { title: "We update your site", detail: "Then we send it back for you to look over." },
-  { title: "We set up your domain", detail: "We'll walk you through it, or do it for you." },
-  { title: "Your site goes live", detail: "Sign in to your portal at defect.tech to see your visits, edit your site and manage your plan." },
-];
+/** In the order onboarding runs: changes, then the launch at their domain, which also sets up their portal. */
+export function afterSignUp(domain: string | null): Step[] {
+  return [
+    { title: "Tell us what to change", detail: "Let us know if you'd like any changes to the website, and we'll get right to work!" },
+    { title: "Your site goes live", detail: `We'll put it online and walk you through connecting your domain${domain ? `, ${domain}` : ""}.` },
+    { title: "Activate your portal", detail: "Sign into your portal at defect.tech to see your visits, edit your site and manage your plan." },
+  ];
+}
 
 export type Included = { title: string; detail: string };
 

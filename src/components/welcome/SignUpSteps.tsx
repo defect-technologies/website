@@ -1,11 +1,11 @@
-import { AFTER_SIGN_UP } from "@/content/welcome";
+import type { Step } from "@/content/welcome";
 import KnifeStroke from "../admin/KnifeStroke";
 
 /** What happens after checkout, in order. Once they've paid, the knife stroke marks the step they're on. */
-export default function SignUpSteps({ current }: { current?: number }) {
+export default function SignUpSteps({ steps, current }: { steps: Step[]; current?: number }) {
   return (
-    <ol className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-      {AFTER_SIGN_UP.map((step, index) => {
+    <ol className="grid gap-x-8 gap-y-10 sm:grid-cols-3">
+      {steps.map((step, index) => {
         const here = index === current;
         return (
           <li key={step.title} aria-current={here ? "step" : undefined} className="flex flex-col gap-3">
