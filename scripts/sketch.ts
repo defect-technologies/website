@@ -14,8 +14,8 @@ export const SKETCH_HTML = `<!doctype html><html><head>
   p { font-size: 24px; line-height: 1.45; margin: 0 0 40px; max-width: 30ch; color: #3d5a47; }
   .button { display: inline-block; background: #23432f; color: #fbf6e9; font-size: 22px; font-weight: 600; padding: 20px 36px; border-radius: 999px; }
   .loaf { position: relative; height: 470px; border-radius: 28px; background: #f2b632; overflow: hidden; }
-  .bread { position: absolute; left: 70px; right: 70px; top: 150px; height: 210px; border-radius: 120px 120px 60px 60px; background: #b4622a; }
-  .score { position: absolute; top: 205px; width: 70px; height: 16px; border-radius: 8px; background: #e7a35a; transform: rotate(-24deg); }
+  .bread { position: absolute; left: 70px; right: 70px; top: 150px; height: 210px; border-radius: 120px 120px 60px 60px; background: #b4622a; overflow: hidden; }
+  .score { position: absolute; top: 88px; width: 64px; height: 16px; border-radius: 8px; background: #e7a35a; transform: rotate(-24deg); }
   .sun { position: absolute; right: 48px; top: 40px; width: 90px; height: 90px; border-radius: 50%; background: #fbf6e9; }
   .strip { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: #23432f; color: #f2b632; display: flex; align-items: center; gap: 56px; padding: 0 64px; font-size: 20px; font-weight: 600; }
 </style></head><body>
@@ -29,10 +29,11 @@ export const SKETCH_HTML = `<!doctype html><html><head>
     </div>
     <div class="loaf">
       <div class="sun"></div>
-      <div class="bread"></div>
-      <div class="score" style="left:150px"></div>
-      <div class="score" style="left:280px"></div>
-      <div class="score" style="left:410px"></div>
+      <div class="bread">
+        <div class="score" style="left:72px"></div>
+        <div class="score" style="left:142px"></div>
+        <div class="score" style="left:212px"></div>
+      </div>
     </div>
   </section>
   <div class="strip"><span>Open daily, 7am</span><span>Fresh loaves at 8</span><span>Elm Street</span></div>
