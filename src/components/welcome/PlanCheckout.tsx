@@ -12,11 +12,11 @@ import { Card, Notice } from "../admin/ui";
 function CheckoutFailed() {
   return (
     <Notice tone="bad">
-      Unable to load the checkout. Refresh the page to try again, or email{" "}
+      The checkout didn&apos;t load. Try refreshing the page. If that doesn&apos;t work, email{" "}
       <a href="mailto:hello@defect.tech" className="underline underline-offset-4">
         hello@defect.tech
-      </a>{" "}
-      and we&apos;ll sign you up.
+      </a>
+      . We&apos;ll sign you up by email instead.
     </Notice>
   );
 }
@@ -39,7 +39,7 @@ function AccountEmailForm({ initial, onContinue }: { initial: string; onContinue
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          hint="You'll sign in to your portal with it, and it's where we'll email you."
+          hint="You'll sign in to your portal with this email. It's also where we'll write to you."
         />
         <div>
           <Button type="submit" variant="solid" icon={<ArrowRight size={18} weight="bold" aria-hidden="true" />}>

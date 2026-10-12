@@ -39,14 +39,14 @@ function Hero({ business, price }: { business: Business; price: number }) {
       <div className="flex flex-col gap-8">
         <PaintedHeadline as="h1" headline={WELCOME} style={{ fontSize: "clamp(3.5rem, 9vw, 7rem)" }} />
         <p className="text-ink-soft max-w-[34ch] text-xl leading-relaxed text-pretty">
-          <span className="text-ink font-semibold">{business.businessName}</span>&rsquo;s new website, hosted and kept up to date for ${price} a month.
+          For ${price} a month, we&rsquo;ll host <span className="text-ink font-semibold">{business.businessName}</span>&rsquo;s new website and keep it up to date.
         </p>
         <div className="flex flex-wrap gap-3">
           <ButtonLink href="#checkout" icon={<ArrowDown size={20} weight="bold" aria-hidden="true" />}>
             Start my plan
           </ButtonLink>
           <a href={business.previewUrl} target="_blank" rel="noopener" className={buttonClasses("soft")}>
-            Open my new site
+            Open my new website
             <ArrowUpRight size={20} weight="bold" aria-hidden="true" />
           </a>
         </div>
@@ -63,7 +63,7 @@ function PriceSummary({ price }: { price: number }) {
         <span className="font-display text-ink text-8xl leading-none font-black tabular-nums">${price}</span>
         <span className="text-ink-soft text-xl">a month</span>
       </p>
-      {price < REGULAR_MONTHLY_PRICE && <p className="text-ink-soft text-lg text-pretty">Usually ${REGULAR_MONTHLY_PRICE}. Your price stays the same for as long as you&rsquo;re with us.</p>}
+      {price < REGULAR_MONTHLY_PRICE && <p className="text-ink-soft text-lg text-pretty">The plan is usually ${REGULAR_MONTHLY_PRICE} a month. Your price stays the same for as long as you&rsquo;re with us.</p>}
     </div>
   );
 }
@@ -74,14 +74,14 @@ function CheckoutArea({ business, code }: { business: Business; code: string }) 
     return (
       <Card className="flex flex-col gap-3 p-6 sm:p-8">
         <p className="text-ink text-xl font-semibold">You&rsquo;ve signed up.</p>
-        <p className="text-ink-soft text-lg text-pretty">We&rsquo;ll email you within a business day about anything you&rsquo;d like changed. Questions in the meantime can go to hello@defect.tech.</p>
+        <p className="text-ink-soft text-lg text-pretty">We&rsquo;ll email you within a business day about anything you&rsquo;d like changed. If you have questions before then, write to hello@defect.tech.</p>
       </Card>
     );
   }
   if (!publishableKey) {
     return (
       <Notice tone="warn">
-        Online checkout isn&rsquo;t available right now. Email hello@defect.tech and we&rsquo;ll sign you up.
+        Online checkout isn&rsquo;t working right now. If you email hello@defect.tech, we&rsquo;ll sign you up.
       </Notice>
     );
   }
@@ -122,7 +122,7 @@ export default async function WelcomePage({ params }: Props) {
               <SectionHeading id="start">Start your plan</SectionHeading>
               <PriceSummary price={price} />
               <p className="text-ink-soft text-lg text-pretty">
-                Questions first? Reply to our email or write to{" "}
+                Have a question first? Reply to our email or write to{" "}
                 <a href="mailto:hello@defect.tech" className="text-ink decoration-ink/30 hover:decoration-ink underline underline-offset-4">
                   hello@defect.tech
                 </a>

@@ -29,8 +29,8 @@ export default async function SignedUpPage({ params, searchParams }: Props) {
         <div className="flex flex-col gap-6">
           <PaintedHeadline as="h1" headline={SIGNED_UP} style={{ fontSize: "clamp(3.5rem, 10vw, 8rem)" }} />
           <p className="text-ink-soft max-w-[40ch] text-xl leading-relaxed text-pretty">
-            Thank you for choosing us for <span className="text-ink font-semibold">{business.businessName}</span>. A welcome email is on its way, and we&rsquo;ll follow up within a
-            business day.
+            Thank you for choosing us for <span className="text-ink font-semibold">{business.businessName}</span>. A welcome email is on its way. We&rsquo;ll follow up within a business
+            day about anything you&rsquo;d like changed.
           </p>
         </div>
         <section className="flex flex-col gap-10" aria-labelledby="next">
