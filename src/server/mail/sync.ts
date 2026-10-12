@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { SENT_FROM_GMAIL } from "@/lib/senders";
 import { record } from "../activity";
 import { db } from "../db/client";
@@ -42,7 +42,19 @@ function matchBusiness(threadId: string, address: string, index: Index): Busines
   return index.byThread.get(threadId) ?? index.byEmail.get(address) ?? index.byDomain.get(domainOf(address));
 }
 
+/** The cold inbox copies its mail to hello@, so the same email (one Message-ID) can arrive through two inboxes. */
+async function alreadyStored(email: IncomingEmail, business: Business): Promise<boolean> {
+  if (!email.headerMessageId) return false;
+  const [found] = await (await db())
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.businessId, business.id), eq(messages.headerMessageId, email.headerMessageId)))
+    .limit(1);
+  return Boolean(found);
+}
+
 async function store(mailbox: Mailbox, email: IncomingEmail, business: Business, direction: "in" | "out"): Promise<boolean> {
+  if (await alreadyStored(email, business)) return false;
   const inserted = await (await db())
     .insert(messages)
     .values({
