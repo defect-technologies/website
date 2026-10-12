@@ -83,7 +83,7 @@ function CheckoutArea({ business, code }: { business: Business; code: string }) 
     return (
       <Card className="flex flex-col gap-3 p-6 sm:p-8">
         <p className="text-ink text-xl font-semibold">You&rsquo;ve signed up.</p>
-        <p className="text-ink-soft text-lg text-pretty">We&rsquo;ll email you to collect any corrections and connect your domain. Questions in the meantime can go to hello@defect.tech.</p>
+        <p className="text-ink-soft text-lg text-pretty">We&rsquo;ll email you within a business day about anything you&rsquo;d like changed. Questions in the meantime can go to hello@defect.tech.</p>
       </Card>
     );
   }
