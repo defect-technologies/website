@@ -6,6 +6,8 @@ import { asClause } from "@/lib/emailTemplate";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { STAGES } from "@/server/db/schema";
+import { BRAND_FILE_TYPES, MAX_BRAND_FILE_BYTES } from "@/lib/brandFiles";
+import { isUploadFor, removeBrandFile, saveBrandFile } from "@/server/leads/brandFiles";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
 import { launchBlocker, requestPreview } from "@/server/runner/jobs";
@@ -86,4 +88,33 @@ export async function approvePreviewAction(form: FormData) {
   await record(founder.email, "approved the preview", { businessId: lead.id });
   await closeFlagsOn(lead.id, ["preview-review"], "A founder marked the preview ready to send.", founder.email);
   revalidatePath("/admin", "layout");
+}
+
+const UploadedBrandFile = z.object({
+  leadId: z.uuid(),
+  url: z.url({ protocol: /^https$/ }),
+  name: z.string().trim().min(1).max(200),
+  contentType: z.enum(BRAND_FILE_TYPES),
+  size: z.number().int().positive().max(MAX_BRAND_FILE_BYTES),
+});
+
+/** Records a file the browser just uploaded to Blob, once we've checked it landed in this lead's folder. */
+export async function saveBrandFileAction(file: z.input<typeof UploadedBrandFile>): Promise<FormResult> {
+  const founder = await requireFounder();
+  const parsed = UploadedBrandFile.safeParse(file);
+  if (!parsed.success || !isUploadFor(parsed.data.url, parsed.data.leadId)) return { ok: false, message: "That upload didn't come through. Try it again." };
+  const { leadId, ...rest } = parsed.data;
+  try {
+    await saveBrandFile({ businessId: leadId, ...rest }, founder.email);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Couldn't save that file." };
+  }
+  revalidatePath(`/admin/pipeline/${leadId}`);
+  return { ok: true, message: "" };
+}
+
+export async function removeBrandFileAction(leadId: string, form: FormData) {
+  const founder = await requireFounder();
+  await removeBrandFile(String(form.get("id") ?? ""), leadId, founder.email);
+  revalidatePath(`/admin/pipeline/${leadId}`);
 }

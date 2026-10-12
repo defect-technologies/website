@@ -332,6 +332,24 @@ export const previewJobs = pgTable(
   ],
 );
 
+/** Artwork the owner gave us (a logo, store signs, illustrations), kept in Vercel Blob and handed to every build of their site. */
+export const brandFiles = pgTable(
+  "brand_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    url: text("url").notNull(),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    addedBy: text("added_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("brand_files_business").on(table.businessId, table.createdAt)],
+);
+
 export const expenseFrequency = pgEnum("expense_frequency", ["monthly", "annual"]);
 
 /** A cost that repeats. Each time it comes due it adds a row to expenses, which can then be edited on its own. */
@@ -528,3 +546,4 @@ export type Prospect = typeof prospects.$inferSelect;
 export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type ExpenseFrequency = RecurringExpense["frequency"];
 export type PortalAccount = typeof portalAccounts.$inferSelect;
+export type BrandFile = typeof brandFiles.$inferSelect;

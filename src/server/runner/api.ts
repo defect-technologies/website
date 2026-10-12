@@ -4,13 +4,14 @@ import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
 import { MAX_FAILED_BUILDS, type JobKind } from "@/lib/previewJobs";
-import type { BotKey, Business, PreviewJob } from "../db/schema";
+import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
 import { saveLaunchedSite } from "../sites/clientSites";
 import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
+import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief, checkoutLink } from "../leads/buildCommand";
 import { updateBusiness } from "../leads/businesses";
 import { outreachSettings } from "../settings";
@@ -59,10 +60,20 @@ function launchPayload(job: PreviewJob, lead: Business) {
   return { launch: { domain: launchDomainOf(lead) ?? "", editorSecret } };
 }
 
-function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string) {
+/** brandFiles are the owner's artwork; the runner downloads them into the lead's folder before the builder starts. */
+function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[]) {
   return {
     job: { id: job.id, attempt: job.attempts, note: job.note, kind: job.kind },
-    lead: { id: lead.id, slug: lead.slug, businessName: lead.businessName, website: lead.website, brief: buildBrief(lead), priceArm: lead.priceArm ?? 59, checkoutUrl },
+    lead: {
+      id: lead.id,
+      slug: lead.slug,
+      businessName: lead.businessName,
+      website: lead.website,
+      brief: buildBrief(lead),
+      priceArm: lead.priceArm ?? 59,
+      checkoutUrl,
+      brandFiles: brand.map(({ url, name }) => ({ url, name })),
+    },
     ...launchPayload(job, lead),
   };
 }
@@ -83,7 +94,7 @@ export async function claimNext(key: BotKey, request: Request) {
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
-  return jobPayload(job, lead, checkoutLink(lead, await outreachSettings()));
+  return jobPayload(job, lead, checkoutLink(lead, await outreachSettings()), await brandFilesFor(lead.id));
 }
 
 async function claimedJob(id: string): Promise<PreviewJob> {
