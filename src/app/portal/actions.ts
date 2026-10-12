@@ -1,10 +1,15 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { emailPortalLink, safeNext, setPassword, signInWithLink, signInWithPassword, type PasswordChange } from "@/server/portal/accounts";
 import { endOwnerSession, requireOwner } from "@/server/portal/session";
-import { clientSite } from "@/server/sites/clientSites";
+import { record } from "@/server/activity";
+import { launchDomainOf } from "@/server/integrations/domain";
+import { businessById } from "@/server/leads/businesses";
+import { launchBlocker, requestPreview } from "@/server/runner/jobs";
+import { clientSite, sitesForOwner } from "@/server/sites/clientSites";
 
 export type SignInState = { status: "idle" | "sent" | "wrong" | "locked" | "invalid" | "not-ready"; email: string };
 
@@ -48,4 +53,17 @@ export async function emailOwnerLinkAction(form: FormData) {
   if (!site) redirect("/portal/sign-in");
   await emailPortalLink(site.ownerEmail, `/portal/edit/${site.slug}`);
   redirect(`/portal/sign-in?site=${encodeURIComponent(site.slug)}&result=sent`);
+}
+
+/** "Looks good, make it live" on the portal's checklist: the owner approves their preview and the launch starts. */
+export async function approvePreviewAction(form: FormData) {
+  const owner = await requireOwner();
+  const slug = String(form.get("site") ?? "");
+  const site = (await sitesForOwner(owner.email)).find((candidate) => candidate.slug === slug);
+  const lead = site?.businessId ? await businessById(site.businessId) : null;
+  if (!lead || launchBlocker(lead) || !launchDomainOf(lead)) redirect("/portal");
+  const { job, created } = await requestPreview(lead, owner.email, "The owner approved the preview in their portal.", "launch");
+  if (created && job.kind === "launch") await record(owner.email, "approved the preview and started the launch", { businessId: lead.id });
+  revalidatePath("/portal");
+  redirect(`/portal?site=${encodeURIComponent(slug)}`);
 }

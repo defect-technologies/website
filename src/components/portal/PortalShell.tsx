@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/Button";
 import { siteName } from "@/server/editor/signInLinks";
 import type { PortalContext } from "@/server/portal/context";
+import { isLive } from "@/server/sites/clientSites";
 import PortalTabs from "./PortalTabs";
 
 function SitePicker({ context, path }: { context: PortalContext; path: string }) {
@@ -40,11 +41,13 @@ export default function PortalShell({ context, path, children }: { context: Port
           <div className="order-3 w-full sm:order-none sm:w-auto sm:flex-1">
             <PortalTabs site={several ? context.site.slug : undefined} />
           </div>
-          {/* A plain link, not next/link: prefetching would open the editor in the background. */}
-          <a href={`/portal/edit/${context.site.slug}`} className={buttonClasses("solid", "md", "ms-auto sm:ms-0")}>
-            <PencilSimple size={20} weight="bold" aria-hidden="true" />
-            Edit website
-          </a>
+          {/* A plain link, not next/link: prefetching would open the editor in the background. The editor lives on the website, so it opens once it's live. */}
+          {isLive(context.site) && (
+            <a href={`/portal/edit/${context.site.slug}`} className={buttonClasses("solid", "md", "ms-auto sm:ms-0")}>
+              <PencilSimple size={20} weight="bold" aria-hidden="true" />
+              Edit website
+            </a>
+          )}
         </div>
       </header>
       <main id="main" className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 pt-8 pb-20 sm:px-8">
