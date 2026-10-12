@@ -1,14 +1,16 @@
 "use client";
 
-import { ArrowCounterClockwise, CheckCircle, PaperPlaneTilt, PencilSimple } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, CheckCircle, PaperPlaneTilt, PencilSimple, PencilSimpleLine } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition, type ReactNode } from "react";
 import { sendFromQueue, skipFromQueue, undoSkip } from "@/app/admin/(panel)/outreachActions";
-import { asClause, type TemplateValues } from "@/lib/emailTemplate";
+import { asClause, fillTemplate, type TemplateValues } from "@/lib/emailTemplate";
 import type { Business } from "@/server/db/schema";
 import type { EmailKind } from "@/server/outreach/compose";
+import type { EmailEdits } from "@/server/outreach/send";
 import { Button } from "../Button";
+import { TextAreaField, TextField } from "./fields";
 import Letter from "./Letter";
 import PreviewThumb from "./PreviewThumb";
 import { ArmChip, Card, Notice } from "./ui";
@@ -20,6 +22,7 @@ type QueueCardProps = {
   template: string;
   values: TemplateValues;
   blockers: string[];
+  editBlockers: string[];
   limitReached: boolean;
 };
 
@@ -86,7 +89,7 @@ function SkippedRow({ name, onUndo, pending }: { name: string; onUndo: () => voi
 
 const KIND_CHIP: Record<EmailKind, string> = { first: "", follow_up: "Follow-up", requested: "From hello@" };
 
-function Header({ business, kind }: { business: Business; kind: QueueCardProps["kind"] }) {
+function Header({ business, kind, editing }: { business: Business; kind: QueueCardProps["kind"]; editing: boolean }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <h3 className="text-xl font-semibold">
@@ -98,7 +101,7 @@ function Header({ business, kind }: { business: Business; kind: QueueCardProps["
         {kind !== "first" && <span className="bg-ink/8 rounded-full px-2.5 py-0.5 text-sm font-medium">{KIND_CHIP[kind]}</span>}
         <ArmChip arm={business.priceArm} />
       </div>
-      <p className="text-ink-faint w-full text-sm">To {business.email || "no address yet"}</p>
+      {!editing && <p className="text-ink-faint w-full text-sm">To {business.email || "no address yet"}</p>}
     </div>
   );
 }
@@ -129,9 +132,50 @@ function EditableLetter({ subject, template, values, line }: { subject: string; 
   );
 }
 
-type ActionsProps = { blockers: string[]; error: string; cannotSend: boolean; pending: boolean; onSend: () => void; onSkip: () => void };
+function useEmailEdits(business: Business, subject: string, composedBody: () => string) {
+  const [edits, setEdits] = useState<EmailEdits | null>(null);
+  const start = () => setEdits({ to: business.email, subject, body: composedBody() });
+  const change = (field: keyof EmailEdits, value: string) => setEdits((current) => current && { ...current, [field]: value });
+  return { edits, start, change, discard: () => setEdits(null) };
+}
 
-function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip }: ActionsProps) {
+type EmailEditing = ReturnType<typeof useEmailEdits>;
+
+function EmailEditor({ id, edits, onChange }: { id: string; edits: EmailEdits; onChange: EmailEditing["change"] }) {
+  return (
+    <div className="bg-paper flex flex-col gap-4 rounded-xl p-4 sm:p-5">
+      <TextField id={`${id}-to`} label="To" type="email" autoComplete="off" value={edits.to} onChange={(event) => onChange("to", event.target.value)} />
+      <TextField id={`${id}-subject`} label="Subject" value={edits.subject} onChange={(event) => onChange("subject", event.target.value)} />
+      <TextAreaField
+        id={`${id}-body`}
+        label="Email"
+        rows={12}
+        value={edits.body}
+        onChange={(event) => onChange("body", event.target.value)}
+        className="field-sizing-content leading-relaxed"
+      />
+    </div>
+  );
+}
+
+function EditToggle({ editing, pending, onStart, onDiscard }: { editing: boolean; pending: boolean; onStart: () => void; onDiscard: () => void }) {
+  if (editing) {
+    return (
+      <Button variant="ghost" onClick={onDiscard} disabled={pending} icon={<ArrowCounterClockwise size={18} aria-hidden="true" />}>
+        Go back to the template
+      </Button>
+    );
+  }
+  return (
+    <Button variant="ghost" onClick={onStart} disabled={pending} icon={<PencilSimpleLine size={18} aria-hidden="true" />}>
+      Edit email
+    </Button>
+  );
+}
+
+type ActionsProps = { blockers: string[]; error: string; cannotSend: boolean; pending: boolean; onSend: () => void; onSkip: () => void; editToggle: ReactNode };
+
+function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip, editToggle }: ActionsProps) {
   return (
     <>
       {blockers.length > 0 && (
@@ -148,6 +192,7 @@ function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip }: 
         <Button variant="solid" onClick={onSend} disabled={cannotSend || pending} aria-busy={pending} icon={<PaperPlaneTilt size={18} weight="bold" aria-hidden="true" />}>
           {pending ? "Sending" : "Send"}
         </Button>
+        {editToggle}
         <Button variant="ghost" onClick={onSkip} disabled={pending}>
           Skip
         </Button>
@@ -156,15 +201,23 @@ function QueueActions({ blockers, error, cannotSend, pending, onSend, onSkip }: 
   );
 }
 
-export default function QueueCard({ business, kind, subject, template, values, blockers, limitReached }: QueueCardProps) {
+export default function QueueCard({ business, kind, subject, template, values, blockers, editBlockers, limitReached }: QueueCardProps) {
   const router = useRouter();
+  const editorId = useId();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<Outcome>({ state: "idle" });
   const line = useProblemLine(business);
+  const editing = useEmailEdits(business, subject, () => fillTemplate(template, { ...values, problem: asClause(line.problem) }));
+  const shownBlockers = editing.edits ? editBlockers : blockers;
+
+  const toggleEditing = (change: () => void) => () => {
+    setOutcome({ state: "idle" });
+    change();
+  };
 
   const send = () =>
     startTransition(async () => {
-      const result = await sendFromQueue(kind, business.id, line.edited ? line.problem : undefined);
+      const result = await sendFromQueue(kind, business.id, line.edited ? line.problem : undefined, editing.edits ?? undefined);
       setOutcome(result.ok ? { state: "sent", to: result.to } : { state: "error", message: result.error });
       if (result.ok) setTimeout(() => router.refresh(), REFRESH_AFTER_MS);
     });
@@ -188,15 +241,20 @@ export default function QueueCard({ business, kind, subject, template, values, b
   return (
     <Card className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
       <div className="flex min-w-0 flex-col gap-4">
-        <Header business={business} kind={kind} />
-        <EditableLetter subject={subject} template={template} values={values} line={line} />
+        <Header business={business} kind={kind} editing={Boolean(editing.edits)} />
+        {editing.edits ? (
+          <EmailEditor id={editorId} edits={editing.edits} onChange={editing.change} />
+        ) : (
+          <EditableLetter subject={subject} template={template} values={values} line={line} />
+        )}
         <QueueActions
-          blockers={blockers}
+          blockers={shownBlockers}
           error={outcome.state === "error" ? outcome.message : ""}
-          cannotSend={blockers.length > 0 || limitReached}
+          cannotSend={shownBlockers.length > 0 || limitReached}
           pending={pending}
           onSend={send}
           onSkip={skip}
+          editToggle={<EditToggle editing={Boolean(editing.edits)} pending={pending} onStart={toggleEditing(editing.start)} onDiscard={toggleEditing(editing.discard)} />}
         />
       </div>
       <PreviewThumb url={business.previewUrl} name={business.businessName} />

@@ -28,6 +28,7 @@ export default function QueueList({ items, limitReached }: { items: QueueItem[];
             template={item.template}
             values={item.values}
             blockers={item.blockers}
+            editBlockers={item.editBlockers}
             limitReached={limitReached}
           />
         </li>
