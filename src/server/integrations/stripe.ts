@@ -1,10 +1,11 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+import { REGULAR_MONTHLY_PRICE } from "@/lib/emailTemplate";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, settings, type Business } from "../db/schema";
 import { env } from "../env";
-import { advanceStage, businessById, updateBusiness } from "../leads/businesses";
+import { advanceStage, businessById } from "../leads/businesses";
 import { sendWelcome } from "../onboarding/welcome";
 import { getJson, integration } from "./result";
 
@@ -16,6 +17,7 @@ type Subscription = { id: string; customer: string; items: { data: { price: Pric
 type CheckoutSession = {
   id: string;
   created: number;
+  status: "open" | "complete" | "expired";
   client_reference_id: string | null;
   customer: string | null;
   subscription: string | null;
@@ -58,15 +60,25 @@ async function businessForSession(session: CheckoutSession, all: Business[]): Pr
   return byReference ?? all.find((b) => email && b.email === email);
 }
 
+/**
+ * Records the payment once. The welcome page's return and the half-hourly sync can both see the
+ * same checkout, so only the one that sets paidAt goes on to send the welcome email.
+ */
 async function markPaid(session: CheckoutSession, business: Business) {
   const payerEmail = (session.customer_details?.email ?? "").toLowerCase();
-  await updateBusiness(business.id, {
-    paidAt: new Date(session.created * 1000),
-    plan: planFor(session.amount_total),
-    stripeCustomerId: session.customer,
-    stripeSubscriptionId: session.subscription,
-    ownerEmail: business.ownerEmail || payerEmail,
-  });
+  const claimed = await (await db())
+    .update(businesses)
+    .set({
+      paidAt: new Date(session.created * 1000),
+      plan: planFor(session.amount_total),
+      stripeCustomerId: session.customer,
+      stripeSubscriptionId: session.subscription,
+      ownerEmail: business.ownerEmail || payerEmail,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(businesses.id, business.id), isNull(businesses.paidAt)))
+    .returning({ id: businesses.id });
+  if (claimed.length === 0) return;
   await advanceStage(business.id, "paid");
   await record("stripe sync", "paid", { businessId: business.id, detail: planFor(session.amount_total) });
   await sendWelcome(business, payerEmail || business.ownerEmail || business.email);
@@ -101,6 +113,54 @@ export function syncPayments() {
     await saveSync(startedAt);
     return { checkouts: data.length, newClients: matched };
   });
+}
+
+type RecurringPrice = { id: string; unit_amount: number | null; recurring: { interval: string } | null };
+
+/** The active monthly price for a price arm, found by its amount so it doesn't depend on lookup keys being set. */
+async function monthlyPriceFor(dollars: number): Promise<string> {
+  const { data } = await stripe<{ data: RecurringPrice[] }>("/prices?active=true&type=recurring&limit=100");
+  const price = data.find((candidate) => candidate.unit_amount === dollars * 100 && candidate.recurring?.interval === "month");
+  if (!price) throw new Error(`Stripe has no active $${dollars} monthly price.`);
+  return price.id;
+}
+
+/** The monthly price a lead signs up at: its price arm, or our regular price for a lead without one. */
+export function monthlyPriceOf(business: Business) {
+  return business.priceArm ?? REGULAR_MONTHLY_PRICE;
+}
+
+/**
+ * A checkout for the welcome page, embedded in it, tagged with the lead's ID so the payment is
+ * matched back to it. Returns the client secret the page mounts Stripe's form with.
+ */
+export async function startWelcomeCheckout(business: Business, returnUrl: string): Promise<string> {
+  if (!env.stripeKey()) throw new Error("STRIPE_API_KEY isn't set.");
+  const email = business.ownerEmail || business.email;
+  const created = await stripePost<{ client_secret: string }>("/checkout/sessions", {
+    ui_mode: "embedded_page",
+    mode: "subscription",
+    "line_items[0][price]": await monthlyPriceFor(monthlyPriceOf(business)),
+    "line_items[0][quantity]": "1",
+    client_reference_id: business.id,
+    allow_promotion_codes: "true",
+    "consent_collection[terms_of_service]": "required",
+    "custom_text[terms_of_service_acceptance][message]": `I agree to the [Terms of Service](${new URL("/terms", env.siteUrl())}).`,
+    "subscription_data[metadata][lead_id]": business.id,
+    return_url: returnUrl,
+    ...(email ? { customer_email: email } : {}),
+  });
+  if (!created.ok) throw new Error(`Stripe refused the checkout: ${created.body.error?.message ?? "no reason given"}`);
+  return created.body.client_secret;
+}
+
+/** Where a welcome-page checkout stands once Stripe sends the owner back, recording the payment if it went through. */
+export async function finishWelcomeCheckout(sessionId: string, business: Business): Promise<CheckoutSession["status"] | "unknown"> {
+  if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId) || !env.stripeKey()) return "unknown";
+  const session = await stripe<CheckoutSession>(`/checkout/sessions/${sessionId}`).catch(() => null);
+  if (!session || session.client_reference_id !== business.id) return "unknown";
+  if (session.status === "complete" && !business.paidAt) await markPaid(session, business);
+  return session.status;
 }
 
 async function stripePost<T>(path: string, form: Record<string, string>): Promise<{ ok: boolean; body: T & { error?: { message?: string } } }> {

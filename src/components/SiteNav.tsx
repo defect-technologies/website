@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ButtonLink } from "./Button";
 
-type Page = "home" | "team" | "start" | "other";
+/** On "start" the visitor is already requesting a website, and on "welcome" we've already built theirs, so neither offers it. */
+type Page = "home" | "team" | "start" | "welcome" | "other";
 
 const LINK = "text-ink rounded-md px-2 py-1 text-base font-medium hover:bg-paper-shade focus-visible:outline-2 focus-visible:outline-ink";
 
@@ -29,7 +30,7 @@ export default function SiteNav({ page }: { page: Page }) {
         <Link href="/portal" className={LINK}>
           Portal
         </Link>
-        {page !== "start" && (
+        {page !== "start" && page !== "welcome" && (
           <ButtonLink href="/start" size="sm">
             Request a website
           </ButtonLink>

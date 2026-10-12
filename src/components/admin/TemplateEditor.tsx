@@ -110,9 +110,7 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
           <TextField label="Mailing address" name="mailingAddress" value={address} onChange={(e) => setAddress(e.target.value)} hint="The virtual mailing address. Every cold email has to carry one." />
         </fieldset>
         <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-lg font-semibold">Checkout and pace</legend>
-          <TextField label="$59 Stripe payment link" name="checkout59" type="url" defaultValue={settings.checkoutLinks["59"]} placeholder="https://buy.stripe.com/..." />
-          <TextField label="$79 Stripe payment link" name="checkout79" type="url" defaultValue={settings.checkoutLinks["79"]} placeholder="https://buy.stripe.com/..." />
+          <legend className="mb-2 text-lg font-semibold">Pace</legend>
           <TextField label="Emails a day" name="dailyLimit" type="number" min={1} max={50} defaultValue={settings.dailyLimit} hint="First emails and follow-ups together." />
           <TextField label="Follow up after (days)" name="followUpAfterDays" type="number" min={1} max={30} defaultValue={settings.followUpAfterDays} />
         </fieldset>

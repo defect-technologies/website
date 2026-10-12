@@ -91,13 +91,12 @@ function ManualCommand({ command }: { command: string }) {
 }
 
 /** The lead page's build controls: queue it for the preview runner, or run the command by hand. */
-export default function PreviewBuild({ lead, job, command, missingCheckout }: { lead: Business; job: PreviewJob | null; command: string; missingCheckout: boolean }) {
+export default function PreviewBuild({ lead, job, command }: { lead: Business; job: PreviewJob | null; command: string }) {
   const canLaunch = !launchBlocker(lead);
   const heldBack = !job && lead.stage === "new" && Boolean(lead.previewUrl);
   return (
     <section className="flex flex-col gap-3">
       <SectionHeading>{lead.previewUrl ? "Preview" : "Build the preview"}</SectionHeading>
-      {missingCheckout && <Notice tone="warn">Add the ${lead.priceArm} Stripe payment link on the Template page, or the preview&apos;s button won&apos;t lead anywhere.</Notice>}
       {heldBack && <Notice tone="warn">The outside reviewer still wanted changes, so this preview isn&apos;t in the outreach queue. Look at it, then approve it or rebuild with a note.</Notice>}
       {heldBack && <ApproveButton lead={lead} />}
       {!job && canLaunch && <LaunchButton lead={lead} />}

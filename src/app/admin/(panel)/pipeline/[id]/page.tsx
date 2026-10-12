@@ -11,12 +11,11 @@ import { activityFor } from "@/server/activity";
 import type { Activity, Business, Message } from "@/server/db/schema";
 import { env } from "@/server/env";
 import { brandFilesFor } from "@/server/leads/brandFiles";
-import { buildCommand, checkoutLink } from "@/server/leads/buildCommand";
+import { buildCommand } from "@/server/leads/buildCommand";
 import { businessById } from "@/server/leads/businesses";
 import { threadFor } from "@/server/mail/threads";
 import { previewLink } from "@/server/outreach/compose";
 import { activeJobFor } from "@/server/runner/jobs";
-import { outreachSettings } from "@/server/settings";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -71,10 +70,9 @@ function timeline(activity: Activity[], thread: Message[]): Event[] {
 export default async function LeadPage({ params }: Params) {
   const business = await businessById((await params).id);
   if (!business) notFound();
-  const [settings, activity, thread, job, brand] = await Promise.all([outreachSettings(), activityFor(business.id), threadFor(business.id), activeJobFor(business.id), brandFilesFor(business.id)]);
+  const [activity, thread, job, brand] = await Promise.all([activityFor(business.id), threadFor(business.id), activeJobFor(business.id), brandFilesFor(business.id)]);
   const events = timeline(activity, thread);
-  const missingCheckout = Boolean(business.priceArm) && !checkoutLink(business, settings);
-  const build = <PreviewBuild lead={business} job={job} command={buildCommand(business, settings)} missingCheckout={missingCheckout} />;
+  const build = <PreviewBuild lead={business} job={job} command={buildCommand(business)} />;
 
   return (
     <>

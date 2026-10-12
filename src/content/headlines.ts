@@ -94,6 +94,22 @@ export const TEAM_NAMES: Record<"boris" | "brendan", Headline> = {
   brendan: { id: "name-brendan", lines: ["Brendan Giang"], typeface: "display", ink: INK, seed: 89 },
 };
 
+export const WELCOME: Headline = {
+  id: "make-it-live",
+  lines: ["let's make", "it live."],
+  typeface: "display",
+  ink: INK,
+  seed: 97,
+};
+
+export const SIGNED_UP: Headline = {
+  id: "youre-in",
+  lines: ["you're in."],
+  typeface: "display",
+  ink: VERMILION,
+  seed: 101,
+};
+
 export const ALL_HEADLINES: Headline[] = [
   WORDMARK,
   ...CONVERSATION,
@@ -102,6 +118,8 @@ export const ALL_HEADLINES: Headline[] = [
   CLOSING,
   TEAM_TITLE,
   ...Object.values(TEAM_NAMES),
+  WELCOME,
+  SIGNED_UP,
 ];
 
 export const SPEAKER_LABEL: Record<Speaker, string> = {

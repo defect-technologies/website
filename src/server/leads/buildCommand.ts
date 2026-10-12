@@ -1,19 +1,10 @@
 import "server-only";
-import type { OutreachSettings } from "@/lib/emailTemplate";
 import type { Business } from "../db/schema";
+import { welcomeLink } from "../outreach/compose";
 
 /** Single-quotes a value for a POSIX shell. Websites come from scraped pages, so they're never pasted in raw. */
 function shellQuote(value: string) {
   return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-/** The lead's Stripe payment link, tagged with its ID so the payment can be matched back to it. */
-export function checkoutLink(business: Business, settings: OutreachSettings): string {
-  const base = business.priceArm ? settings.checkoutLinks[String(business.priceArm) as "59" | "79"] : "";
-  if (!base) return "";
-  const url = new URL(base);
-  url.searchParams.set("client_reference_id", business.id);
-  return url.toString();
 }
 
 /** For a business with no website, what the builder works from instead of a crawl: build_preview.sh --brief. */
@@ -22,12 +13,12 @@ export function buildBrief(business: Business): string {
 }
 
 /** What to run in core/engine to build this lead's preview at its price, and report it back here. */
-export function buildCommand(business: Business, settings: OutreachSettings): string {
+export function buildCommand(business: Business): string {
   const price = business.priceArm ?? 59;
   const source = business.website ? shellQuote(business.website) : `--brief ${shellQuote(buildBrief(business))}`;
   return [
     `PRICE=${price}`,
-    `CHECKOUT_URL=${shellQuote(checkoutLink(business, settings))}`,
+    `CHECKOUT_URL=${shellQuote(welcomeLink(business))}`,
     "preview/build_preview.sh",
     source,
     business.slug,

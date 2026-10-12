@@ -31,6 +31,8 @@ export const env = {
   engineToken: () => optional("ENGINE_TOKEN"),
   cronSecret: () => optional("CRON_SECRET"),
   stripeKey: () => optional("STRIPE_API_KEY"),
+  /** Public by design: the welcome page loads Stripe's checkout form with it. */
+  stripePublishableKey: () => optional("STRIPE_PUBLISHABLE_KEY"),
   vercel: () => ({
     token: optional("VERCEL_TOKEN"),
     teamId: optional("VERCEL_TEAM_ID"),
