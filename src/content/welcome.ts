@@ -7,10 +7,10 @@
 export type Step = { title: string; detail: string };
 
 export const AFTER_SIGN_UP: Step[] = [
-  { title: "We email you within a business day", detail: "We'll ask for any corrections and where your domain is managed." },
-  { title: "We make your corrections", detail: "Then we send you the updated site to look over." },
-  { title: "We connect your domain", detail: "We change only the records for your website, so your email keeps working. If you'd rather not touch any settings, we can do it for you." },
-  { title: "Your site goes live", detail: "You get a sign-in for your portal, where you can edit the site and manage your plan." },
+  { title: "We email you within a business day", detail: "Tell us anything you'd like changed on the new site." },
+  { title: "We update your site", detail: "Then we send it back for you to look over." },
+  { title: "We set up your domain", detail: "We'll walk you through it, or do it for you." },
+  { title: "Your site goes live", detail: "Sign in to your portal at defect.tech to see your visits, edit your site and manage your plan." },
 ];
 
 export type Included = { title: string; detail: string };
@@ -28,11 +28,7 @@ export type Question = { question: string; answer: string };
 export const QUESTIONS: Question[] = [
   {
     question: "What if I don't like something on the new site?",
-    answer: "Tell us after you sign up and we'll change it before the site goes live. Corrections are part of getting set up.",
-  },
-  {
-    question: "Will my email keep working?",
-    answer: "Yes. We only change the domain records that point to your website. The records your email uses stay exactly as they are.",
+    answer: "Tell us after you sign up and we'll change it before the site goes live. It's all part of getting set up.",
   },
   {
     question: "Who owns the website?",

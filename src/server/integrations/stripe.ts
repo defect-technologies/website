@@ -144,6 +144,7 @@ export async function startWelcomeCheckout(business: Business, returnUrl: string
     "line_items[0][quantity]": "1",
     client_reference_id: business.id,
     allow_promotion_codes: "true",
+    "excluded_payment_method_types[0]": "klarna",
     "consent_collection[terms_of_service]": "required",
     "custom_text[terms_of_service_acceptance][message]": `I agree to the [Terms of Service](${new URL("/terms", env.siteUrl())}).`,
     "subscription_data[metadata][lead_id]": business.id,
