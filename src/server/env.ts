@@ -38,6 +38,11 @@ export const env = {
   }),
   healthchecksKey: () => optional("HEALTHCHECKS_API_KEY"),
   sitesDatabaseUrl: () => optional("SITES_DATABASE_URL"),
+  /**
+   * The defect-brand-files Blob store, connected to this project with the BRAND_FILES prefix. Never the client
+   * sites' shared store: that token can write every live site's images (defect-tech 02-system/image-storage.md).
+   */
+  brandFilesToken: () => optional("BRAND_FILES_READ_WRITE_TOKEN"),
   signInEmail: () => ({ apiKey: optional("SIGN_IN_EMAIL_API_KEY"), from: optional("SIGN_IN_EMAIL_FROM") }),
   /** Shared with every client site on site-kit, which checks the sign-in links we mint with it. */
   editorSecret: () => optional("EDITOR_SECRET"),

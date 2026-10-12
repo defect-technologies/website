@@ -2,12 +2,15 @@ import { ArrowLeft, ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import BrandFiles from "@/components/admin/BrandFiles";
 import LeadForm from "@/components/admin/LeadForm";
 import PreviewBuild from "@/components/admin/PreviewBuild";
 import PreviewThumb from "@/components/admin/PreviewThumb";
 import { ArmChip, Card, KeyValue, SectionHeading, StageChip, When } from "@/components/admin/ui";
 import { activityFor } from "@/server/activity";
 import type { Activity, Business, Message } from "@/server/db/schema";
+import { env } from "@/server/env";
+import { brandFilesFor } from "@/server/leads/brandFiles";
 import { buildCommand, checkoutLink } from "@/server/leads/buildCommand";
 import { businessById } from "@/server/leads/businesses";
 import { threadFor } from "@/server/mail/threads";
@@ -68,7 +71,7 @@ function timeline(activity: Activity[], thread: Message[]): Event[] {
 export default async function LeadPage({ params }: Params) {
   const business = await businessById((await params).id);
   if (!business) notFound();
-  const [settings, activity, thread, job] = await Promise.all([outreachSettings(), activityFor(business.id), threadFor(business.id), activeJobFor(business.id)]);
+  const [settings, activity, thread, job, brand] = await Promise.all([outreachSettings(), activityFor(business.id), threadFor(business.id), activeJobFor(business.id), brandFilesFor(business.id)]);
   const events = timeline(activity, thread);
   const missingCheckout = Boolean(business.priceArm) && !checkoutLink(business, settings);
   const build = <PreviewBuild lead={business} job={job} command={buildCommand(business, settings)} missingCheckout={missingCheckout} />;
@@ -90,6 +93,7 @@ export default async function LeadPage({ params }: Params) {
             <LeadForm business={business} />
           </Card>
           {business.stage !== "new" && build}
+          <BrandFiles leadId={business.id} files={brand} canUpload={Boolean(env.brandFilesToken())} />
         </div>
         <aside className="flex flex-col gap-6">
           <PreviewThumb url={business.previewUrl} name={business.businessName} />
