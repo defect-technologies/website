@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { record } from "../activity";
 import { db } from "../db/client";
@@ -36,6 +36,26 @@ async function threadToAnswer(lead: Business, mailboxId: string | null = null): 
   if (latest) return latest;
   if (mailboxId) return threadToAnswer(lead);
   throw new BotError(409, "This lead has no email thread to reply to yet.");
+}
+
+/**
+ * Once a client has an account, the Onboarding and Client care bots write to its email, which can
+ * differ from the address we cold-emailed: the latest message from or to it, like the welcome email.
+ */
+async function ownerThread(lead: Business): Promise<Message | null> {
+  const owner = lead.ownerEmail.trim().toLowerCase();
+  if (!owner) return null;
+  const involvesOwner = or(
+    and(eq(messages.direction, "in"), sql`lower(${messages.fromAddress}) = ${owner}`),
+    and(eq(messages.direction, "out"), sql`lower(${messages.toAddress}) = ${owner}`),
+  );
+  const [latest] = await (await db())
+    .select()
+    .from(messages)
+    .where(and(eq(messages.businessId, lead.id), isNotNull(messages.threadId), involvesOwner))
+    .orderBy(desc(messages.at))
+    .limit(1);
+  return latest ?? null;
 }
 
 function recipientOf(message: Message, lead: Business): string {
@@ -96,7 +116,8 @@ export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof
   const finePrinted = withSalesFinePrint(lead, text, await outreachSettings());
   if (!finePrinted.ok) throw new BotError(409, finePrinted.error);
   const body = finePrinted.body;
-  const answering = await threadToAnswer(lead, key.bot === "outreach" && lead.source !== "request" ? lead.mailboxId : null);
+  const outreach = key.bot === "outreach";
+  const answering = (!outreach && (await ownerThread(lead))) || (await threadToAnswer(lead, outreach && lead.source !== "request" ? lead.mailboxId : null));
   const to = recipientOf(answering, lead);
   const subject = replySubject(answering.subject);
   const sender = await senderFor(lead, answering);

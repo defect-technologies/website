@@ -85,7 +85,7 @@ function CheckoutArea({ business, code }: { business: Business; code: string }) 
       </Notice>
     );
   }
-  return <PlanCheckout code={code} publishableKey={publishableKey} />;
+  return <PlanCheckout code={code} publishableKey={publishableKey} suggestedEmail={business.ownerEmail || business.email} />;
 }
 
 export default async function WelcomePage({ params }: Props) {

@@ -73,7 +73,8 @@ async function markPaid(session: CheckoutSession, business: Business) {
       plan: planFor(session.amount_total),
       stripeCustomerId: session.customer,
       stripeSubscriptionId: session.subscription,
-      ownerEmail: business.ownerEmail || payerEmail,
+      // The welcome page asks for the account email before checkout, so the payer's email is the owner's.
+      ownerEmail: payerEmail || business.ownerEmail,
       updatedAt: new Date(),
     })
     .where(and(eq(businesses.id, business.id), isNull(businesses.paidAt)))
@@ -132,11 +133,10 @@ export function monthlyPriceOf(business: Business) {
 
 /**
  * A checkout for the welcome page, embedded in it, tagged with the lead's ID so the payment is
- * matched back to it. Returns the client secret the page mounts Stripe's form with.
+ * matched back to it. The account email the owner chose fills Stripe's email field. Returns the client secret the page mounts Stripe's form with.
  */
-export async function startWelcomeCheckout(business: Business, returnUrl: string): Promise<string> {
+export async function startWelcomeCheckout(business: Business, returnUrl: string, accountEmail: string): Promise<string> {
   if (!env.stripeKey()) throw new Error("STRIPE_API_KEY isn't set.");
-  const email = business.ownerEmail || business.email;
   const created = await stripePost<{ client_secret: string }>("/checkout/sessions", {
     ui_mode: "embedded_page",
     mode: "subscription",
@@ -149,7 +149,7 @@ export async function startWelcomeCheckout(business: Business, returnUrl: string
     "custom_text[terms_of_service_acceptance][message]": `I agree to the [Terms of Service](${new URL("/terms", env.siteUrl())}).`,
     "subscription_data[metadata][lead_id]": business.id,
     return_url: returnUrl,
-    ...(email ? { customer_email: email } : {}),
+    customer_email: accountEmail,
   });
   if (!created.ok) throw new Error(`Stripe refused the checkout: ${created.body.error?.message ?? "no reason given"}`);
   return created.body.client_secret;
