@@ -121,6 +121,11 @@ async function launchedUrl(lead: Business): Promise<string> {
   return result.liveUrl;
 }
 
+/** A change waiting for the owner's review: one part of the site, what it would become, and our notes. */
+type ProposalView = { part: string; label: string; document: unknown; notes: string; proposedBy: string; updatedAt: string };
+
+type EditorReply = { ok: boolean; message: string; issues?: unknown; proposed?: unknown; proposals?: ProposalView[] };
+
 async function callEditor(key: BotKey, lead: Business, request: unknown) {
   const response = await fetch(new URL("/edit/api", await launchedUrl(lead)), {
     method: "POST",
@@ -128,7 +133,7 @@ async function callEditor(key: BotKey, lead: Business, request: unknown) {
     body: JSON.stringify(request),
     signal: AbortSignal.timeout(20_000),
   });
-  const reply = (await response.json().catch(() => null)) as { ok: boolean; message: string; issues?: unknown; draft?: unknown; pending?: string[] } | null;
+  const reply = (await response.json().catch(() => null)) as EditorReply | null;
   if (!reply) throw new BotError(502, `The live site answered ${response.status} without a result. Try again on the next run.`);
   return reply;
 }
@@ -140,27 +145,27 @@ export async function readContent(key: BotKey, id: string) {
   const reply = await callEditor(key, lead, { action: "read" });
   if (!reply.ok) throw new BotError(502, reply.message);
   return {
-    content: reply.draft,
-    pending: reply.pending ?? [],
-    keys: "Change one with POST /leads/<id>/content: key is theme, module:<name> (like module:hours) or page:<path> (like page:/ or page:/about), and document is the whole new value for that key. Changes wait for the owner's review; pending lists the ones waiting.",
+    content: reply.proposed,
+    waiting: reply.proposals ?? [],
+    keys: "Change one part with POST /leads/<id>/content: key is theme, module:<name> (like module:hours) or page:<path> (like page:/ or page:/about), document is the whole new value for that part, and notes says in a sentence what changed. content is what's live plus every change still waiting for the owner's review (listed in waiting), so build on it. The owner's own unpublished edits are never in it.",
   };
 }
 
-export const ContentBody = z.object({ key: z.string().trim().min(1).max(200), document: z.unknown() });
+export const ContentBody = z.object({ key: z.string().trim().min(1).max(200), document: z.unknown(), notes: z.string().trim().max(500).optional() });
 
-/** Every change is saved as a draft: it goes live only once the owner approves it. */
-function editorRequest(key: string, document: unknown) {
-  if (key === "theme") return { action: "saveTheme", theme: document, publish: false };
-  if (key.startsWith("module:")) return { action: "saveModule", module: key.slice("module:".length), data: document, publish: false };
-  if (key.startsWith("page:")) return { action: "savePage", path: key.slice("page:".length), page: document, publish: false };
-  throw new BotError(400, `"${key}" isn't a content key. Use theme, module:<name> or page:<path>.`);
+const PART = /^(theme|module:[a-zA-Z]+|page:\/[a-z0-9/-]*)$/;
+
+/** Every change is a proposal: it waits apart from the owner's own edits and goes live only once they approve it. */
+function editorRequest({ key, document, notes }: z.infer<typeof ContentBody>) {
+  if (!PART.test(key)) throw new BotError(400, `"${key}" isn't a content key. Use theme, module:<name> or page:<path>.`);
+  return { action: "propose", part: key, document, notes };
 }
 
 /** POST /leads/:id/content: saves one changed document for the owner's review, through the site's own editor checks. */
 export async function changeContent(key: BotKey, id: string, body: z.infer<typeof ContentBody>) {
   requireBot(key, ["client_care"], "change live sites");
   const lead = await ownedLead(key, id);
-  const reply = await callEditor(key, lead, editorRequest(body.key, body.document));
+  const reply = await callEditor(key, lead, editorRequest(body));
   if (!reply.ok) throw new BotError(422, `${reply.message} ${JSON.stringify(reply.issues ?? [])}`);
   return { ok: true, message: `${reply.message} It isn't live yet: send the owner a review link (POST /leads/<id>/review-link).` };
 }
@@ -191,15 +196,24 @@ async function designWaiting(lead: Business): Promise<boolean> {
   return !launch?.finishedAt || build.finishedAt > launch.finishedAt;
 }
 
-/** POST /leads/:id/publish: once the owner approves by email, puts their waiting content changes live and launches any rebuilt design. */
+/** POST /leads/:id/publish: once the owner approves by email, puts our waiting changes live and launches any rebuilt design. The owner's own unpublished edits stay theirs. */
 export async function publishChanges(key: BotKey, id: string) {
   requireBot(key, ["client_care"], "publish changes");
   const lead = await ownedLead(key, id);
-  const reply = await callEditor(key, lead, { action: "publishDrafts" });
+  const reply = await callEditor(key, lead, { action: "applyProposal" });
   if (!reply.ok) throw new BotError(502, reply.message);
   if (!(await designWaiting(lead))) return { ok: true, message: reply.message, relaunching: false };
   await requestPreview(lead, actorOf(key), "Publish the design changes the owner approved.", "launch");
   return { ok: true, message: `${reply.message} The rebuilt design is going live: check launch.status.`, relaunching: true };
+}
+
+/** POST /leads/:id/discard-changes: drops our waiting changes when the owner turns them down. Nothing on the site changes. */
+export async function discardChanges(key: BotKey, id: string) {
+  requireBot(key, ["client_care"], "drop waiting changes");
+  const lead = await ownedLead(key, id);
+  const reply = await callEditor(key, lead, { action: "discardProposal" });
+  if (!reply.ok) throw new BotError(502, reply.message);
+  return { ok: true, message: reply.message };
 }
 
 /** POST /leads/:id/billing-link: a one-time Stripe page where the client updates their card, sees invoices, switches plans or cancels. */
