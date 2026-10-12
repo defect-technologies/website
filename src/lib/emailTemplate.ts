@@ -32,7 +32,6 @@ export type OutreachSettings = {
   requestEmail: string;
   senderName: string;
   mailingAddress: string;
-  checkoutLinks: { "59": string; "79": string };
   dailyLimit: number;
   followUpAfterDays: number;
 };
@@ -79,7 +78,6 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
   ].join("\n"),
   senderName: "Brendan Giang",
   mailingAddress: "",
-  checkoutLinks: { "59": "", "79": "" },
   dailyLimit: 10,
   followUpAfterDays: 4,
 };

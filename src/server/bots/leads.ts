@@ -2,23 +2,20 @@ import "server-only";
 import { and, asc, desc, eq, ilike, inArray, notInArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { BOT_LABEL, canMove, ownerOfStage, type Bot } from "@/lib/bots";
-import type { OutreachSettings } from "@/lib/emailTemplate";
 import { STAGES, type Stage } from "@/lib/stages";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { activity, businesses, messages, type Business, type BotKey } from "../db/schema";
 import { businessById, optOut, updateBusiness } from "../leads/businesses";
 import { domainFacts } from "../integrations/domain";
-import { checkoutLink } from "../leads/buildCommand";
-import { previewLink } from "../outreach/compose";
-import { outreachSettings } from "../settings";
+import { previewLink, welcomeLink } from "../outreach/compose";
 import { actorOf, BotError } from "./http";
 import { buildAndLaunchState } from "./sites";
 
 const NOTE_ACTIONS = ["note", "handoff note"];
 
 /** What a bot sees of a lead. Stripe IDs and internal codes stay out. */
-function leadView(lead: Business, settings: OutreachSettings) {
+function leadView(lead: Business) {
   return {
     id: lead.id,
     slug: lead.slug,
@@ -33,7 +30,8 @@ function leadView(lead: Business, settings: OutreachSettings) {
     /** The link to put in emails: counts the click and forwards to previewUrl. */
     previewLink: lead.previewUrl ? previewLink(lead) : "",
     previewUrl: lead.previewUrl,
-    checkoutUrl: checkoutLink(lead, settings),
+    /** The owner's welcome page: how it works, what's included, and checkout. Send it when they want to go ahead. */
+    welcomeLink: welcomeLink(lead),
     siteUrl: lead.siteUrl,
     /** Set by a founder when the site launches somewhere other than the old website's domain. */
     launchDomain: lead.launchDomain,
@@ -86,7 +84,7 @@ async function ownedElsewhere(key: BotKey, query: z.infer<typeof LeadQuery>) {
 }
 
 export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
-  const [rows, elsewhere, settings] = await Promise.all([
+  const [rows, elsewhere] = await Promise.all([
     (await db())
       .select()
       .from(businesses)
@@ -94,9 +92,8 @@ export async function listLeads(key: BotKey, query: z.infer<typeof LeadQuery>) {
       .orderBy(desc(businesses.updatedAt))
       .limit(100),
     ownedElsewhere(key, query),
-    outreachSettings(),
   ]);
-  return { leads: rows.map((row) => leadView(row, settings)), ownedByOtherBots: elsewhere };
+  return { leads: rows.map((row) => leadView(row)), ownedByOtherBots: elsewhere };
 }
 
 /** The lead, if it exists and sits in one of this bot's stages. */
@@ -110,19 +107,18 @@ export async function ownedLead(key: BotKey, id: string): Promise<Business> {
 export async function leadDetail(key: BotKey, id: string) {
   const lead = await ownedLead(key, id);
   const database = await db();
-  const [thread, history, settings, domain] = await Promise.all([
+  const [thread, history, domain] = await Promise.all([
     database
       .select({ direction: messages.direction, from: messages.fromAddress, to: messages.toAddress, subject: messages.subject, body: messages.body, at: messages.at })
       .from(messages)
       .where(eq(messages.businessId, id))
       .orderBy(asc(messages.at)),
     database.select().from(activity).where(eq(activity.businessId, id)).orderBy(desc(activity.at)).limit(50),
-    outreachSettings(),
     domainFacts(lead.website),
   ]);
   const notes = history.filter((entry) => NOTE_ACTIONS.includes(entry.action)).map(({ at, actor, action, detail }) => ({ at, by: actor, handoff: action === "handoff note", text: detail }));
   const builds = await buildAndLaunchState(lead);
-  return { lead: leadView(lead, settings), domain, ...builds, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
+  return { lead: leadView(lead), domain, ...builds, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
 }
 
 export const NoteBody = z.object({ text: z.string().trim().min(1).max(4000), handoff: z.boolean().default(false) });

@@ -11,6 +11,13 @@ export async function businessById(id: string): Promise<Business | null> {
   return row ?? null;
 }
 
+/** The lead behind a preview or welcome link. Codes are random, so a miss is just a wrong link. */
+export async function businessByLinkCode(code: string): Promise<Business | null> {
+  if (!/^[a-z0-9]{4,32}$/i.test(code)) return null;
+  const [row] = await (await db()).select().from(businesses).where(eq(businesses.linkCode, code));
+  return row ?? null;
+}
+
 /** Moves a lead forward to `stage`, and never backward: a late click can't undo a reply. */
 export async function advanceStage(id: string, stage: Stage) {
   const earlier = stagesBefore(stage);

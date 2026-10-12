@@ -12,9 +12,9 @@ import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { brandFilesFor } from "../leads/brandFiles";
-import { buildBrief, checkoutLink } from "../leads/buildCommand";
+import { buildBrief } from "../leads/buildCommand";
+import { welcomeLink } from "../outreach/compose";
 import { updateBusiness } from "../leads/businesses";
-import { outreachSettings } from "../settings";
 import { maybePickForSpotCheck } from "../spotChecks";
 import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
@@ -94,7 +94,7 @@ export async function claimNext(key: BotKey, request: Request) {
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
-  return jobPayload(job, lead, checkoutLink(lead, await outreachSettings()), await brandFilesFor(lead.id));
+  return jobPayload(job, lead, welcomeLink(lead), await brandFilesFor(lead.id));
 }
 
 async function claimedJob(id: string): Promise<PreviewJob> {

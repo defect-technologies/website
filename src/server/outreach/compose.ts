@@ -15,6 +15,11 @@ export function previewLink(business: Business) {
   return new URL(`/p/${business.linkCode}`, env.siteUrl()).toString();
 }
 
+/** Where an owner who wants to go ahead learns how it works and signs up: the video, what's included and checkout. */
+export function welcomeLink(business: Business) {
+  return new URL(`/welcome/${business.linkCode}`, env.siteUrl()).toString();
+}
+
 export function templateValues(business: Business, settings: OutreachSettings, problem = business.emailProblem): TemplateValues {
   return {
     first_name: business.ownerFirstName || "there",
