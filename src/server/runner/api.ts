@@ -94,7 +94,8 @@ export async function claimNext(key: BotKey, request: Request) {
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
-  return jobPayload(job, lead, welcomeLink(lead), await brandFilesFor(lead.id));
+  // A client who has paid already has their plan, so their previews carry no "Make it live" button.
+  return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id));
 }
 
 async function claimedJob(id: string): Promise<PreviewJob> {
@@ -176,9 +177,8 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   else await maybePickForSpotCheck(lead, body.previewUrl, job.id, ACTOR);
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
-  await record(ACTOR, "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
-  // A launched site's changes go live by launching again: the same project, redeployed.
-  if (lead.vercelProjectId) await requestPreview(lead, ACTOR, "Redeploy with the changes just built.", "launch");
+  // A launched site's rebuilt design waits for the owner's OK; the Client care bot publishes it by launching again.
+  await record(ACTOR, lead.vercelProjectId ? "built changes for the owner to review" : "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
 }
 
 /** The address the site answers on once the owner connects their domain, or the Vercel one until then. */

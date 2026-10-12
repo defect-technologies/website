@@ -13,6 +13,9 @@ import { ownedLead } from "./leads";
 const SESSION_COOKIE = "defect_editor";
 const SESSION_TYPE = "editor-session";
 const SESSION_SECONDS = 5 * 60;
+/** site-kit's review link: shows the owner their site's unpublished changes and lets them publish those. */
+const REVIEW_TYPE = "review";
+const REVIEW_DAYS = 14;
 const VERCEL_A = "76.76.21.21";
 const LOOKUP_TIMEOUT_MS = 4000;
 
@@ -22,7 +25,7 @@ function requireBot(key: BotKey, bots: string[], what: string) {
 
 export const CorrectionsBody = z.object({ request: z.string().trim().min(1).max(4000) });
 
-/** POST /leads/:id/corrections: rebuilds the preview with the client's words as the note. A launched site redeploys after. */
+/** POST /leads/:id/corrections: rebuilds the preview with the client's words as the note. A launched site goes live again only through POST /leads/:id/publish. */
 export async function requestCorrections(key: BotKey, id: string, body: z.infer<typeof CorrectionsBody>) {
   requireBot(key, ["onboarding", "client_care"], "send corrections to the builder");
   const lead = await ownedLead(key, id);
@@ -110,17 +113,22 @@ async function editorCookie(lead: Business, actor: string): Promise<string> {
 /** The kit's actor pattern allows letters, digits and dashes after bot:. */
 const editorActor = (key: BotKey) => `bot:${key.bot.replace(/_/g, "-")}`;
 
-async function callEditor(key: BotKey, lead: Business, request: unknown) {
+/** The launched site's own vercel.app address, which answers even before the owner's domain points at it. */
+async function launchedUrl(lead: Business): Promise<string> {
   const launch = await latestJob(lead.id, "launch");
   const result = (launch?.status === "done" ? launch.result : null) as LaunchResult | null;
   if (!result) throw new BotError(409, "This site hasn't launched, so there's no live content to read or change.");
-  const response = await fetch(new URL("/edit/api", result.liveUrl), {
+  return result.liveUrl;
+}
+
+async function callEditor(key: BotKey, lead: Business, request: unknown) {
+  const response = await fetch(new URL("/edit/api", await launchedUrl(lead)), {
     method: "POST",
     headers: { "content-type": "application/json", cookie: await editorCookie(lead, editorActor(key)) },
     body: JSON.stringify(request),
     signal: AbortSignal.timeout(20_000),
   });
-  const reply = (await response.json().catch(() => null)) as { ok: boolean; message: string; issues?: unknown; draft?: unknown } | null;
+  const reply = (await response.json().catch(() => null)) as { ok: boolean; message: string; issues?: unknown; draft?: unknown; pending?: string[] } | null;
   if (!reply) throw new BotError(502, `The live site answered ${response.status} without a result. Try again on the next run.`);
   return reply;
 }
@@ -131,25 +139,67 @@ export async function readContent(key: BotKey, id: string) {
   const lead = await ownedLead(key, id);
   const reply = await callEditor(key, lead, { action: "read" });
   if (!reply.ok) throw new BotError(502, reply.message);
-  return { content: reply.draft, keys: "Change one with POST /leads/<id>/content: key is theme, module:<name> (like module:hours) or page:<path> (like page:/ or page:/about), and document is the whole new value for that key." };
+  return {
+    content: reply.draft,
+    pending: reply.pending ?? [],
+    keys: "Change one with POST /leads/<id>/content: key is theme, module:<name> (like module:hours) or page:<path> (like page:/ or page:/about), and document is the whole new value for that key. Changes wait for the owner's review; pending lists the ones waiting.",
+  };
 }
 
 export const ContentBody = z.object({ key: z.string().trim().min(1).max(200), document: z.unknown() });
 
+/** Every change is saved as a draft: it goes live only once the owner approves it. */
 function editorRequest(key: string, document: unknown) {
-  if (key === "theme") return { action: "saveTheme", theme: document };
-  if (key.startsWith("module:")) return { action: "saveModule", module: key.slice("module:".length), data: document };
-  if (key.startsWith("page:")) return { action: "savePage", path: key.slice("page:".length), page: document, publish: true };
+  if (key === "theme") return { action: "saveTheme", theme: document, publish: false };
+  if (key.startsWith("module:")) return { action: "saveModule", module: key.slice("module:".length), data: document, publish: false };
+  if (key.startsWith("page:")) return { action: "savePage", path: key.slice("page:".length), page: document, publish: false };
   throw new BotError(400, `"${key}" isn't a content key. Use theme, module:<name> or page:<path>.`);
 }
 
-/** POST /leads/:id/content: publishes one changed document through the site's own editor checks. */
+/** POST /leads/:id/content: saves one changed document for the owner's review, through the site's own editor checks. */
 export async function changeContent(key: BotKey, id: string, body: z.infer<typeof ContentBody>) {
   requireBot(key, ["client_care"], "change live sites");
   const lead = await ownedLead(key, id);
   const reply = await callEditor(key, lead, editorRequest(body.key, body.document));
   if (!reply.ok) throw new BotError(422, `${reply.message} ${JSON.stringify(reply.issues ?? [])}`);
-  return { ok: true, message: reply.message };
+  return { ok: true, message: `${reply.message} It isn't live yet: send the owner a review link (POST /leads/<id>/review-link).` };
+}
+
+/** POST /leads/:id/review-link: a link, good for 14 days, where the owner sees the waiting changes on their site and can publish them. */
+export async function reviewLink(key: BotKey, id: string) {
+  requireBot(key, ["client_care"], "send review links");
+  const lead = await ownedLead(key, id);
+  const secret = env.editorSecret();
+  if (!secret) throw new BotError(503, "EDITOR_SECRET isn't set on the admin, so review links can't be made yet.");
+  const owner = lead.ownerEmail || lead.email;
+  if (!owner) throw new BotError(409, "This client has no owner email on file, so a review link can't name who approves. Flag it for a founder.");
+  const token = await new SignJWT({ site: lead.slug, typ: REVIEW_TYPE })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(owner)
+    .setIssuedAt()
+    .setExpirationTime(`${REVIEW_DAYS}d`)
+    .sign(new TextEncoder().encode(secret));
+  const url = new URL("/edit/review", lead.siteUrl || (await launchedUrl(lead)));
+  url.searchParams.set("token", token);
+  return { url: url.toString(), expiresInDays: REVIEW_DAYS };
+}
+
+/** A design change built since the site last launched, waiting for the owner's OK. */
+async function designWaiting(lead: Business): Promise<boolean> {
+  const [build, launch] = await Promise.all([latestJob(lead.id, "preview"), latestJob(lead.id, "launch")]);
+  if (build?.status !== "done" || !build.finishedAt) return false;
+  return !launch?.finishedAt || build.finishedAt > launch.finishedAt;
+}
+
+/** POST /leads/:id/publish: once the owner approves by email, puts their waiting content changes live and launches any rebuilt design. */
+export async function publishChanges(key: BotKey, id: string) {
+  requireBot(key, ["client_care"], "publish changes");
+  const lead = await ownedLead(key, id);
+  const reply = await callEditor(key, lead, { action: "publishDrafts" });
+  if (!reply.ok) throw new BotError(502, reply.message);
+  if (!(await designWaiting(lead))) return { ok: true, message: reply.message, relaunching: false };
+  await requestPreview(lead, actorOf(key), "Publish the design changes the owner approved.", "launch");
+  return { ok: true, message: `${reply.message} The rebuilt design is going live: check launch.status.`, relaunching: true };
 }
 
 /** POST /leads/:id/billing-link: a one-time Stripe page where the client updates their card, sees invoices, switches plans or cancels. */
