@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { linksAsPlainText } from "@/lib/emailMarkup";
 
 export type Address = { name: string; email: string };
 
@@ -54,12 +55,13 @@ const BASE64_TEXT = (type: "plain" | "html") => [`Content-Type: text/${type}; ch
 
 /** The body headers and content: plain text alone, or plain text and HTML as alternatives. */
 function bodyParts(email: OutgoingEmail): { headers: string[]; content: string } {
-  if (!email.html) return { headers: BASE64_TEXT("plain"), content: wrapBase64(email.body) };
+  const plain = linksAsPlainText(email.body);
+  if (!email.html) return { headers: BASE64_TEXT("plain"), content: wrapBase64(plain) };
   const boundary = `defect-${randomUUID()}`;
   const part = (type: "plain" | "html", text: string) => `--${boundary}\r\n${BASE64_TEXT(type).join("\r\n")}\r\n\r\n${wrapBase64(text)}`;
   return {
     headers: [`Content-Type: multipart/alternative; boundary="${boundary}"`],
-    content: [part("plain", email.body), part("html", email.html), `--${boundary}--`].join("\r\n"),
+    content: [part("plain", plain), part("html", email.html), `--${boundary}--`].join("\r\n"),
   };
 }
 
