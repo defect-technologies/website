@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowCounterClockwise, Check, CheckCircle, FloppyDisk, PaperPlaneTilt, PencilSimple, PencilSimpleLine, Plus } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Check, CheckCircle, FloppyDisk, LinkSimple, PaperPlaneTilt, PencilSimple, PencilSimpleLine, Plus } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition, type ReactNode } from "react";
+import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { discardDraft, saveDraft, sendFromQueue, skipFromQueue, undoSkip } from "@/app/admin/(panel)/outreachActions";
 import type { EmailDraft } from "@/lib/emailDraft";
+import { withLinkMarkup } from "@/lib/emailMarkup";
 import { asClause, fillTemplate, type TemplateValues } from "@/lib/emailTemplate";
 import type { Business } from "@/server/db/schema";
 import type { EmailKind } from "@/server/outreach/compose";
@@ -213,13 +214,22 @@ function CopyFields(props: EditorProps) {
   );
 }
 
-function EmailEditor({ id, edits, onChange }: EditorProps) {
+function BodyField({ id, edits, onChange }: EditorProps) {
+  const area = useRef<HTMLTextAreaElement>(null);
+  const addLink = () => {
+    const element = area.current;
+    if (!element) return;
+    const { text, select } = withLinkMarkup(element.value, element.selectionStart, element.selectionEnd);
+    onChange("body", text);
+    requestAnimationFrame(() => {
+      element.focus();
+      element.setSelectionRange(...select);
+    });
+  };
   return (
-    <div className="bg-paper flex flex-col gap-4 rounded-xl p-4 sm:p-5">
-      <AddressField id={id} edits={edits} onChange={onChange} field="to" label="To" hint="Separate several addresses with commas." />
-      <CopyFields id={id} edits={edits} onChange={onChange} />
-      <TextField id={`${id}-subject`} label="Subject" value={edits.subject} onChange={(event) => onChange("subject", event.target.value)} />
+    <>
       <TextAreaField
+        ref={area}
         id={`${id}-body`}
         label="Email"
         rows={12}
@@ -227,6 +237,22 @@ function EmailEditor({ id, edits, onChange }: EditorProps) {
         onChange={(event) => onChange("body", event.target.value)}
         className="field-sizing-content leading-relaxed"
       />
+      <div className="-mt-2">
+        <Button size="sm" variant="ghost" onClick={addLink} icon={<LinkSimple size={16} weight="bold" aria-hidden="true" />}>
+          Add link
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function EmailEditor({ id, edits, onChange }: EditorProps) {
+  return (
+    <div className="bg-paper flex flex-col gap-4 rounded-xl p-4 sm:p-5">
+      <AddressField id={id} edits={edits} onChange={onChange} field="to" label="To" hint="Separate several addresses with commas." />
+      <CopyFields id={id} edits={edits} onChange={onChange} />
+      <TextField id={`${id}-subject`} label="Subject" value={edits.subject} onChange={(event) => onChange("subject", event.target.value)} />
+      <BodyField id={id} edits={edits} onChange={onChange} />
     </div>
   );
 }

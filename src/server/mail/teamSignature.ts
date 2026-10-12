@@ -5,6 +5,7 @@ import "server-only";
  * defect-tech/02-system/email-signature.html: inline styles and a hosted PNG, because
  * mail apps drop <style> blocks and Gmail won't show SVG.
  */
+import { linkParts } from "@/lib/emailMarkup";
 import { TEAM_SIGN_OFF } from "@/lib/teamSignOff";
 
 export const TEAM_SIGNATURE_TEXT = TEAM_SIGN_OFF;
@@ -40,19 +41,27 @@ export function signatureHtml({ name, line, email }: Signer): string {
 
 export const TEAM_SIGNATURE_HTML = signatureHtml(TEAM);
 
+/** Escaped text with [words](address) turned into links and line breaks kept. */
+function inlineHtml(text: string): string {
+  return linkParts(text)
+    .map(({ text: words, href }) => (href ? `<a href="${escapeHtml(href)}" style="color:${INK};text-decoration:underline;">${escapeHtml(words)}</a>` : escapeHtml(words)))
+    .join("")
+    .replace(/\n/g, "<br>");
+}
+
 function paragraphsHtml(text: string): string {
   return text
     .trim()
     .split(/\n{2,}/)
     .filter(Boolean)
-    .map((paragraph) => `<p style="margin:0 0 16px;">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .map((paragraph) => `<p style="margin:0 0 16px;">${inlineHtml(paragraph)}</p>`)
     .join("");
 }
 
 function finePrintHtml(lines: string[]): string {
   const text = lines.join("\n").trim();
   if (!text) return "";
-  return `<p style="margin:16px 0 0;font-size:12px;line-height:18px;color:${INK_FAINT};">${escapeHtml(text).replace(/\n/g, "<br>")}</p>`;
+  return `<p style="margin:16px 0 0;font-size:12px;line-height:18px;color:${INK_FAINT};">${inlineHtml(text)}</p>`;
 }
 
 function wrap(inner: string): string {

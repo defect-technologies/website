@@ -1,5 +1,5 @@
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 const CONTROL =
   "bg-surface border-ink/15 w-full rounded-lg border px-3 py-2 text-base text-ink placeholder:text-ink-faint focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ink/20";
@@ -44,7 +44,7 @@ export function TextField({ label, hint, error, id, name, className = "", ...res
   );
 }
 
-export function TextAreaField({ label, hint, error, id, name, className = "", ...rest }: Labelled & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextAreaField({ label, hint, error, id, name, className = "", ...rest }: Labelled & ComponentProps<"textarea">) {
   const fieldId = id ?? name ?? label;
   return (
     <FieldShell label={label} hint={hint} error={error} htmlFor={fieldId}>
