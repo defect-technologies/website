@@ -1,6 +1,6 @@
 "use client";
 
-import { AddressBook, Browsers, ChatsCircle, Eye, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, Tray, type Icon } from "@phosphor-icons/react";
+import { AddressBook, Browsers, ChatsCircle, Eye, Flag, Gauge, PaperPlaneTilt, PencilSimpleLine, Receipt, Robot, Table, Tray, VideoCamera, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
@@ -28,6 +28,7 @@ export default function AdminNav({ counts }: { counts: { outreach: number; reque
     { href: "/admin/expenses", label: "Expenses", icon: Receipt },
     { href: "/admin/bots", label: "Bots", icon: Robot },
     { href: "/admin/template", label: "Template", icon: PencilSimpleLine },
+    { href: "/admin/video", label: "Video", icon: VideoCamera },
   ];
 
   return (
