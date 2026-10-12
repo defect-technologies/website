@@ -6,6 +6,8 @@ import SiteNav from "@/components/SiteNav";
 import SectionHeading from "@/components/welcome/SectionHeading";
 import SignUpSteps from "@/components/welcome/SignUpSteps";
 import { SIGNED_UP } from "@/content/headlines";
+import { afterSignUp } from "@/content/welcome";
+import { launchDomainOf } from "@/server/integrations/domain";
 import { finishWelcomeCheckout } from "@/server/integrations/stripe";
 import { businessByLinkCode } from "@/server/leads/businesses";
 
@@ -33,7 +35,7 @@ export default async function SignedUpPage({ params, searchParams }: Props) {
         </div>
         <section className="flex flex-col gap-10" aria-labelledby="next">
           <SectionHeading id="next">What happens next</SectionHeading>
-          <SignUpSteps current={0} />
+          <SignUpSteps steps={afterSignUp(launchDomainOf(business))} current={0} />
         </section>
       </main>
       <SiteFooter />
