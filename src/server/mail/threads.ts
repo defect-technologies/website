@@ -6,6 +6,8 @@ import type { Founder } from "../auth/session";
 import { db } from "../db/client";
 import { businesses, messages, type Business, type Message } from "../db/schema";
 import { businessById, updateBusiness } from "../leads/businesses";
+import { withSalesFinePrint } from "../outreach/finePrint";
+import { outreachSettings } from "../settings";
 import { deliver } from "./outbox";
 
 export type ThreadSummary = {
@@ -86,6 +88,8 @@ export async function sendReply(businessId: string, body: string, founder: Found
   if (!business) return { ok: false, error: "That business no longer exists." };
   if (!body.trim()) return { ok: false, error: "Write something first." };
   if (business.stage === "opted_out") return { ok: false, error: "They opted out. Nothing more can be sent to them." };
+  const finePrinted = withSalesFinePrint(business, body.trim(), await outreachSettings());
+  if (!finePrinted.ok) return finePrinted;
   const thread = await threadFor(businessId);
   const last = thread.at(-1);
   try {
@@ -94,7 +98,7 @@ export async function sendReply(businessId: string, body: string, founder: Found
         from: { name: founder.name, email: from?.email ?? "outbox@dev.localhost" },
         to: replyAddress(thread, business),
         subject: replySubject(thread, business),
-        body: body.trim(),
+        body: finePrinted.body,
         threadId: last?.threadId ?? business.threadId,
         inReplyTo: last?.headerMessageId || null,
       }),
