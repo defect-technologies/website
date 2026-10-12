@@ -6,6 +6,7 @@ import { db } from "../db/client";
 import { businesses, settings, type Business } from "../db/schema";
 import { env } from "../env";
 import { advanceStage, businessById } from "../leads/businesses";
+import { openPortal } from "../sites/clientSites";
 import { sendWelcome } from "../onboarding/welcome";
 import { getJson, integration } from "./result";
 
@@ -80,6 +81,7 @@ async function markPaid(session: CheckoutSession, business: Business) {
     .where(and(eq(businesses.id, business.id), isNull(businesses.paidAt)))
     .returning({ id: businesses.id });
   if (claimed.length === 0) return;
+  await openPortal(business, payerEmail || business.ownerEmail, "stripe sync");
   await advanceStage(business.id, "paid");
   await record("stripe sync", "paid", { businessId: business.id, detail: planFor(session.amount_total) });
   await sendWelcome(business, payerEmail || business.ownerEmail || business.email);

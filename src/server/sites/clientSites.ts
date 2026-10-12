@@ -1,7 +1,7 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { db, type Db } from "../db/client";
-import { businesses, clientSites, type ClientSite } from "../db/schema";
+import { businesses, clientSites, type Business, type ClientSite } from "../db/schema";
 
 export type ClientSiteRow = ClientSite & { businessName: string | null };
 
@@ -27,19 +27,22 @@ export async function clientSite(slug: string): Promise<ClientSiteRow | null> {
   return row ?? null;
 }
 
-export type OwnerSite = ClientSiteRow & { stripeCustomerId: string | null; vercelProjectId: string | null };
+export type OwnerSite = ClientSiteRow & { stripeCustomerId: string | null; vercelProjectId: string | null; launchedAt: Date | null };
+
+/** A client's account exists from the moment they pay; their website is live once it launches. A site added by hand has no lead and is live. */
+export const isLive = (site: Pick<OwnerSite, "businessId" | "launchedAt">) => !site.businessId || Boolean(site.launchedAt);
 
 /** The sites an owner sees in their portal, with what the portal needs to name them, open billing and read analytics. */
 export async function sitesForOwner(email: string): Promise<OwnerSite[]> {
   return (await db())
-    .select({ ...withBusiness, stripeCustomerId: businesses.stripeCustomerId, vercelProjectId: businesses.vercelProjectId })
+    .select({ ...withBusiness, stripeCustomerId: businesses.stripeCustomerId, vercelProjectId: businesses.vercelProjectId, launchedAt: businesses.launchedAt })
     .from(clientSites)
     .leftJoin(businesses, eq(clientSites.businessId, businesses.id))
     .where(eq(clientSites.ownerEmail, email.trim().toLowerCase()))
     .orderBy(asc(clientSites.slug));
 }
 
-/** Every live site with the Vercel project its launch recorded, for counting analytics across all of them. */
+/** Every live site with the Vercel project its launch recorded, for counting analytics across all of them. Accounts whose website hasn't launched have no analytics yet. */
 export type SiteWithProject = {
   slug: string;
   url: string;
@@ -63,7 +66,14 @@ export async function sitesWithProjects(): Promise<SiteWithProject[]> {
     })
     .from(clientSites)
     .leftJoin(businesses, eq(clientSites.businessId, businesses.id))
+    .where(or(isNull(clientSites.businessId), isNotNull(businesses.launchedAt)))
     .orderBy(asc(clientSites.slug));
+}
+
+/** Opens a client's portal when they pay, before their website is live, at its preview's address until the launch replaces it. */
+export async function openPortal(business: Business, ownerEmail: string, createdBy: string) {
+  if (!ownerEmail || !business.previewUrl) return null;
+  return addClientSite({ slug: business.slug, ownerEmail, url: business.previewUrl, businessId: business.id, createdBy });
 }
 
 export async function clientSitesOwnedBy(email: string): Promise<ClientSite[]> {

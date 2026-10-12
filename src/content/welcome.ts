@@ -6,12 +6,12 @@
 
 export type Step = { title: string; detail: string };
 
-/** In the order onboarding runs: changes, then the launch at their domain, which also sets up their portal. */
+/** In the order onboarding runs: the portal opens at payment, then changes, then the launch at their domain. */
 export function afterSignUp(domain: string | null): Step[] {
   return [
+    { title: "Sign in to your portal", detail: "We'll email you a link right away. Your portal shows each step to putting your website live and what we need from you." },
     { title: "Tell us what to change", detail: "Let us know anything you'd like changed on the website. We'll get right to work on it!" },
-    { title: "Your website goes live", detail: `We'll put your website online and walk you through connecting ${domain ?? "your domain"} to it.` },
-    { title: "Activate your portal", detail: "Your portal is your own page at defect.tech. Sign in there to see how many people visit your website, edit it and manage your plan." },
+    { title: "Your website goes live", detail: `We'll put your website online. Your portal will show you how to connect ${domain ?? "your domain"} to it.` },
   ];
 }
 

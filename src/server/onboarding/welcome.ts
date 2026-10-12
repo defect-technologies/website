@@ -2,6 +2,7 @@ import "server-only";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { messages, type Business } from "../db/schema";
+import { env } from "../env";
 import { connectedMailboxes, deliver } from "../mail/outbox";
 import { TEAM_SIGNATURE_TEXT, withTeamSignatureHtml } from "../mail/teamSignature";
 
@@ -18,12 +19,17 @@ export async function studioMailboxId() {
 }
 
 function welcomeBody(business: Business) {
+  const portal = new URL(`/portal/sign-in?site=${encodeURIComponent(business.slug)}`, env.siteUrl()).toString();
   return [
     `Hi ${business.ownerFirstName || "there"},`,
     "",
     `Thank you for signing up! We're so happy to have ${business.businessName} with us.`,
     "",
-    "Someone from the Defect Technologies team will email you soon to get your new website live.",
+    `Your portal is ready: ${portal}`,
+    "",
+    "Sign in with this email address to see each step to putting your new website live, including connecting your domain. It's also where you'll manage your plan.",
+    "",
+    "Someone from the Defect Technologies team will email you soon about anything you'd like changed.",
     "",
     "Warmly,",
     "",
