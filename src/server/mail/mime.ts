@@ -5,7 +5,11 @@ export type Address = { name: string; email: string };
 
 export type OutgoingEmail = {
   from: Address;
+  /** One address, or several joined with ", ". */
   to: string;
+  cc?: string[];
+  /** Gmail delivers to these and strips the header from what everyone receives. */
+  bcc?: string[];
   subject: string;
   body: string;
   /** An HTML version shown by mail apps that render it; body stays the plain-text fallback. */
@@ -30,6 +34,10 @@ function encodedWord(value: string) {
 function mailbox({ name, email }: Address) {
   const display = encodedWord(name).replace(/"/g, "'");
   return display ? `"${display}" <${headerSafe(email)}>` : headerSafe(email);
+}
+
+function copyHeader(name: "Cc" | "Bcc", addresses: string[] = []) {
+  return addresses.length > 0 ? [`${name}: ${addresses.map(headerSafe).join(", ")}`] : [];
 }
 
 function threadingHeaders(inReplyTo?: string | null) {
@@ -61,6 +69,8 @@ export function buildRawMessage(email: OutgoingEmail): string {
   const headers = [
     `From: ${mailbox(email.from)}`,
     `To: ${headerSafe(email.to)}`,
+    ...copyHeader("Cc", email.cc),
+    ...copyHeader("Bcc", email.bcc),
     `Subject: ${encodedWord(email.subject)}`,
     "MIME-Version: 1.0",
     ...bodyHeaders,

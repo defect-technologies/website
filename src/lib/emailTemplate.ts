@@ -27,7 +27,7 @@ export type OutreachSettings = {
   subject: string;
   firstEmail: string;
   followUp: string;
-  /** To a business that asked us for a website. Sent from hello@defect.tech as the team, so it has no sender or address. */
+  /** To a business that asked us for a website. Sent from hello@defect.tech as the team, so it has no {sender}; it still needs {address} and a way to opt out. */
   requestSubject: string;
   requestEmail: string;
   senderName: string;
@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
     "",
     "Warmly,",
     "{sender}",
-    "Defect Technologies, {address}",
+    "This is a sales email from Defect Technologies, {address}.",
     "Not interested? Reply \"no thanks\" and we won't email again.",
   ].join("\n"),
   followUp: [
@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
     "",
     "Warmly,",
     "{sender}",
-    "Defect Technologies, {address}",
+    "This is a sales email from Defect Technologies, {address}.",
     "Not interested? Reply \"no thanks\" and we won't email again.",
   ].join("\n"),
   requestSubject: "The new website for {business}",
@@ -74,6 +74,8 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
     "Warmly,",
     "The Defect Technologies team",
     "hello@defect.tech",
+    "Defect Technologies, {address}",
+    "Don't want emails about this? Reply \"no thanks\" and we'll stop.",
   ].join("\n"),
   senderName: "Brendan Giang",
   mailingAddress: "",

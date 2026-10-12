@@ -59,10 +59,20 @@ function wrap(inner: string): string {
   return `<div style="${FONT}font-size:14px;line-height:21px;color:${INK};">${inner}</div>`;
 }
 
-/** The HTML version of a plain-text email that ends with the team signature lines. */
+/** Where the last team sign-off starts, or -1 when the body has none. */
+export function teamSignOffAt(lines: string[]): number {
+  for (let at = lines.length - TEAM_SIGNATURE_TEXT.length; at >= 0; at--) {
+    if (TEAM_SIGNATURE_TEXT.every((line, index) => lines[at + index].trim() === line)) return at;
+  }
+  return -1;
+}
+
+/** The HTML version of a plain-text email signed by the team. Lines under the sign-off, like the mailing address, become fine print. */
 export function withTeamSignatureHtml(body: string): string {
   const lines = body.trimEnd().split("\n");
-  return wrap(paragraphsHtml(lines.slice(0, -TEAM_SIGNATURE_TEXT.length).join("\n")) + TEAM_SIGNATURE_HTML);
+  const found = teamSignOffAt(lines);
+  const at = found === -1 ? lines.length - TEAM_SIGNATURE_TEXT.length : found;
+  return wrap(paragraphsHtml(lines.slice(0, at).join("\n")) + TEAM_SIGNATURE_HTML + finePrintHtml(lines.slice(at + TEAM_SIGNATURE_TEXT.length)));
 }
 
 /**

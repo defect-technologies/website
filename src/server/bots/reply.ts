@@ -7,7 +7,8 @@ import { messages, type BotKey, type Business, type Message } from "../db/schema
 import { updateBusiness } from "../leads/businesses";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
-import { TEAM_SIGNATURE_TEXT, withSignerHtml, withTeamSignatureHtml } from "../mail/teamSignature";
+import { teamSignOffAt, withSignerHtml, withTeamSignatureHtml } from "../mail/teamSignature";
+import { withSalesFinePrint } from "../outreach/finePrint";
 import { outreachSettings } from "../settings";
 import type { Mailbox } from "../db/schema";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
@@ -44,9 +45,7 @@ function recipientOf(message: Message, lead: Business): string {
 
 /** HTML with the graphic signature when the body ends with the team's sign-off; plain text alone otherwise. */
 export function htmlFor(body: string): string | undefined {
-  const lines = body.trimEnd().split("\n").map((line) => line.trim());
-  const endsWithSignature = TEAM_SIGNATURE_TEXT.every((line, index) => lines[lines.length - TEAM_SIGNATURE_TEXT.length + index] === line);
-  return endsWithSignature ? withTeamSignatureHtml(body) : undefined;
+  return teamSignOffAt(body.trimEnd().split("\n")) === -1 ? undefined : withTeamSignatureHtml(body);
 }
 
 type Reply = { to: string; subject: string; body: string; answering: Message };
@@ -92,8 +91,11 @@ export async function replyToLead(key: BotKey, id: string, input: z.infer<typeof
   const senderFor = SENDERS[key.bot];
   if (!senderFor) throw new BotError(403, "Only Outreach, Onboarding and Client care send email.");
   const lead = await ownedLead(key, id);
-  const { text: body, unwrapped } = unwrapLinks(withoutSubjectLine(input.body));
-  checkBody(body);
+  const { text, unwrapped } = unwrapLinks(withoutSubjectLine(input.body));
+  checkBody(text);
+  const finePrinted = withSalesFinePrint(lead, text, await outreachSettings());
+  if (!finePrinted.ok) throw new BotError(409, finePrinted.error);
+  const body = finePrinted.body;
   const answering = await threadToAnswer(lead, key.bot === "outreach" && lead.source !== "request" ? lead.mailboxId : null);
   const to = recipientOf(answering, lead);
   const subject = replySubject(answering.subject);

@@ -120,6 +120,13 @@
       "when": 1791773183728,
       "tag": "0016_brand_files",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791832346362,
+      "tag": "0017_email_draft",
+      "breakpoints": true
     }
   ]
 }
