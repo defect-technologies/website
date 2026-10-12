@@ -5,10 +5,9 @@ import { ABOUT_LIMIT, INBOUND_KINDS, INBOUND_STATUSES, SORTED_KINDS, type Inboun
 import { unwrapLinks, withoutSubjectLine } from "@/lib/emailLinks";
 import { record } from "../activity";
 import { db } from "../db/client";
-import { inboundRequests, mailboxes, type BotKey, type InboundRequest } from "../db/schema";
+import { inboundRequests, type BotKey, type InboundRequest } from "../db/schema";
 import { inboundById, openOfKinds, pastRequests, replyToRequest, requestLink, tellFoundersAbout } from "../inbound/requests";
-import { syncMail } from "../mail/sync";
-import { STUDIO_INBOX } from "../onboarding/welcome";
+import { BOT_READ_FRESH_MS, syncMailIfStale } from "../mail/sync";
 import { FlagBody, raiseFlag } from "./flags";
 import { actorOf, BotError } from "./http";
 import { checkBody, ReplyBody } from "./reply";
@@ -40,14 +39,6 @@ function inboundView(request: InboundRequest) {
   };
 }
 
-const FRESH_FOR = 5 * 60 * 1000;
-
-/** The bot runs more often than the half-hourly sync, so a read past five minutes old reads hello@ again first. */
-async function syncIfStale() {
-  const [studio] = await (await db()).select().from(mailboxes).where(eq(mailboxes.email, STUDIO_INBOX));
-  if (!studio || (studio.lastSyncedAt && Date.now() - studio.lastSyncedAt.getTime() < FRESH_FOR)) return;
-  await syncMail().catch((error) => console.error("[inbound] sync", error));
-}
 
 export const InboundQuery = z.object({
   status: z.enum(INBOUND_STATUSES).default("open"),
@@ -57,7 +48,7 @@ export const InboundQuery = z.object({
 /** GET /inbound: emails to hello@defect.tech from addresses that match no lead, plus requests from the form. */
 export async function listInbound(key: BotKey, query: z.infer<typeof InboundQuery>) {
   mustBe(key, ["client_care", "overseer"]);
-  await syncIfStale();
+  await syncMailIfStale(BOT_READ_FRESH_MS);
   const kinds: InboundKind[] = query.kind ? [query.kind] : [...INBOUND_KINDS];
   const rows = query.status === "open" ? await openOfKinds(kinds) : (await pastRequests()).filter((row) => row.status === query.status && kinds.includes(row.kind));
   return { inbound: rows.map(inboundView) };
