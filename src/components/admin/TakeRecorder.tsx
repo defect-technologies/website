@@ -19,6 +19,44 @@ const FORMATS = [
 
 const formatFor = () => FORMATS.find((format) => MediaRecorder.isTypeSupported(format.mimeType)) ?? null;
 
+/**
+ * The mic exactly as it hears you. The browser's automatic gain starts quiet and turns itself up a few
+ * seconds in, and its noise suppression changes the tone as it does, so a take sounded like two mics.
+ * The cleanup after recording handles noise and level instead.
+ */
+const RAW_MIC: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
+
+/** How loud the mic is right now, 0 to 1, for the meter while recording. */
+function watchLevel(stream: MediaStream, onLevel: (level: number) => void): () => void {
+  const context = new AudioContext();
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 1024;
+  context.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Float32Array(analyser.fftSize);
+  let frame = 0;
+  const tick = () => {
+    analyser.getFloatTimeDomainData(samples);
+    const peak = samples.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+    onLevel(Math.min(1, peak));
+    frame = requestAnimationFrame(tick);
+  };
+  tick();
+  return () => {
+    cancelAnimationFrame(frame);
+    void context.close();
+  };
+}
+
+/** Green while you're loud enough, amber when quiet, red when it's about to distort. */
+function LevelMeter({ level }: { level: number }) {
+  const tone = level > 0.95 ? "bg-bad" : level > 0.2 ? "bg-good" : "bg-warn";
+  return (
+    <span className="bg-paper-shade relative h-2 w-32 overflow-hidden rounded-full" role="meter" aria-label="Microphone level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)}>
+      <span className={`absolute inset-y-0 left-0 ${tone}`} style={{ width: `${Math.round(level * 100)}%` }} />
+    </span>
+  );
+}
+
 const seconds = (ms: number) => `0:${String(Math.floor(ms / 1000)).padStart(2, "0")}`;
 
 function micProblem(error: unknown): string {
@@ -34,11 +72,14 @@ export default function TakeRecorder({ lineId }: { lineId: string }) {
   const [elapsed, setElapsed] = useState(0);
   const [take, setTake] = useState<{ blob: Blob; url: string; extension: string; type: string } | null>(null);
   const [problem, setProblem] = useState("");
+  const [level, setLevel] = useState(0);
+  const stopMeter = useRef<(() => void) | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | null>(null);
 
   useEffect(() => () => {
     if (timer.current) window.clearInterval(timer.current);
+    stopMeter.current?.();
     recorder.current?.stream.getTracks().forEach((track) => track.stop());
   }, []);
   useEffect(() => () => void (take && URL.revokeObjectURL(take.url)), [take]);
@@ -48,11 +89,13 @@ export default function TakeRecorder({ lineId }: { lineId: string }) {
     const format = formatFor();
     if (!format) return setProblem("This browser can't record audio. Try Chrome or Safari.");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true } });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: RAW_MIC });
+      stopMeter.current = watchLevel(stream, setLevel);
       const chunks: Blob[] = [];
       const media = new MediaRecorder(stream, { mimeType: format.mimeType, audioBitsPerSecond: 128_000 });
       media.ondataavailable = (event) => chunks.push(event.data);
       media.onstop = () => {
+        stopMeter.current?.();
         stream.getTracks().forEach((track) => track.stop());
         const blob = new Blob(chunks, { type: format.type });
         setTake({ blob, url: URL.createObjectURL(blob), extension: format.extension, type: format.type });
@@ -106,6 +149,7 @@ export default function TakeRecorder({ lineId }: { lineId: string }) {
               <span className="bg-bad size-2.5 animate-pulse rounded-full motion-reduce:animate-none" aria-hidden="true" />
               Recording {seconds(elapsed)}
             </span>
+            <LevelMeter level={level} />
           </>
         )}
         {(phase === "recorded" || phase === "saving") && take && (
