@@ -19,7 +19,7 @@ export type Included = { title: string; detail: string };
 
 export const INCLUDED: Included[] = [
   { title: "Changes by email", detail: "Send us new hours, prices or photos. We'll usually publish them the same business day." },
-  { title: "Editing it yourself", detail: "Change the wording, photos, hours and prices from your portal whenever you like. Because we keep every save, you can undo any change." },
+  { title: "Editing it yourself", detail: "Change the wording, photos, hours and prices from your portal whenever you like. You can always go back to an earlier version." },
   { title: "Hosting and upkeep", detail: "We host your website. Once a year, we also check that its links work and that people with disabilities can use it." },
   { title: "A monthly report", detail: "Each month's report shows how many people called you, asked for directions or emailed you from your website." },
   { title: "No setup fee or contract", detail: "You can cancel anytime from your portal. To give you time to move your website, we'll keep it up for at least 30 days after you cancel." },
