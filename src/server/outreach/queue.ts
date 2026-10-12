@@ -6,7 +6,7 @@ import { businesses, messages, type Business } from "../db/schema";
 import { blockedContacts } from "../leads/businesses";
 import { outreachSettings } from "../settings";
 import { requestThreads } from "../inbound/threads";
-import { blockers, composeBody, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread } from "./compose";
+import { blockers, composeBody, failingChecks, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread } from "./compose";
 
 export type QueueItem = {
   business: Business;
@@ -16,6 +16,8 @@ export type QueueItem = {
   template: string;
   values: TemplateValues;
   blockers: string[];
+  /** What still stops the email once the founder writes it themselves. */
+  editBlockers: string[];
 };
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -81,7 +83,8 @@ function toItem(kind: EmailKind, business: Business, { settings, blocked, firstS
     body,
     template: templateFor(kind, settings),
     values: templateValues(business, settings),
-    blockers: blockers(business, settings, blocked, body, kind),
+    blockers: blockers(business, settings, blocked, body, { kind }),
+    editBlockers: failingChecks(business, settings, blocked, { kind, edited: true }),
   };
 }
 

@@ -1,16 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireFounder } from "@/server/auth/session";
 import { record } from "@/server/activity";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import type { EmailKind } from "@/server/outreach/compose";
-import { sendOutreach, skipLead, type SendResult } from "@/server/outreach/send";
+import { sendOutreach, skipLead, type EmailEdits, type SendResult } from "@/server/outreach/send";
+
+const Edits = z.object({
+  to: z.email("That email address doesn't look right.").trim().toLowerCase().max(200),
+  subject: z.string().trim().min(1, "Write a subject.").max(300),
+  body: z.string().trim().min(1, "Write the email."),
+});
 
 /** Doesn't revalidate, so the card can show "Sent" before the queue refreshes around it. */
-export async function sendFromQueue(kind: EmailKind, id: string, problem?: string): Promise<SendResult> {
+export async function sendFromQueue(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<SendResult> {
   const founder = await requireFounder();
-  return sendOutreach(kind, id, founder, problem?.trim() || undefined);
+  const parsed = edits ? Edits.safeParse(edits) : undefined;
+  if (parsed && !parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  return sendOutreach(kind, id, founder, problem?.trim() || undefined, parsed?.data);
 }
 
 export async function skipFromQueue(id: string): Promise<{ ok: boolean }> {

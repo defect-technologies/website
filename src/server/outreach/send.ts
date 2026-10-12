@@ -17,6 +17,9 @@ import { sentToday } from "./queue";
 
 export type SendResult = { ok: true; to: string } | { ok: false; error: string };
 
+/** The email as the founder rewrote it on the queue card, sent in place of the template. */
+export type EmailEdits = { to: string; subject: string; body: string };
+
 const CLAIM_COLUMN = { first: businesses.firstSentAt, follow_up: businesses.followUpSentAt, requested: businesses.firstSentAt } as const;
 const CLAIM_FIELD = { first: "firstSentAt", follow_up: "followUpSentAt", requested: "firstSentAt" } as const;
 const isCold = (kind: EmailKind) => kind !== "requested";
@@ -46,15 +49,17 @@ async function firstSubject(business: Business) {
 
 type Prepared = { business: Business; subject: string; body: string; thread: RequestThread | null };
 
-async function prepare(kind: EmailKind, id: string, problem?: string): Promise<Prepared | string> {
-  const [business, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
-  if (!business) return "That business no longer exists.";
+async function prepare(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<Prepared | string> {
+  const [stored, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
+  if (!stored) return "That business no longer exists.";
   if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit on the Template page, or send tomorrow.`;
-  const body = composeBody(kind, business, settings, problem);
-  const problems = blockers(business, settings, blocked, body, kind);
+  const business = edits ? { ...stored, email: edits.to } : stored;
+  const body = edits?.body ?? composeBody(kind, business, settings, problem);
+  const problems = blockers(business, settings, blocked, body, { kind, edited: Boolean(edits) });
   if (problems.length > 0) return problems[0];
   const thread = kind === "requested" ? ((await requestThreads([business.id])).get(business.id) ?? null) : null;
-  return { business, subject: composeSubject(kind, business, settings, await firstSubject(business), thread), body, thread };
+  const subject = edits?.subject ?? composeSubject(kind, business, settings, await firstSubject(business), thread);
+  return { business, subject, body, thread };
 }
 
 /** A business that asked us hears from hello@defect.tech as the team, in the thread they asked in. */
@@ -105,7 +110,7 @@ async function remember(kind: EmailKind, prepared: Prepared, delivery: Awaited<R
   });
   const firstFields = kind !== "follow_up" ? { threadId: delivery.threadId, firstMessageHeaderId: delivery.headerMessageId, mailboxId: delivery.mailbox?.id ?? null } : {};
   const problemField = problem ? { emailProblem: problem } : {};
-  await updateBusiness(business.id, { ...firstFields, ...problemField, lastContactAt: now });
+  await updateBusiness(business.id, { ...firstFields, ...problemField, email: business.email, lastContactAt: now });
   await advanceStage(business.id, "sent");
   await record(founder.email, SENT_ACTION[kind], { businessId: business.id, detail: business.email });
 }
@@ -114,8 +119,8 @@ const SENT_ACTION: Record<EmailKind, string> = { first: "sent first email", foll
 
 const mailboxFor = async (kind: EmailKind, business: Business) => (isCold(kind) ? business.mailboxId : await studioMailboxId());
 
-export async function sendOutreach(kind: EmailKind, id: string, founder: Founder, problem?: string): Promise<SendResult> {
-  const prepared = await prepare(kind, id, problem);
+export async function sendOutreach(kind: EmailKind, id: string, founder: Founder, problem?: string, edits?: EmailEdits): Promise<SendResult> {
+  const prepared = await prepare(kind, id, problem, edits);
   if (typeof prepared === "string") return { ok: false, error: prepared };
   if (!(await claim(kind, id))) return { ok: false, error: "This one already went out. The queue was out of date." };
   const { senderName } = await outreachSettings();

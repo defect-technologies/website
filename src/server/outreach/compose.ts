@@ -49,23 +49,31 @@ export function composeSubject(kind: EmailKind, business: Business, settings: Ou
   return fillTemplate(settings.subject, templateValues(business, settings));
 }
 
-type Check = { failed: (b: Business, s: OutreachSettings, blocked: Set<string>) => boolean; fix: string; coldOnly?: boolean };
+/** fixedByEditing marks what the founder covers by writing the email themselves: the address and the problem line. */
+type Check = { failed: (b: Business, s: OutreachSettings, blocked: Set<string>) => boolean; fix: string; coldOnly?: boolean; fixedByEditing?: boolean };
 
 /** Reasons an email can't go yet, each written as what to do about it. */
 const CHECKS: Check[] = [
-  { failed: (b) => !b.email, fix: "Add an email address for this business." },
+  { failed: (b) => !b.email, fix: "Add an email address for this business.", fixedByEditing: true },
   { failed: (b, _s, blocked) => isBlocked(blocked, b), fix: "This business opted out, so it can't be emailed." },
   { failed: (b) => !b.previewUrl, fix: "Build and deploy the preview first." },
   { failed: (b) => !b.priceArm, fix: "Pick $59 or $79 for this lead." },
-  { failed: (b) => !(b.emailProblem || b.problemSummary), fix: "Write the problem line.", coldOnly: true },
+  { failed: (b) => !(b.emailProblem || b.problemSummary), fix: "Write the problem line.", coldOnly: true, fixedByEditing: true },
   { failed: (_b, s) => !s.mailingAddress, fix: "Add the mailing address on the Template page. The law requires it.", coldOnly: true },
   { failed: (_b, s) => !s.senderName, fix: "Add the sender's name on the Template page.", coldOnly: true },
 ];
 
-export function blockers(business: Business, settings: OutreachSettings, blocked: Set<string>, body: string, kind: EmailKind = "first"): string[] {
-  const checks = kind === "requested" ? CHECKS.filter((check) => !check.coldOnly) : CHECKS;
-  const failing = checks.filter((check) => check.failed(business, settings, blocked)).map((check) => check.fix);
+type CheckOptions = { kind?: EmailKind; edited?: boolean };
+
+const applies = (check: Check, { kind = "first", edited = false }: CheckOptions) => !(kind === "requested" && check.coldOnly) && !(edited && check.fixedByEditing);
+
+export function failingChecks(business: Business, settings: OutreachSettings, blocked: Set<string>, options: CheckOptions = {}): string[] {
+  return CHECKS.filter((check) => applies(check, options) && check.failed(business, settings, blocked)).map((check) => check.fix);
+}
+
+export function blockers(business: Business, settings: OutreachSettings, blocked: Set<string>, body: string, options: CheckOptions = {}): string[] {
+  const failing = failingChecks(business, settings, blocked, options);
   const leftovers = unfilledPlaceholders(body);
-  if (leftovers.length > 0 && failing.length === 0) failing.push(`The template has unknown placeholders: ${leftovers.join(", ")}.`);
+  if (leftovers.length > 0 && failing.length === 0) failing.push(`The email has unfilled placeholders: ${leftovers.join(", ")}.`);
   return failing;
 }
