@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { pageAddress } from "@/lib/seo";
 import Link from "next/link";
 import LegalPage, { Conspicuous, Items, Table, Term, type LegalSection } from "@/components/legal/LegalPage";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
   description: "How Defect Technologies collects, uses, discloses and protects personal information.",
+  ...pageAddress("/privacy"),
 };
 
 const EFFECTIVE = "October 11, 2026";

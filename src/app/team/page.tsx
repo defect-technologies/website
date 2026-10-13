@@ -3,11 +3,14 @@ import PaintedHeadline from "@/components/PaintedHeadline";
 import PaintedPortrait from "@/components/PaintedPortrait";
 import SiteFooter from "@/components/SiteFooter";
 import SiteNav from "@/components/SiteNav";
+import JsonLd from "@/components/JsonLd";
+import { pageAddress, teamJsonLd } from "@/lib/seo";
 import { TEAM_NAMES, TEAM_TITLE } from "@/content/headlines";
 
 export const metadata: Metadata = {
   title: "Team",
-  description: "Brendan Giang and Boris Nezlobin.",
+  description: "Brendan Giang and Boris Nezlobin founded defect.tech to design websites for small businesses.",
+  ...pageAddress("/team"),
 };
 
 const PEOPLE = [
@@ -20,6 +23,7 @@ const NAME_SIZE = { fontSize: "clamp(2.25rem, 5vw, 3.75rem)" };
 export default function TeamPage() {
   return (
     <>
+      <JsonLd data={teamJsonLd()} />
       <SiteNav page="team" />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 pt-32 pb-[16vh] sm:px-8">
         <PaintedHeadline as="h1" headline={TEAM_TITLE} style={{ fontSize: "clamp(3rem, 10vw, 8rem)" }} />

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { pageAddress } from "@/lib/seo";
 import Link from "next/link";
 import LegalPage, { Conspicuous, Items, Term, type LegalSection } from "@/components/legal/LegalPage";
 
 export const metadata: Metadata = {
   title: "Terms of service",
   description: "The agreement between Defect Technologies and the businesses whose websites we design, host and maintain.",
+  ...pageAddress("/terms"),
 };
 
 const EFFECTIVE = "October 11, 2026";

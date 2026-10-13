@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Big_Shoulders, Dr_Sugiyama, Geist } from "next/font/google";
 import "./globals.css";
+import { DESCRIPTION, LEGAL_NAME, OPEN_GRAPH, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const display = Big_Shoulders({
   subsets: ["latin"],
@@ -20,8 +21,18 @@ const body = Geist({
 });
 
 export const metadata: Metadata = {
-  title: { default: "defect.tech", template: "%s · defect.tech" },
-  description: "We design beautiful, interactive websites for small businesses and keep them current for $79 a month.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: "defect.tech: website design for small businesses, $79 a month", template: "%s · defect.tech" },
+  description: DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: LEGAL_NAME, url: SITE_URL }],
+  creator: LEGAL_NAME,
+  publisher: LEGAL_NAME,
+  category: "Website design",
+  openGraph: { ...OPEN_GRAPH, url: "/", description: DESCRIPTION },
+  twitter: { card: "summary_large_image", description: DESCRIPTION },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
+  formatDetection: { telephone: false },
 };
 
 /** Lets CSS hide the plain text under each painting only when scripts can lay the painting down. */
