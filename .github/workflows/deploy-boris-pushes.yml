@@ -5,6 +5,7 @@ name: Deploy Boris's pushes
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: production-deploy
@@ -12,7 +13,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.head_commit.author.email == 'boris.nezlobin@gmail.com'
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.author.email == 'boris.nezlobin@gmail.com'
     runs-on: ubuntu-latest
     env:
       VERCEL_ORG_ID: team_dwvhZslf3zImPm9iPzwTvxhq
