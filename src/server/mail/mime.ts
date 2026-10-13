@@ -17,8 +17,6 @@ export type OutgoingEmail = {
   html?: string;
   threadId?: string | null;
   inReplyTo?: string | null;
-  /** Cold email needs a one-click way out. Clients' email leaves it off, or mail apps file it as a mailing list. */
-  listUnsubscribe?: boolean;
 };
 
 /** Header values come partly from scraped websites, so line breaks are never allowed through. */
@@ -47,18 +45,47 @@ function threadingHeaders(inReplyTo?: string | null) {
   return [`In-Reply-To: ${id}`, `References: ${id}`];
 }
 
-function wrapBase64(text: string) {
-  return (Buffer.from(text.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").match(/.{1,76}/g) ?? []).join("\r\n");
+const QP_LINE_LENGTH = 75;
+
+/** One byte as quoted-printable: printable ASCII and spaces as they are, everything else (and "=") as =XX. */
+function quotedByte(byte: number) {
+  const printable = (byte >= 33 && byte <= 126 && byte !== 61) || byte === 32;
+  return printable ? String.fromCharCode(byte) : `=${byte.toString(16).toUpperCase().padStart(2, "0")}`;
 }
 
-const BASE64_TEXT = (type: "plain" | "html") => [`Content-Type: text/${type}; charset=UTF-8`, "Content-Transfer-Encoding: base64"];
+/** A line as quoted-printable, with soft breaks ("=" at the end) keeping each line under 76 characters. */
+function quotedLine(line: string) {
+  let encoded = "";
+  let current = "";
+  for (const byte of Buffer.from(line, "utf8")) {
+    const next = quotedByte(byte);
+    if (current.length + next.length > QP_LINE_LENGTH) {
+      encoded += `${current}=\r\n`;
+      current = "";
+    }
+    current += next;
+  }
+  // A space at the very end of a line would be stripped in transit, so it's encoded.
+  return encoded + current.replace(/ $/, "=20");
+}
+
+/**
+ * Text as quoted-printable (RFC 2045), the way mail apps send it. Base64 text reads to spam
+ * filters as hidden content (SpamAssassin's MIME_BASE64_TEXT).
+ */
+function quotedPrintable(text: string) {
+  return text.replace(/\r?\n/g, "\n").split("\n").map(quotedLine).join("\r\n");
+}
+
+const QUOTED_TEXT = (type: "plain" | "html") => [`Content-Type: text/${type}; charset=UTF-8`, "Content-Transfer-Encoding: quoted-printable"];
 
 /** The body headers and content: plain text alone, or plain text and HTML as alternatives. */
 function bodyParts(email: OutgoingEmail): { headers: string[]; content: string } {
   const plain = linksAsPlainText(email.body);
-  if (!email.html) return { headers: BASE64_TEXT("plain"), content: wrapBase64(plain) };
-  const boundary = `defect-${randomUUID()}`;
-  const part = (type: "plain" | "html", text: string) => `--${boundary}\r\n${BASE64_TEXT(type).join("\r\n")}\r\n\r\n${wrapBase64(text)}`;
+  if (!email.html) return { headers: QUOTED_TEXT("plain"), content: quotedPrintable(plain) };
+  // "=_" can't occur in quoted-printable text, so the boundary never collides with the content.
+  const boundary = `=_defect-${randomUUID()}`;
+  const part = (type: "plain" | "html", text: string) => `--${boundary}\r\n${QUOTED_TEXT(type).join("\r\n")}\r\n\r\n${quotedPrintable(text)}`;
   return {
     headers: [`Content-Type: multipart/alternative; boundary="${boundary}"`],
     content: [part("plain", plain), part("html", email.html), `--${boundary}--`].join("\r\n"),
@@ -76,7 +103,6 @@ export function buildRawMessage(email: OutgoingEmail): string {
     `Subject: ${encodedWord(email.subject)}`,
     "MIME-Version: 1.0",
     ...bodyHeaders,
-    ...(email.listUnsubscribe ? [`List-Unsubscribe: <mailto:${headerSafe(email.from.email)}?subject=unsubscribe>`] : []),
     ...threadingHeaders(email.inReplyTo),
   ];
   const message = `${headers.join("\r\n")}\r\n\r\n${content}`;
