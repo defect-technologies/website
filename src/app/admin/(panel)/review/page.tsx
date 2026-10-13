@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/Button";
-import CopyFixButton from "@/components/admin/CopyFixButton";
 import EmptyState from "@/components/admin/EmptyState";
 import { TextAreaField } from "@/components/admin/fields";
 import SubmitButton from "@/components/admin/SubmitButton";
@@ -11,9 +10,8 @@ import { Card, PageHeader, SectionHeading, When } from "@/components/admin/ui";
 import { FIXER_LABEL, type Fixer } from "@/lib/flags";
 import type { Flag } from "@/server/db/schema";
 import { openFlags, resolvedFlags, type FlagRow } from "@/server/bots/flags";
-import { fixPrompt } from "@/server/flags/fixPrompt";
 import { approvePreviewAction, requestPreviewAction } from "../pipeline/actions";
-import { resolveFlagAction } from "./actions";
+import { handToClaudeAction, resolveFlagAction } from "./actions";
 
 export const metadata: Metadata = { title: "Review queue" };
 
@@ -104,12 +102,38 @@ function DecisionActions({ flag }: { flag: Flag }) {
 
 const RETRY_LABEL: Record<string, string> = { launch: "Retry launch", build: "Rebuild preview" };
 
+/** Claude works its flags by itself: this says whether it has started, or hands it a founder's flag. */
+function ClaudeStatus({ flag }: { flag: Flag }) {
+  if (flag.fixer !== "claude") {
+    return (
+      <form action={handToClaudeAction}>
+        <input type="hidden" name="id" value={flag.id} />
+        <SubmitButton variant="soft" size="sm">
+          Hand to Claude
+        </SubmitButton>
+      </form>
+    );
+  }
+  const started = flag.reviewer === "claude" ? /\d{4}-\d{2}-\d{2}T[\d:.]+Z/.exec(flag.note)?.[0] : undefined;
+  return (
+    <span className="text-ink-soft inline-flex min-h-9 items-center text-sm">
+      {started ? (
+        <>
+          Claude is working on this, since&nbsp;<When date={new Date(started)} />
+        </>
+      ) : (
+        "Claude picks this up within a few minutes"
+      )}
+    </span>
+  );
+}
+
 function FixActions({ row }: { row: FlagRow }) {
   const { flag } = row;
   const retry = flag.businessId ? RETRY_LABEL[flag.topic] : undefined;
   return (
     <>
-      <CopyFixButton prompt={fixPrompt(flag, row.businessName)} primary={flag.fixer === "claude"} />
+      <ClaudeStatus flag={flag} />
       {retry && (
         <Intent flag={flag} intent="retry" variant={flag.fixer === "claude" ? "soft" : "solid"} icon={<ArrowClockwise size={16} aria-hidden="true" />}>
           {retry}

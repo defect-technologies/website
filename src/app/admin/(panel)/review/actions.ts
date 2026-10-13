@@ -8,6 +8,7 @@ import { requireFounder } from "@/server/auth/session";
 import { resolveFlag } from "@/server/bots/flags";
 import { db } from "@/server/db/client";
 import { flags, type Flag } from "@/server/db/schema";
+import { handFlagToClaude } from "@/server/flags/claudeQueue";
 import { businessById } from "@/server/leads/businesses";
 import { requestPreview } from "@/server/runner/jobs";
 
@@ -35,6 +36,15 @@ const RESOLVE: Record<Resolution["intent"], (flag: Flag, input: Resolution, foun
     return note ? ["fixed", note] : null;
   },
 };
+
+/** Hands an open flag to Claude: a Claude Code session picks it up within a few minutes (engine/ops/flag_worker.py). */
+export async function handToClaudeAction(form: FormData) {
+  await requireFounder();
+  const id = z.uuid().safeParse(form.get("id"));
+  if (!id.success) return;
+  await handFlagToClaude(id.data);
+  revalidatePath("/admin", "layout");
+}
 
 /** One action for every button on a card: the button's intent says what it does. */
 export async function resolveFlagAction(form: FormData) {
