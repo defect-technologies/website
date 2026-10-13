@@ -5,8 +5,8 @@ export const PLACEHOLDERS = {
   business: "The business name",
   problem: "The problem on their current site, as the preview builder wrote it",
   link: "The link to their preview",
-  price: "Our usual price, 79. Every lead sees it",
-  offer: "For a lead on the $59 offer, the sentence offering to lock in $59 a month if they sign up now. Empty at $79",
+  price: "The lead's monthly price, 59 or 79",
+  offer: "For a lead at $59, the sentence saying our usual price is $79 and they keep $59. Empty at $79",
   sender: "Who the email is from",
   address: "The mailing address CAN-SPAM requires",
 } as const;
@@ -16,10 +16,10 @@ export type Placeholder = keyof typeof PLACEHOLDERS;
 /** Our price. $59 is a limited-time offer some leads get; they keep it for as long as they stay. A $79 lead never hears about it. */
 export const REGULAR_MONTHLY_PRICE = 79;
 
-/** Follows the $79 price sentence for a lead on the offer, and is empty for everyone else. */
+/** Follows the price for a lead on the offer, and is empty for everyone else. */
 export function offerSentence(priceArm: number | null): string {
   if (!priceArm || priceArm >= REGULAR_MONTHLY_PRICE) return "";
-  return ` We had so much fun redesigning your site that we'd love to give you a limited-time offer: sign up now and you'll lock in $${priceArm} a month instead of $${REGULAR_MONTHLY_PRICE}, for as long as you're with us.`;
+  return ` Our usual price is $${REGULAR_MONTHLY_PRICE}, but you'll keep $${priceArm} for as long as you stay with us.`;
 }
 export type TemplateValues = Record<Placeholder, string>;
 
@@ -37,15 +37,15 @@ export type OutreachSettings = {
 };
 
 export const DEFAULT_SETTINGS: OutreachSettings = {
-  subject: "A fresh version of {business}'s website",
+  subject: "A new website for {business}",
   firstEmail: [
-    "Hi {first_name}, {problem}.",
+    "Hi {first_name},",
     "",
-    "I redesigned your site using your own photos and text so you can see it before deciding anything: {link}",
+    "I was looking at {business}'s website and noticed {problem}. I made you a new version to show what it could look like: {link}",
     "",
-    "If you like it, we'll host it and keep it up to date for ${price} a month, with no setup fee.{offer} When something changes, like your hours or a price, you just email us and it's usually live the same day.",
+    "If you like it, it's ${price} a month to keep it live, with no setup fee. That covers hosting and the changes you ask for.{offer} When your hours or prices change, reply to one of our emails and we'll usually have it updated the same day.",
     "",
-    "If that's less than you pay to keep your current site running, it might be worth a look.",
+    "What do you think?",
     "",
     "Warmly,",
     "{sender}",
@@ -55,9 +55,9 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
   followUp: [
     "Hi {first_name}, just wanted to bump this to the top of your inbox in case it got lost :)",
     "",
-    "Here's the fresh version of {business}'s site again: {link}",
+    "Here's the new version of {business}'s website again: {link}",
     "",
-    "It's ${price} a month to keep it live and current, and you can cancel anytime.{offer}",
+    "If you'd like a change before deciding, tell me what to fix and I'll send you an updated link.",
     "",
     "Warmly,",
     "{sender}",
@@ -68,7 +68,7 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
   requestEmail: [
     "Hi {first_name}, thanks for asking us to build a website for {business}. Here it is: {link}",
     "",
-    "If you like it, we'll put it live and keep it up to date for ${price} a month, with no setup fee.{offer} When something changes, like your hours or a price, you just email us and it's usually live the same day.",
+    "If you like it, it's ${price} a month to keep it live, with no setup fee. That covers hosting and the changes you ask for.{offer} When your hours or prices change, reply to one of our emails and we'll usually have it updated the same day.",
     "",
     "Warmly,",
     "The Defect Technologies team",
