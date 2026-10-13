@@ -83,15 +83,3 @@ export function withTeamSignatureHtml(body: string): string {
   const at = found === -1 ? lines.length - TEAM_SIGNATURE_TEXT.length : found;
   return wrap(paragraphsHtml(lines.slice(0, at).join("\n")) + TEAM_SIGNATURE_HTML + finePrintHtml(lines.slice(at + TEAM_SIGNATURE_TEXT.length)));
 }
-
-/**
- * The HTML version of a cold email: everything above the signer's name as written, the
- * graphic signature in place of the name, and the lines under it (the mailing address and
- * opt-out line the law requires) as fine print. Null when the name isn't on its own line.
- */
-export function withSignerHtml(body: string, signer: Signer): string | null {
-  const lines = body.trimEnd().split("\n");
-  const at = lines.map((line) => line.trim()).lastIndexOf(signer.name.trim());
-  if (at === -1) return null;
-  return wrap(paragraphsHtml(lines.slice(0, at).join("\n")) + signatureHtml(signer) + finePrintHtml(lines.slice(at + 1)));
-}

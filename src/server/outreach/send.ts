@@ -8,7 +8,6 @@ import { advanceStage, blockedContacts, businessById, updateBusiness } from "../
 import { isBlocked } from "../leads/contactKeys";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
-import { withSignerHtml } from "../mail/teamSignature";
 import { htmlFor } from "../bots/reply";
 import { requestThreads } from "../inbound/threads";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
@@ -90,19 +89,20 @@ function requestedEmail({ recipients, subject, body, thread }: Prepared, from: M
   };
 }
 
+/**
+ * Cold email goes out as plain text from one person: no HTML, images or List-Unsubscribe header,
+ * which spam filters read as a mailing from a new domain. The opt-out stays in the body.
+ */
 function outgoing(kind: EmailKind, prepared: Prepared, from: Mailbox | null, senderName: string): OutgoingEmail {
   if (kind === "requested") return requestedEmail(prepared, from);
   const { business, recipients, subject, body } = prepared;
-  const email = from?.email ?? "outbox@dev.localhost";
   return {
-    from: { name: senderName, email },
+    from: { name: senderName, email: from?.email ?? "outbox@dev.localhost" },
     ...addressed(recipients),
     subject,
     body,
-    html: withSignerHtml(body, { name: senderName, line: "Defect Technologies", email }) ?? undefined,
     threadId: kind === "follow_up" ? business.threadId : null,
     inReplyTo: kind === "follow_up" ? business.firstMessageHeaderId : null,
-    listUnsubscribe: true,
   };
 }
 

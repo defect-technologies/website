@@ -7,7 +7,7 @@ import { messages, type BotKey, type Business, type Message } from "../db/schema
 import { updateBusiness } from "../leads/businesses";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
-import { teamSignOffAt, withSignerHtml, withTeamSignatureHtml } from "../mail/teamSignature";
+import { teamSignOffAt, withTeamSignatureHtml } from "../mail/teamSignature";
 import { withSalesFinePrint } from "../outreach/finePrint";
 import { outreachSettings } from "../settings";
 import type { Mailbox } from "../db/schema";
@@ -81,20 +81,14 @@ async function studioSender(): Promise<Sender> {
   return { mailboxId: await studioMailboxId(), compose: (from, reply) => ({ ...threaded(from, STUDIO_NAME, reply), html: htmlFor(reply.body) }) };
 }
 
-/** Prospects hear from the cold inbox their thread is on, as the founder, with the cold signature and a way out. A business that asked us hears from hello@ as the team. */
+/** Prospects hear from the cold inbox their thread is on, as the founder, in plain text like the cold email. A business that asked us hears from hello@ as the team. */
 async function outreachSender(lead: Business, answering: Message): Promise<Sender> {
   if (lead.source === "request") return studioSender();
   const mailboxId = answering.mailboxId ?? lead.mailboxId;
   // Never let a prospect's reply fall back to hello@defect.tech, which only clients hear from.
   if (!mailboxId) throw new BotError(409, "This prospect's thread isn't on a cold inbox the admin knows. Reply with the Gmail tool this once and flag it.");
   const { senderName } = await outreachSettings();
-  return {
-    mailboxId,
-    compose: (from, reply) => {
-      const email = threaded(from, senderName, reply);
-      return { ...email, html: withSignerHtml(reply.body, { name: senderName, line: "Defect Technologies", email: email.from.email }) ?? undefined, listUnsubscribe: true };
-    },
-  };
+  return { mailboxId, compose: (from, reply) => threaded(from, senderName, reply) };
 }
 
 const SENDERS: Record<string, (lead: Business, answering: Message) => Promise<Sender>> = {
