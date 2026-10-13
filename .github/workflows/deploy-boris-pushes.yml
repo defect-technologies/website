@@ -1,0 +1,23 @@
+# Vercel blocks deploys of commits by authors outside the Vercel team, and Boris isn't on it.
+# Deploying without the .git folder leaves Vercel no commit author to check.
+name: Deploy Boris's pushes
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event.head_commit.author.email == 'boris.nezlobin@gmail.com'
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_dwvhZslf3zImPm9iPzwTvxhq
+      VERCEL_PROJECT_ID: prj_07DVNdEQBnVgzCSpyt6TroTon8Au
+    steps:
+      - uses: actions/checkout@v4
+      - run: rm -rf .git
+      - run: npx --yes vercel@63.1.2 deploy --prod --yes --token "${{ secrets.VERCEL_TOKEN }}"
