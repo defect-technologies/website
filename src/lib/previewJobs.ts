@@ -15,6 +15,17 @@ export const JOB_STATUS_LABEL: Record<PreviewJobStatus, string> = {
   waiting_for_usage: "Waiting for Claude usage",
 };
 
+/**
+ * A build the runner skipped before building: a look at the business's current site found it already good, so a
+ * redesign wouldn't win them over. Stored as a failed job with this step (no migration needed), never retried,
+ * not counted against the daily cap, and shown as its own lead status.
+ */
+export const SKIPPED_STEP = "Skipped: their site is already good";
+
+export function isSkipped(job: { status: PreviewJobStatus; step?: string | null } | null | undefined): boolean {
+  return job?.status === "failed" && job.step === SKIPPED_STEP;
+}
+
 /** A preview build (or rebuild with a note), or a launch onto the client's own Vercel project. */
 export const JOB_KINDS = ["preview", "launch"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];

@@ -34,7 +34,7 @@ export async function sheetRows(): Promise<{ leads: LeadRow[]; clients: LeadRow[
   const [all, jobs, emails] = await Promise.all([(await db()).select().from(businesses).orderBy(desc(businesses.updatedAt)), latestJobs(), lastEmails()]);
   const rows = all.map((lead) => {
     const job = jobs.get(lead.id) ?? null;
-    return { lead, job, lastEmail: emails.get(lead.id) ?? null, status: leadStatus(lead.stage, job?.status ?? null) };
+    return { lead, job, lastEmail: emails.get(lead.id) ?? null, status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? "") };
   });
   return { leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live") };
 }

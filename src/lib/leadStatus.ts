@@ -1,5 +1,5 @@
 import type { Bot } from "./bots";
-import type { PreviewJobStatus } from "./previewJobs";
+import { isSkipped, type PreviewJobStatus } from "./previewJobs";
 import type { Stage } from "./stages";
 
 /**
@@ -7,7 +7,7 @@ import type { Stage } from "./stages";
  * lead might be untouched, queued, building, or stuck on a failed build, which
  * only its latest preview job knows. Live leads are clients and have no status.
  */
-export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "needs_a_look", "ready_to_send", "waiting", "negotiating", "setting_up", "closed"] as const;
+export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "skipped", "needs_a_look", "ready_to_send", "waiting", "negotiating", "setting_up", "closed"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
@@ -15,6 +15,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   queued: "Queued",
   building: "Building",
   build_failed: "Build failed",
+  skipped: "Skipped, site already good",
   needs_a_look: "Built, needs a look",
   ready_to_send: "Built, not emailed",
   waiting: "Waiting for reply",
@@ -31,6 +32,7 @@ export const LEAD_STATUS_OWNER: Record<LeadStatus, Owner> = {
   queued: "runner",
   building: "runner",
   build_failed: "founders",
+  skipped: "nobody",
   needs_a_look: "founders",
   ready_to_send: "founders",
   waiting: "outreach",
@@ -60,7 +62,8 @@ const BY_JOB: Record<PreviewJobStatus, LeadStatus> = {
 };
 
 /** A new lead's status comes from its latest build; every later stage speaks for itself. */
-export function leadStatus(stage: Stage, latestJob: PreviewJobStatus | null): LeadStatus {
+export function leadStatus(stage: Stage, latestJob: PreviewJobStatus | null, latestStep = ""): LeadStatus {
   if (stage !== "new") return BY_STAGE[stage] ?? "closed";
+  if (latestJob && isSkipped({ status: latestJob, step: latestStep })) return "skipped";
   return latestJob ? BY_JOB[latestJob] : "not_queued";
 }

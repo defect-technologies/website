@@ -61,6 +61,11 @@ const NOW: Record<LeadStatus, (row: LeadRow) => ReactNode> = {
       {job?.criticVerdict || "The build failed"} <When date={job?.finishedAt ?? null} />
     </>
   ),
+  skipped: ({ job }) => (
+    <span className="text-ink-soft line-clamp-1">
+      {job?.criticVerdict || "Their current site is already good"} <When date={job?.finishedAt ?? null} />
+    </span>
+  ),
   needs_a_look: ({ lead, job }) => (
     <span className="flex flex-wrap gap-x-3">
       <span>{job?.criticVerdict || "The design critic asked for changes"}</span>

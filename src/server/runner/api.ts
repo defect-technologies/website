@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { MAX_FAILED_BUILDS, type JobKind } from "@/lib/previewJobs";
+import { MAX_FAILED_BUILDS, type JobKind, SKIPPED_STEP } from "@/lib/previewJobs";
 import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
@@ -124,6 +124,8 @@ export const DoneBody = z.object({
   minutes: z.number().min(0).optional(),
   apiEquivalentUsd: z.number().min(0).optional(),
   logTail: z.string().max(LOG_TAIL_LIMIT * 4).optional(),
+  /** With status "failed": the runner skipped this lead before building, because its current site is already good. */
+  skipped: z.boolean().optional(),
   resumeAt: z.iso.datetime({ offset: true }).optional(),
   launch: z
     .object({
@@ -218,7 +220,14 @@ async function retryOrGiveUp(job: PreviewJob, lead: Business, body: Done) {
   else await record(ACTOR, "gave up on a preview", { businessId: lead.id, detail: `${MAX_FAILED_BUILDS} builds in a row failed, so this lead is skipped.` });
 }
 
+/** Skipped before building: recorded with its reason, never retried and never flagged. */
+async function finishSkipped(job: PreviewJob, lead: Business, body: Done) {
+  await updateJob(job.id, { status: "failed", step: SKIPPED_STEP, ...results(body) });
+  await record(ACTOR, "skipped a lead", { businessId: lead.id, detail: body.criticVerdict || "Their current site is already good." });
+}
+
 async function finishFailed(job: PreviewJob, lead: Business, body: Done) {
+  if (body.skipped && job.kind === "preview") return finishSkipped(job, lead, body);
   await updateJob(job.id, { status: "failed", step: "Failed", ...results(body) });
   await record(ACTOR, job.kind === "launch" ? "launch failed" : "preview build failed", { businessId: lead.id, detail: lastLines(body.logTail ?? "", 3) });
   await retryOrGiveUp(job, lead, body);

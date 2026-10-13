@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
-import { ACTIVE_JOB_STATUSES, type JobKind, type PreviewJobStatus } from "@/lib/previewJobs";
+import { ACTIVE_JOB_STATUSES, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
@@ -62,7 +62,8 @@ export async function failuresInARow(businessId: string): Promise<number> {
   const jobs = await (await db())
     .select({ status: previewJobs.status })
     .from(previewJobs)
-    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.kind, "preview"), inArray(previewJobs.status, ["done", "failed"])))
+    // A skipped build isn't a failure: the runner chose not to build.
+    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.kind, "preview"), inArray(previewJobs.status, ["done", "failed"]), ne(previewJobs.step, SKIPPED_STEP)))
     .orderBy(desc(previewJobs.createdAt))
     .limit(10);
   const firstSuccess = jobs.findIndex((job) => job.status === "done");
@@ -94,7 +95,8 @@ export async function buildsToday(): Promise<number> {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
     .from(previewJobs)
-    .where(and(eq(previewJobs.kind, "preview"), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
+    // A skip takes a minute and builds nothing, so it doesn't use up a build.
+    .where(and(eq(previewJobs.kind, "preview"), ne(previewJobs.step, SKIPPED_STEP), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
   return row?.count ?? 0;
 }
 
