@@ -1,5 +1,5 @@
 import "server-only";
-import { asClause, fillTemplate, offerSentence, REGULAR_MONTHLY_PRICE, unfilledPlaceholders, type OutreachSettings, type TemplateValues } from "@/lib/emailTemplate";
+import { asClause, fillTemplate, offerSentence, unfilledPlaceholders, type OutreachSettings, type TemplateValues } from "@/lib/emailTemplate";
 import { replySubject } from "@/lib/emailLinks";
 import type { Business } from "../db/schema";
 import { env } from "../env";
@@ -26,7 +26,7 @@ export function templateValues(business: Business, settings: OutreachSettings, p
     business: business.businessName,
     problem: asClause(problem || business.problemSummary),
     link: previewLink(business),
-    price: business.priceArm ? String(REGULAR_MONTHLY_PRICE) : "{price}",
+    price: business.priceArm ? String(business.priceArm) : "{price}",
     offer: offerSentence(business.priceArm),
     sender: settings.senderName,
     address: settings.mailingAddress || "{address}",

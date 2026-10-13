@@ -15,7 +15,7 @@ const MADE_UP: TemplateValues = {
   business: "Marigold Bakery",
   problem: "your site still says © 2021 and gets cut off on phones",
   link: "https://defect.tech/p/k3m9q2xa",
-  price: "79",
+  price: "59",
   offer: offerSentence(59),
   sender: "",
   address: "",
