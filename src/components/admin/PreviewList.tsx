@@ -4,6 +4,7 @@ import { switchPreviewVersionAction } from "@/app/admin/(panel)/projects/actions
 import type { Business, Stage } from "@/server/db/schema";
 import { PREVIEW_LIFETIME_DAYS, type PreviewDeployment } from "@/server/integrations/vercel";
 import CopyLinkButton from "./CopyLinkButton";
+import OpenPreviewsButton from "./OpenPreviewsButton";
 import ShowMore from "./ShowMore";
 import SubmitButton from "./SubmitButton";
 import { StageChip, When } from "./ui";
@@ -222,9 +223,12 @@ export default function PreviewList({ previews, leads, filters }: { previews: Pr
   const filtered = Boolean(filters.q || filters.status || filters.days);
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-ink-faint text-sm" role="status">
-        {filtered ? `${shown.length} of ${sites.length} businesses match` : `${sites.length} businesses, newest first`}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p className="text-ink-faint text-sm" role="status">
+          {filtered ? `${shown.length} of ${sites.length} businesses match` : `${sites.length} businesses, newest first`}
+        </p>
+        <OpenPreviewsButton urls={shown.map((site) => site.versions[0].url)} />
+      </div>
       {shown.length === 0 ? (
         <p className="text-ink-soft text-sm">No preview matches. Try fewer filters.</p>
       ) : (
