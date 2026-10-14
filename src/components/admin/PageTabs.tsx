@@ -3,9 +3,10 @@ import KnifeStroke from "./KnifeStroke";
 
 export type PageTab = { href: string; label: string; count?: number };
 
-export const LEAD_TABS: PageTab[] = [
-  { href: "/admin/leads", label: "Leads" },
-  { href: "/admin/leads/previews", label: "Previews" },
+export const SITE_TABS: PageTab[] = [
+  { href: "/admin/sites", label: "Sites" },
+  { href: "/admin/sites/previews", label: "Previews" },
+  { href: "/admin/sites/changes", label: "Site changes" },
 ];
 
 /** Views of one page. The current one sits on a knife stroke, like the current page in the nav. */

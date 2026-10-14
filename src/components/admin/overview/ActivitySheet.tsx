@@ -23,7 +23,7 @@ export default function ActivitySheet({ rows }: { rows: ActivityRow[] }) {
             <RowHeader className="whitespace-nowrap">{actorLabel(entry.actor)}</RowHeader>
             <Cell label="Lead" className="lg:min-w-40">
               {entry.businessId ? (
-                <Link href={`/admin/leads/${entry.businessId}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
+                <Link href={`/admin/sites/${entry.businessId}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
                   {entry.businessName}
                 </Link>
               ) : (

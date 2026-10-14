@@ -1,5 +1,5 @@
 import { ArrowsClockwise, CaretRight, Eye, Globe, Hammer, HourglassMedium, PaperPlaneTilt, RocketLaunch } from "@phosphor-icons/react/dist/ssr";
-import { approvePreviewAction, launchSiteAction, requestPreviewAction } from "@/app/admin/(panel)/leads/actions";
+import { approvePreviewAction, launchSiteAction, requestPreviewAction } from "@/app/admin/(panel)/sites/actions";
 import { JOB_STATUS_LABEL } from "@/lib/previewJobs";
 import type { Business, PreviewJob } from "@/server/db/schema";
 import { launchDomainOf } from "@/server/integrations/domain";

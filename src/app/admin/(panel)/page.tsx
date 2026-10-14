@@ -17,6 +17,7 @@ import type { InboundRequest } from "@/server/db/schema";
 import type { LeadMatcher } from "@/server/inbound/requests";
 import type { ThreadSummary } from "@/server/mail/threads";
 import { agentStates, runnerDay } from "@/server/overview";
+import { runnerStatus } from "@/server/runner/status";
 import type { QueueItem } from "@/server/outreach/queue";
 import { today } from "@/server/today";
 
@@ -186,7 +187,7 @@ function nothingWaiting(data: Today) {
 }
 
 export default async function TodayPage() {
-  const [data, agents, runner] = await Promise.all([today(), agentStates(), runnerDay()]);
+  const [data, agents, runner, builds] = await Promise.all([today(), agentStates(), runnerDay(), runnerStatus()]);
 
   return (
     <>
@@ -194,7 +195,7 @@ export default async function TodayPage() {
         <LiveRefresh renderedAt={data.readAt} />
         <CheckMailButton />
       </PageHeader>
-      <AgentRow agents={agents} now={data.readAt} runner={runner} />
+      <AgentRow agents={agents} now={data.readAt} runner={runner} builds={builds} />
       {nothingWaiting(data) && <EmptyState title="Nothing needs you" />}
       <Flags data={data} />
       <Requests data={data} />

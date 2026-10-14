@@ -10,7 +10,7 @@ import { BRAND_FILE_TYPES, MAX_BRAND_FILE_BYTES } from "@/lib/brandFiles";
 import { isUploadFor, removeBrandFile, saveBrandFile } from "@/server/leads/brandFiles";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
-import { launchBlocker, requestPreview } from "@/server/runner/jobs";
+import { isActive, jobById, launchBlocker, requestPreview, updateJob } from "@/server/runner/jobs";
 import { closeFlagsOn } from "@/server/bots/flags";
 
 export type FormResult = { ok: boolean; message: string };
@@ -66,7 +66,6 @@ export async function requestPreviewAction(form: FormData) {
   const note = String(form.get("note") ?? "").trim().slice(0, 2000);
   await requestPreview(lead, founder.email, note);
   revalidatePath("/admin", "layout");
-  revalidatePath("/admin", "layout");
 }
 
 /** Queues a launch on the runner. When it finishes, the site is added to Sites so its owner can sign in at /edit. */
@@ -75,7 +74,6 @@ export async function launchSiteAction(form: FormData) {
   const lead = await businessById(String(form.get("id") ?? ""));
   if (!lead || launchBlocker(lead)) return;
   await requestPreview(lead, founder.email, "", "launch");
-  revalidatePath("/admin", "layout");
   revalidatePath("/admin", "layout");
 }
 
@@ -116,5 +114,20 @@ export async function saveBrandFileAction(file: z.input<typeof UploadedBrandFile
 export async function removeBrandFileAction(leadId: string, form: FormData) {
   const founder = await requireFounder();
   await removeBrandFile(String(form.get("id") ?? ""), leadId, founder.email);
+  revalidatePath("/admin", "layout");
+}
+
+const JobChoice = z.object({ id: z.uuid(), intent: z.enum(["requeue", "fail"]) });
+
+/** A job the runner abandoned: put it back at the end of the queue (it resumes where it stopped), or give up on it. */
+export async function settleAbandonedJobAction(form: FormData) {
+  const founder = await requireFounder();
+  const parsed = JobChoice.safeParse({ id: form.get("id"), intent: form.get("intent") });
+  if (!parsed.success) return;
+  const job = await jobById(parsed.data.id);
+  if (!job || !isActive(job.status)) return;
+  const requeue = parsed.data.intent === "requeue";
+  await updateJob(job.id, requeue ? { status: "queued", createdAt: new Date(), claimedAt: null, startedAt: null, step: "" } : { status: "failed", finishedAt: new Date(), step: "Stopped by a founder: the runner had abandoned it" });
+  await record(founder.email, requeue ? "put an abandoned build back in the queue" : "marked an abandoned build failed", { businessId: job.businessId });
   revalidatePath("/admin", "layout");
 }

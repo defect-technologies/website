@@ -94,7 +94,7 @@ function Header({ business, kind, editing }: { business: Business; kind: QueueCa
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <h3 className="text-xl font-semibold">
-        <Link href={`/admin/leads/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
+        <Link href={`/admin/sites/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
           {business.businessName}
         </Link>
       </h3>

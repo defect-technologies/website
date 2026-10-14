@@ -24,7 +24,7 @@ export default function PreviewThumb({ url, name }: { url: string; name: string 
         sandbox="allow-same-origin"
         className="pointer-events-none absolute top-0 left-0 h-[400%] w-[400%] origin-top-left scale-25 border-0"
       />
-      <span className="bg-ink/70 text-paper absolute right-2 bottom-2 grid size-8 place-items-center rounded-full opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+      <span className="bg-ink/70 text-paper absolute right-2 bottom-2 grid size-8 place-items-center rounded-full opacity-80 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
         <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
       </span>
     </a>

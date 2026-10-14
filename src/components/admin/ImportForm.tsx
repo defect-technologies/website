@@ -2,7 +2,7 @@
 
 import { UploadSimple } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { importAction, type FormResult } from "@/app/admin/(panel)/leads/actions";
+import { importAction, type FormResult } from "@/app/admin/(panel)/sites/actions";
 import SubmitButton from "./SubmitButton";
 import { Notice } from "./ui";
 

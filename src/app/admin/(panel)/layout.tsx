@@ -22,7 +22,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         <Link href="/" className="font-script text-ink w-fit rounded-md px-3 text-3xl leading-[1.4] focus-visible:outline-2 focus-visible:outline-ink">
           defect.tech
         </Link>
-        <AdminNav counts={counts} />
+        <AdminNav counts={counts} building={counts.building} />
         <form action={signOut} className="flex items-center gap-2 lg:mt-auto">
           <span className="text-ink-faint min-w-0 truncate px-3 text-sm" title={founder.email}>
             {founder.name}

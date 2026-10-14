@@ -6,6 +6,7 @@ import { balances } from "./expenses/expenses";
 import { leadMatcher, openOfKinds, pastRequests } from "./inbound/requests";
 import { threadSummaries } from "./mail/threads";
 import { outreachQueue } from "./outreach/queue";
+import { runnerStatus } from "./runner/status";
 import { openSpotChecks } from "./spotChecks";
 
 /** The layout's badges and the Today page both read these in one request; React's cache runs each once. */
@@ -57,7 +58,9 @@ export async function today() {
 export async function navCounts() {
   const [flags, inbound, sendQueue, spotChecks, monthRows, threadRows] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), threads()]);
   const sendable = [...sendQueue.requested, ...sendQueue.followUps, ...sendQueue.firstEmails].filter((item) => item.blockers.length === 0).length;
+  const builds = await runnerStatus();
   return {
+    building: builds.current.length > 0,
     today: flags.length + inbound.length + sendable + spotChecks.length + settleDue(monthRows).length,
     messages: threadRows.reduce((total, thread) => total + thread.unread, 0),
   };
