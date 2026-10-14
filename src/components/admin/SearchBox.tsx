@@ -55,11 +55,13 @@ export default function SearchBox() {
   const open = hits.length > 0;
   useShortcut(input);
 
+  /** Opens the chosen site, or, when Enter beats the results, the Sites list filtered by what was typed. */
   const go = (hit: SearchHit | undefined) => {
-    if (!hit) return;
+    const typed = query.trim();
+    if (!hit && !typed) return;
     setQuery("");
     input.current?.blur();
-    router.push(`/admin/sites/${hit.id}`);
+    router.push(hit ? `/admin/sites/${hit.id}` : `/admin/sites?q=${encodeURIComponent(typed)}`);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
