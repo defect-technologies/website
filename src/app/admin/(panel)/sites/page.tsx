@@ -3,6 +3,7 @@ import { Plus } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
+import OpenEditorButton from "@/components/admin/OpenEditorButton";
 import { Card, PageHeader } from "@/components/admin/ui";
 import { allClientSites } from "@/server/sites/clientSites";
 
@@ -34,6 +35,7 @@ export default async function SitesPage() {
                 <th scope="col" className="px-5 py-3 font-medium">Site</th>
                 <th scope="col" className="px-5 py-3 font-medium">Owner</th>
                 <th scope="col" className="px-5 py-3 font-medium">Client</th>
+                <th scope="col" className="px-5 py-3 font-medium"><span className="sr-only">Editor</span></th>
               </tr>
             </thead>
             <tbody className="divide-ink/8 divide-y">
@@ -46,6 +48,9 @@ export default async function SitesPage() {
                   </td>
                   <td className="text-ink-soft px-5 py-3">{site.ownerEmail}</td>
                   <td className="text-ink-soft px-5 py-3">{site.businessName ?? "Not linked"}</td>
+                  <td className="px-5 py-2 text-right">
+                    <OpenEditorButton slug={site.slug} label="Open editor" variant="soft" size="sm" />
+                  </td>
                 </tr>
               ))}
             </tbody>

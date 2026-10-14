@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { emailSignInLink, linksReady } from "@/server/editor/signInLinks";
+import { editorReady, emailSignInLink, enterUrl, linksReady } from "@/server/editor/signInLinks";
 import { businessById } from "@/server/leads/businesses";
 import { addClientSite, changeSiteOwner, clientSite } from "@/server/sites/clientSites";
 
@@ -64,6 +64,16 @@ export async function sendLinkAction(form: FormData) {
   }
   await record(founder.email, "emailed a sign-in link", { businessId: site.businessId, detail: `${site.url} to ${site.ownerEmail}` });
   redirect(sitePage(site.slug, "link=sent"));
+}
+
+/** Signs the founder into the client's editor as themselves, so their edits are logged under their own name. */
+export async function openEditorAction(form: FormData) {
+  const founder = await requireFounder();
+  const site = await clientSite(String(form.get("slug") ?? ""));
+  if (!site) redirect("/admin/sites");
+  if (!editorReady()) redirect(sitePage(site.slug, "editor=not-ready"));
+  await record(founder.email, "opened a site's editor", { businessId: site.businessId, detail: site.url });
+  redirect(await enterUrl(site, founder.email));
 }
 
 export async function changeOwnerAction(form: FormData) {
