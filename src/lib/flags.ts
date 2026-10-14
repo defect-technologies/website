@@ -11,7 +11,7 @@ export type Fixer = (typeof FIXERS)[number];
 export const FIXER_LABEL: Record<Fixer, string> = { either: "Either of you", brendan: "Brendan", boris: "Boris", claude: "Claude" };
 
 /** A flag on the same lead and topic as an open one joins it instead of opening a second card. */
-export const FLAG_TOPICS = ["launch", "build", "preview-review", "client-waiting", "domain", "site-change", "billing", "email-quality", "other"] as const;
+export const FLAG_TOPICS = ["launch", "build", "preview-review", "client-waiting", "domain", "site-change", "billing", "email-quality", "feature-request", "other"] as const;
 export type FlagTopic = (typeof FLAG_TOPICS)[number];
 
 export const HEADLINE_LIMIT = 80;
