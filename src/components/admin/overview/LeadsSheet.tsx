@@ -1,31 +1,45 @@
-import { ArrowDownLeft, ArrowSquareOut, ArrowUpRight, ChatCircleDots, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { ArrowDownLeft, ArrowUpRight, ChatCircleDots, Eye, Globe, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { actorLabel, BOT_LABEL, type Bot } from "@/lib/bots";
-import { LEAD_STATUS_LABEL, LEAD_STATUS_OWNER, LEAD_STATUSES, type LeadStatus, type Owner } from "@/lib/leadStatus";
+import { actorLabel } from "@/lib/bots";
+import { stepParts } from "@/lib/buildStatus";
+import { LEAD_STATUS_LABEL, LEAD_STATUSES, type LeadStatus } from "@/lib/leadStatus";
 import { JOB_STATUS_LABEL } from "@/lib/previewJobs";
 import { senderName } from "@/lib/senders";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { LastEmail, LeadRow } from "@/server/overview";
 import { Cell, EmptyRow, GroupRow, RowHeader, Sheet, SheetBody, SheetRow } from "../sheet";
-import { StatusMark, When } from "../ui";
+import { StepBar } from "../BuildProgress";
+import OpenEditorButton from "../OpenEditorButton";
+import { ArmChip, StatusMark, When } from "../ui";
 import LeadStatusMark from "./LeadStatusMark";
 
-const COLUMNS = ["Business", "Now", "With", "Last email"];
+const COLUMNS = ["Business", "Now", "Price", "Last email", "Open"];
 
 /** Groups that tend to grow too long to scan, or have nothing left to do. Past a few rows they open on their own filter. */
 const FOLDABLE: LeadStatus[] = ["not_queued", "closed"];
 const FOLD_AFTER = 5;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export type Editors = Map<string, string>;
 
-function OpenPreview({ url }: { url: string }) {
-  if (!url) return null;
+const linkClass = "text-ink-soft hover:text-ink inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-sm font-medium hover:bg-paper-shade whitespace-nowrap";
+
+/** The preview, the live site and its editor, as one-click links. */
+function OpenLinks({ lead, editorSlug }: { lead: LeadRow["lead"]; editorSlug: string | undefined }) {
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="text-ink-soft inline-flex items-center gap-1 hover:underline">
-      Preview <ArrowSquareOut size={14} aria-hidden="true" />
-      <span className="sr-only"> (opens in a new tab)</span>
-    </a>
+    <span className="-mx-2 flex flex-wrap items-center">
+      {lead.previewUrl && (
+        <a href={lead.previewUrl} target="_blank" rel="noreferrer" className={linkClass}>
+          <Eye size={16} aria-hidden="true" /> Preview<span className="sr-only"> of {lead.businessName} (opens in a new tab)</span>
+        </a>
+      )}
+      {lead.siteUrl && lead.stage === "live" && (
+        <a href={lead.siteUrl} target="_blank" rel="noreferrer" className={linkClass}>
+          <Globe size={16} aria-hidden="true" /> Site<span className="sr-only"> of {lead.businessName} (opens in a new tab)</span>
+        </a>
+      )}
+      {editorSlug && <OpenEditorButton slug={editorSlug} label="Editor" variant="ghost" size="sm" />}
+    </span>
   );
 }
 
@@ -38,30 +52,30 @@ function Clipped({ text, children }: { text: string; children?: ReactNode }) {
   );
 }
 
-/** "4/6 Designing and building with Claude (this takes a while)" reads as "4/6 Designing and building with Claude". */
-function stepParts(step: string) {
-  const match = /^(\d+\/\d+)\s+(.*)$/.exec(step);
-  const words = (match?.[2] ?? step).replace(/\s*\([^)]*\)\s*$/, "");
-  return { fraction: match?.[1] ?? "", words: words || "Starting up" };
+function StepWords({ step }: { step: string }) {
+  const { done, total, words } = stepParts(step);
+  return (
+    <span>
+      {done > 0 && <span className="font-semibold tabular-nums">{done}/{total} </span>}
+      {words}
+    </span>
+  );
 }
 
-function Building({ job, now }: TimedRow) {
-  const { fraction, words } = stepParts(job?.step ?? "");
-  const started = job?.startedAt ?? job?.claimedAt ?? null;
-  const stuck = started !== null && now - started.getTime() > DAY_MS;
+const ABANDONED_DETAIL = "The runner moved on without finishing this build. Put it back in the queue on Builds.";
+
+function Building({ job, ctx }: TimedRow) {
+  if (!job) return <>Starting up</>;
+  const abandoned = ctx.abandoned.has(job.id);
   return (
-    <span className="flex flex-wrap items-center gap-x-3" title={`${job?.step || "Starting up"} on ${job?.runnerName || "the runner"}`}>
-      <span>
-        {fraction && <span className="font-semibold tabular-nums">{fraction} </span>}
-        {words}
-      </span>
-      {stuck ? (
-        <StatusMark icon={WarningCircle} tone="warn" label={<>Started <When date={started} /></>} />
-      ) : (
+    <span className="flex flex-col gap-1.5" title={`${job.step || "Starting up"} on ${job.runnerName || "the runner"}`}>
+      {!abandoned && <StepBar step={job.step} size="sm" />}
+      <span className="flex flex-wrap items-center gap-x-3">
+        {abandoned ? <StatusMark icon={WarningCircle} tone="warn" label="Abandoned" detail={ABANDONED_DETAIL} /> : <StepWords step={job.step} />}
         <span className="text-ink-faint">
-          <When date={started} />
+          <When date={job.startedAt ?? job.claimedAt} />
         </span>
-      )}
+      </span>
     </span>
   );
 }
@@ -88,7 +102,9 @@ function Skipped({ job }: LeadRow) {
   return <Clipped text={verdict}>{score ? `Their site scored ${score}` : verdict}</Clipped>;
 }
 
-type TimedRow = LeadRow & { now: number };
+export type SheetContext = { editors: Editors; abandoned: Set<string> };
+
+type TimedRow = LeadRow & { ctx: SheetContext };
 
 const NOW: Record<LeadStatus, (row: TimedRow) => ReactNode> = {
   not_queued: ({ lead }) => <Clipped text={lead.problemSummary || lead.niche || "No preview requested"} />,
@@ -110,19 +126,11 @@ const NOW: Record<LeadStatus, (row: TimedRow) => ReactNode> = {
     </span>
   ),
   skipped: Skipped,
-  needs_a_look: ({ lead, job }) => (
-    <span className="flex flex-wrap gap-x-3">
-      <Clipped text={job?.criticVerdict || "The design critic asked for changes"} />
-      <OpenPreview url={lead.previewUrl} />
-    </span>
-  ),
+  needs_a_look: ({ job }) => <Clipped text={job?.criticVerdict || "The design critic asked for changes"} />,
   ready_to_send: ({ lead }) => (
-    <span className="flex flex-wrap gap-x-3">
-      <span>
-        Built <When date={lead.previewBuiltAt} />
-      </span>
-      <OpenPreview url={lead.previewUrl} />
-    </span>
+    <>
+      Built <When date={lead.previewBuiltAt} />
+    </>
   ),
   waiting: Waiting,
   negotiating: Negotiating,
@@ -132,14 +140,14 @@ const NOW: Record<LeadStatus, (row: TimedRow) => ReactNode> = {
       {lead.plan && `, ${lead.plan}`}
     </>
   ),
+  live: ({ lead }) => (
+    <>
+      Live <When date={lead.launchedAt} />
+      {lead.plan && `, ${lead.plan}`}
+    </>
+  ),
   closed: ({ lead }) => <Clipped text={lead.note ? `${STAGE_LABEL[lead.stage]}: ${lead.note}` : STAGE_LABEL[lead.stage]}>{STAGE_LABEL[lead.stage]}</Clipped>,
 };
-
-const OWNER_LABEL: Record<Exclude<Owner, Bot>, string> = { founders: "Founders", nobody: "Nobody" };
-
-function ownerName(owner: Owner) {
-  return owner === "founders" || owner === "nobody" ? OWNER_LABEL[owner] : BOT_LABEL[owner];
-}
 
 export function LastEmailCell({ email }: { email: LastEmail | null }) {
   if (!email) return <span className="text-ink-faint">None</span>;
@@ -156,29 +164,32 @@ export function LastEmailCell({ email }: { email: LastEmail | null }) {
   );
 }
 
-function LeadLine({ row, now }: { row: LeadRow; now: number }) {
+function LeadLine({ row, ctx }: { row: LeadRow; ctx: SheetContext }) {
   const Now = NOW[row.status];
   return (
     <SheetRow dim={row.status === "closed"}>
       <RowHeader className="lg:min-w-48">
-        <Link href={`/admin/leads/${row.lead.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
+        <Link href={`/admin/sites/${row.lead.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
           {row.lead.businessName}
         </Link>
       </RowHeader>
       <Cell className="lg:min-w-72">
-        <Now {...row} now={now} />
+        <Now {...row} ctx={ctx} />
       </Cell>
-      <Cell label="With" className="whitespace-nowrap">
-        {ownerName(LEAD_STATUS_OWNER[row.status])}
+      <Cell label="Price">
+        <ArmChip arm={row.lead.priceArm} />
       </Cell>
       <Cell label="Last email">
         <LastEmailCell email={row.lastEmail} />
+      </Cell>
+      <Cell label="Open">
+        <OpenLinks lead={row.lead} editorSlug={ctx.editors.get(row.lead.id)} />
       </Cell>
     </SheetRow>
   );
 }
 
-function Group({ status, rows, folded, href, now }: { status: LeadStatus; rows: LeadRow[]; folded: boolean; href: string; now: number }) {
+function Group({ status, rows, folded, href, ctx }: { status: LeadStatus; rows: LeadRow[]; folded: boolean; href: string; ctx: SheetContext }) {
   if (rows.length === 0) return null;
   return (
     <SheetBody>
@@ -193,27 +204,28 @@ function Group({ status, rows, folded, href, now }: { status: LeadStatus; rows: 
           </Link>
         )}
       </GroupRow>
-      {!folded && rows.map((row) => <LeadLine key={row.lead.id} row={row} now={now} />)}
+      {!folded && rows.map((row) => <LeadLine key={row.lead.id} row={row} ctx={ctx} />)}
     </SheetBody>
   );
 }
 
-export function statusHref(status: LeadStatus | null) {
-  return status ? `/admin/leads?status=${status}` : "/admin/leads";
+export function statusHref(status: LeadStatus | null, query = "") {
+  const params = new URLSearchParams(Object.entries({ status: status ?? "", q: query }).filter(([, value]) => value));
+  return params.size ? `/admin/sites?${params}` : "/admin/sites";
 }
 
-function StatusFilter({ counts, selected }: { counts: Map<LeadStatus, number>; selected: LeadStatus | null }) {
+function StatusFilter({ counts, selected, query }: { counts: Map<LeadStatus, number>; selected: LeadStatus | null; query: string }) {
   const total = [...counts.values()].reduce((sum, n) => sum + n, 0);
   const options: (LeadStatus | null)[] = [null, ...LEAD_STATUSES.filter((status) => counts.get(status))];
   return (
-    <nav aria-label="Filter leads by status">
+    <nav aria-label="Filter sites by status">
       <ul className="flex flex-wrap gap-1">
         {options.map((status) => {
           const current = status === selected;
           return (
             <li key={status ?? "all"}>
               <Link
-                href={statusHref(status)}
+                href={statusHref(status, query)}
                 aria-current={current ? "page" : undefined}
                 className={`flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-ink text-paper font-semibold" : "text-ink-soft hover:bg-paper-shade"}`}
               >
@@ -234,22 +246,22 @@ function countByStatus(rows: LeadRow[]) {
   return counts;
 }
 
-/** Every lead that isn't a client yet, grouped by where it is, in the order leads move. */
-export default function LeadsSheet({ rows, selected, now }: { rows: LeadRow[]; selected: LeadStatus | null; now: number }) {
+/** Every business, lead or client, grouped by where it is in the order businesses move. */
+export default function LeadsSheet({ rows, selected, ctx, query = "" }: { rows: LeadRow[]; selected: LeadStatus | null; ctx: SheetContext; query?: string }) {
   const shown = selected ? [selected] : LEAD_STATUSES;
   return (
     <div className="flex flex-col gap-3">
-      <StatusFilter counts={countByStatus(rows)} selected={selected} />
-      <Sheet caption="Leads" columns={COLUMNS}>
+      <StatusFilter counts={countByStatus(rows)} selected={selected} query={query} />
+      <Sheet caption="Sites" columns={COLUMNS}>
         {rows.length === 0 ? (
           <SheetBody>
-            <EmptyRow span={COLUMNS.length}>No leads yet</EmptyRow>
+            <EmptyRow span={COLUMNS.length}>{query ? `Nothing matches “${query}”` : "No sites yet"}</EmptyRow>
           </SheetBody>
         ) : (
           shown.map((status) => {
             const group = rows.filter((row) => row.status === status);
             const folded = !selected && FOLDABLE.includes(status) && group.length > FOLD_AFTER;
-            return <Group key={status} status={status} rows={group} folded={folded} href={statusHref(status)} now={now} />;
+            return <Group key={status} status={status} rows={group} folded={folded} href={statusHref(status, query)} ctx={ctx} />;
           })
         )}
       </Sheet>

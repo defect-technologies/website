@@ -2,7 +2,7 @@
 
 import { CaretRight, FloppyDisk } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { saveLeadAction, type FormResult } from "@/app/admin/(panel)/leads/actions";
+import { saveLeadAction, type FormResult } from "@/app/admin/(panel)/sites/actions";
 import { STAGE_LABEL, STAGES } from "@/lib/stages";
 import type { Business } from "@/server/db/schema";
 import { SelectField, TextAreaField, TextField } from "./fields";

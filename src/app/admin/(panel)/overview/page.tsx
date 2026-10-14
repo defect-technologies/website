@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** The Overview's sheets moved to Leads, Clients and Setup. */
+/** The Overview's sheets moved to Sites. */
 export default function Moved() {
-  redirect("/admin/leads");
+  redirect("/admin/sites");
 }

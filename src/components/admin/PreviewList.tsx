@@ -167,7 +167,7 @@ function PreviewRow({ site }: { site: PreviewSite }) {
       <span className="col-start-2 row-start-1 flex items-center justify-end @[26rem]:col-start-auto @[26rem]:row-start-auto">
         <CopyLinkButton url={latest.url} />
         {site.owner ? (
-          <Link href={`/admin/leads/${site.owner.id}`} title="Open the lead" className="text-ink-faint hover:text-ink hover:bg-paper-shade grid size-9 place-items-center rounded-full">
+          <Link href={`/admin/sites/${site.owner.id}`} title="Open the lead" className="text-ink-faint hover:text-ink hover:bg-paper-shade grid size-9 place-items-center rounded-full">
             <Kanban size={18} aria-hidden="true" />
             <span className="sr-only">Open {site.name} in the pipeline</span>
           </Link>

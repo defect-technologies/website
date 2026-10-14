@@ -2,7 +2,7 @@
 
 import { Plus } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { addSiteAction, type AddSiteResult } from "@/app/admin/(panel)/clients/actions";
+import { addSiteAction, type AddSiteResult } from "@/app/admin/(panel)/sites/live/actions";
 import SubmitButton from "./SubmitButton";
 import { SelectField, TextField } from "./fields";
 import { Card, Notice } from "./ui";

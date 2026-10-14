@@ -43,7 +43,7 @@ function LeadMatch({ lead }: { lead: MatchedLead }) {
   if (!lead) return null;
   return (
     <p className="text-warn flex flex-wrap items-center gap-2 text-sm font-medium" title="Building a preview uses this lead, and gives it the request email if we haven't emailed it yet.">
-      <Link href={`/admin/leads/${lead.id}`} className="underline underline-offset-4">
+      <Link href={`/admin/sites/${lead.id}`} className="underline underline-offset-4">
         Same as {lead.businessName}
       </Link>
       <StageChip stage={lead.stage} />

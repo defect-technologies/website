@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Conversation from "@/components/admin/Conversation";
 import EmptyState from "@/components/admin/EmptyState";
-import { CheckMailButton, OptOutButton, ReplyBox } from "@/components/admin/ThreadControls";
-import { ArmChip, Card, Notice, PageHeader, StageChip, When } from "@/components/admin/ui";
-import { sentByLine } from "@/lib/senders";
-import type { Business, Message } from "@/server/db/schema";
+import { CheckMailButton } from "@/components/admin/ThreadControls";
+import { PageHeader, When } from "@/components/admin/ui";
 import { businessById } from "@/server/leads/businesses";
-import { domainOf } from "@/server/mail/mime";
-import { looksLikeOptOut } from "@/server/mail/sync";
 import { markThreadRead, threadFor, threadSummaries, type ThreadSummary } from "@/server/mail/threads";
 
 export const metadata: Metadata = { title: "Messages" };
@@ -46,59 +43,6 @@ function ThreadList({ threads, selected }: { threads: ThreadSummary[]; selected?
   );
 }
 
-function MessageBlock({ message, business }: { message: Message; business: Business }) {
-  const ours = message.direction === "out";
-  return (
-    <article className={`flex flex-col gap-2 rounded-2xl p-4 ${ours ? "bg-paper-shade/60 ml-6 sm:ml-12" : "bg-surface shadow-card mr-6 sm:mr-12"}`}>
-      <header className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-        <span className="font-semibold">{ours ? sentByLine(message.sentBy) : business.businessName}</span>
-        <span className="text-ink-faint">
-          {ours ? `to ${message.toAddress}` : message.fromAddress}, <When date={message.at} />
-        </span>
-      </header>
-      <p className="leading-relaxed break-words whitespace-pre-wrap">{message.body}</p>
-    </article>
-  );
-}
-
-function ThreadView({ business, thread }: { business: Business; thread: Message[] }) {
-  // Newest first, so the latest reply is at the top and the first cold email at the bottom.
-  const newestFirst = [...thread].reverse();
-  const lastIncoming = newestFirst.find((m) => m.direction === "in");
-  const suggestOptOut = Boolean(lastIncoming && looksLikeOptOut(lastIncoming.body)) && business.stage !== "opted_out";
-  return (
-    <div className="flex min-w-0 flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-2xl font-semibold">
-            <Link href={`/admin/leads/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
-              {business.businessName}
-            </Link>
-          </h2>
-          <StageChip stage={business.stage} />
-          <ArmChip arm={business.priceArm} />
-        </div>
-        {business.stage !== "opted_out" && <OptOutButton businessId={business.id} domain={domainOf(business.email)} suggested={suggestOptOut} />}
-      </header>
-      {suggestOptOut && <Notice tone="warn">Their last message reads like a no. Mark them opted out?</Notice>}
-      {business.stage === "opted_out" ? (
-        <Notice tone="bad">Opted out. Nothing more can be sent.</Notice>
-      ) : (
-        <Card className="p-4">
-          <ReplyBox businessId={business.id} to={lastIncoming?.fromAddress ?? business.email} />
-        </Card>
-      )}
-      <ol className="flex flex-col gap-3" aria-label="Messages, newest first">
-        {newestFirst.map((message) => (
-          <li key={message.id}>
-            <MessageBlock message={message} business={business} />
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
 /** The asked-for conversation, else the first one with unread mail, else the newest. Opening it marks it read. */
 async function openThread(threads: ThreadSummary[], asked?: string) {
   const selectedId = asked ?? threads.find((t) => t.unread > 0)?.business.id ?? threads[0]?.business.id;
@@ -123,7 +67,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       ) : (
         <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <ThreadList threads={threads} selected={business?.id} />
-          {business && <ThreadView business={business} thread={thread} />}
+          {business && <Conversation business={business} thread={thread} />}
         </div>
       )}
     </>

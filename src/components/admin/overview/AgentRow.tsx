@@ -2,13 +2,14 @@ import { Play, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { resumeRunnerAction } from "@/app/admin/(panel)/setup/bots/actions";
 import { BOT_LABEL } from "@/lib/bots";
+import { stepParts } from "@/lib/buildStatus";
+import type { RunnerStatus } from "@/server/runner/status";
 import type { AgentState, RunnerDay } from "@/server/overview";
 import SubmitButton from "../SubmitButton";
 import { Card, StatusMark, timeAgo } from "../ui";
 import WorkingDot from "./WorkingDot";
 
 const RECENT_CALL_MS = 5 * 60 * 1000;
-const STUCK_MS = 24 * 60 * 60 * 1000;
 
 const pacific = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
 
@@ -52,18 +53,22 @@ function Bot({ agent, now }: { agent: AgentState; now: number }) {
   );
 }
 
-function Runner({ agent, runner, now }: { agent: AgentState; runner: RunnerDay; now: number }) {
-  const stuck = agent.building.filter((job) => now - (job.startedAt ?? job.claimedAt ?? new Date(now)).getTime() > STUCK_MS);
+function Runner({ builds, runner }: { builds: RunnerStatus; runner: RunnerDay }) {
+  const now = builds.current[0];
   return (
     <li className="flex flex-wrap items-center gap-x-3">
-      <Link href="/admin/leads?status=building" className="hover:bg-paper-shade flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm">
-        <PresenceMark presence={agent.building.length > 0 ? "working" : "idle"} />
-        <span className={agent.building.length > 0 ? "text-ink font-medium" : "text-ink-soft"}>Runner</span>
+      <Link href="/admin/builds" className="hover:bg-paper-shade flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm">
+        <PresenceMark presence={now ? "working" : "idle"} />
+        <span className={now ? "text-ink font-medium" : "text-ink-soft"}>Runner</span>
         <span className="text-ink-faint tabular-nums">
-          {agent.building.length} building, {runner.built}/{runner.settings.dailyCap} today
+          {now ? `${now.businessName}, ${stepParts(now.step).done || 1}/${stepParts(now.step).total}` : "idle"}, {builds.queue.length} queued, {runner.built}/{runner.settings.dailyCap} today
         </span>
       </Link>
-      {stuck.length > 0 && <StatusMark icon={WarningCircle} tone="warn" label={`${stuck.length} stuck over a day`} detail={stuck.map((job) => job.businessName).join(", ")} />}
+      {builds.abandoned.length > 0 && (
+        <Link href="/admin/builds" className="rounded-xl px-1 hover:underline">
+          <StatusMark icon={WarningCircle} tone="warn" label={`${builds.abandoned.length} abandoned`} detail={builds.abandoned.map((job) => job.businessName).join(", ")} />
+        </Link>
+      )}
     </li>
   );
 }
@@ -82,8 +87,7 @@ function Paused({ until }: { until: Date }) {
 }
 
 /** Every bot and the preview runner on one line: who's working, and anything stuck. */
-export default function AgentRow({ agents, now, runner }: { agents: AgentState[]; now: number; runner: RunnerDay }) {
-  const runnerAgent = agents.find((agent) => agent.bot === "runner");
+export default function AgentRow({ agents, now, runner, builds }: { agents: AgentState[]; now: number; runner: RunnerDay; builds: RunnerStatus }) {
   return (
     <Card className="px-2 py-1">
       <h2 className="sr-only">Bots</h2>
@@ -93,7 +97,7 @@ export default function AgentRow({ agents, now, runner }: { agents: AgentState[]
           .map((agent) => (
             <Bot key={agent.bot} agent={agent} now={now} />
           ))}
-        {runnerAgent && <Runner agent={runnerAgent} runner={runner} now={now} />}
+        <Runner builds={builds} runner={runner} />
         {runner.pausedUntil && <Paused until={runner.pausedUntil} />}
       </ul>
     </Card>

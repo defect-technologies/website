@@ -35,5 +35,5 @@ export async function POST(request: Request) {
   await advanceStage(business.id, "preview_built");
   await record("preview builder", "preview built", { businessId: business.id, detail: preview_url });
   await maybePickForSpotCheck(business, preview_url, null, "preview builder");
-  return NextResponse.json({ ok: true, admin: new URL(`/admin/leads/${business.id}`, env.siteUrl()).toString() });
+  return NextResponse.json({ ok: true, admin: new URL(`/admin/sites/${business.id}`, env.siteUrl()).toString() });
 }

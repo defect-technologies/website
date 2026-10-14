@@ -200,7 +200,7 @@ function ProspectRow({ prospect }: { prospect: Prospect }) {
         <div className="flex flex-col gap-3 px-4 pt-1 pb-4 ps-[34px]">
           <KeyValue rows={facts(prospect)} />
           {prospect.businessId && (
-            <Link href={`/admin/leads/${prospect.businessId}`} className={buttonClasses("soft", "sm", "w-fit")}>
+            <Link href={`/admin/sites/${prospect.businessId}`} className={buttonClasses("soft", "sm", "w-fit")}>
               Open the lead
             </Link>
           )}

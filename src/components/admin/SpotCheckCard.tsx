@@ -47,7 +47,7 @@ export default function SpotCheckCard({ row }: { row: SpotCheckRow }) {
         <input type="hidden" name="id" value={check.id} />
         <header className="flex flex-wrap items-baseline justify-between gap-x-3">
           <h3 className="text-lg font-semibold">
-            <Link href={`/admin/leads/${check.businessId}`} className="hover:underline">
+            <Link href={`/admin/sites/${check.businessId}`} className="hover:underline">
               {businessName}
             </Link>
           </h3>

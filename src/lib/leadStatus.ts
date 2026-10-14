@@ -5,9 +5,9 @@ import type { Stage } from "./stages";
 /**
  * Where a lead is, in the order it moves. The stage alone can't say this: a new
  * lead might be untouched, queued, building, or stuck on a failed build, which
- * only its latest preview job knows. Live leads are clients and have no status.
+ * only its latest preview job knows. A live lead is a client.
  */
-export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "skipped", "needs_a_look", "ready_to_send", "waiting", "negotiating", "setting_up", "closed"] as const;
+export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "skipped", "needs_a_look", "ready_to_send", "waiting", "negotiating", "setting_up", "live", "closed"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
@@ -21,6 +21,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   waiting: "Waiting for reply",
   negotiating: "Negotiating",
   setting_up: "Setting up",
+  live: "Live",
   closed: "Closed",
 };
 
@@ -38,6 +39,7 @@ export const LEAD_STATUS_OWNER: Record<LeadStatus, Owner> = {
   waiting: "outreach",
   negotiating: "outreach",
   setting_up: "onboarding",
+  live: "client_care",
   closed: "nobody",
 };
 
@@ -47,6 +49,7 @@ const BY_STAGE: Partial<Record<Stage, LeadStatus>> = {
   clicked: "waiting",
   replied: "negotiating",
   paid: "setting_up",
+  live: "live",
   lost: "closed",
   opted_out: "closed",
 };

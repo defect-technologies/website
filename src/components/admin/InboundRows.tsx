@@ -68,7 +68,7 @@ export function PastRow({ request }: { request: InboundRequest }) {
       </span>
       <div className="flex items-start">
         {request.businessId ? (
-          <Link href={`/admin/leads/${request.businessId}`} className="inline-flex items-center gap-1 font-medium hover:underline">
+          <Link href={`/admin/sites/${request.businessId}`} className="inline-flex items-center gap-1 font-medium hover:underline">
             Open lead <ArrowRight size={14} aria-hidden="true" />
           </Link>
         ) : (

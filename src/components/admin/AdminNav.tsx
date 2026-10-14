@@ -8,11 +8,11 @@ import {
   ClockCounterClockwise,
   Eye,
   GearSix,
+  Hammer,
   type Icon,
   PencilSimpleLine,
   PlugsConnected,
   Robot,
-  Storefront,
   SunHorizon,
   VideoCamera,
   Wallet,
@@ -20,8 +20,10 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
+import WorkingDot from "./overview/WorkingDot";
+import SearchBox from "./SearchBox";
 
-type Item = { href: string; label: string; icon: Icon; count?: number };
+type Item = { href: string; label: string; icon: Icon; count?: number; live?: boolean };
 
 const SETUP: Item[] = [
   { href: "/admin/setup/bots", label: "Bots", icon: Robot },
@@ -48,6 +50,12 @@ function NavLink({ item, current, index }: { item: Item; current: boolean; index
       {current && <KnifeStroke variant={index} className="text-vermilion/25 absolute inset-x-1 inset-y-1.5 -z-10 h-[calc(100%-0.75rem)] w-[calc(100%-0.5rem)]" />}
       <ItemIcon size={20} weight={current ? "fill" : "regular"} aria-hidden="true" />
       <span className="flex-1">{item.label}</span>
+      {item.live && (
+        <span title="Building now">
+          <WorkingDot />
+          <span className="sr-only"> building now</span>
+        </span>
+      )}
       {Boolean(item.count) && (
         <span className="bg-ink text-paper min-w-6 rounded-full px-1.5 text-center text-sm font-semibold tabular-nums">
           {item.count}
@@ -78,18 +86,20 @@ function SetupGroup({ pathname }: { pathname: string }) {
   );
 }
 
-export default function AdminNav({ counts }: { counts: { today: number; messages: number } }) {
+export default function AdminNav({ counts, building }: { counts: { today: number; messages: number }; building: boolean }) {
   const pathname = usePathname();
   const items: Item[] = [
     { href: "/admin", label: "Today", icon: SunHorizon, count: counts.today },
-    { href: "/admin/leads", label: "Leads", icon: Storefront },
-    { href: "/admin/clients", label: "Clients", icon: Browsers },
+    { href: "/admin/builds", label: "Builds", icon: Hammer, live: building },
+    { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },
     { href: "/admin/money", label: "Money", icon: Wallet },
   ];
 
   return (
-    <nav aria-label="Admin" className="flex flex-col gap-1">
+    <nav aria-label="Admin" className="flex flex-col gap-3">
+      <SearchBox />
+      <div className="flex flex-col gap-1">
       <ul className="flex flex-wrap gap-x-1 lg:flex-col">
         {items.map((item, index) => (
           <li key={item.href}>
@@ -98,6 +108,7 @@ export default function AdminNav({ counts }: { counts: { today: number; messages
         ))}
       </ul>
       <SetupGroup pathname={pathname} />
+      </div>
     </nav>
   );
 }

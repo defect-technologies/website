@@ -1,5 +1,5 @@
 import { Trash, WarningCircle } from "@phosphor-icons/react/dist/ssr";
-import { removeBrandFileAction } from "@/app/admin/(panel)/leads/actions";
+import { removeBrandFileAction } from "@/app/admin/(panel)/sites/actions";
 import { MAX_BRAND_FILES } from "@/lib/brandFiles";
 import type { BrandFile } from "@/server/db/schema";
 import BrandFileUpload from "./BrandFileUpload";

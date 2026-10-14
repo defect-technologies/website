@@ -28,13 +28,13 @@ async function lastEmails(): Promise<Map<string, LastEmail>> {
 }
 
 /** Every business with its latest build and email. Live ones are clients; the rest are leads. */
-export async function sheetRows(): Promise<{ leads: LeadRow[]; clients: LeadRow[]; readAt: number }> {
+export async function sheetRows(): Promise<{ all: LeadRow[]; leads: LeadRow[]; clients: LeadRow[]; readAt: number }> {
   const [all, jobs, emails] = await Promise.all([(await db()).select().from(businesses).orderBy(desc(businesses.updatedAt)), latestJobs(), lastEmails()]);
   const rows = all.map((lead) => {
     const job = jobs.get(lead.id) ?? null;
     return { lead, job, lastEmail: emails.get(lead.id) ?? null, status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? "") };
   });
-  return { leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live"), readAt: Date.now() };
+  return { all: rows, leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live"), readAt: Date.now() };
 }
 
 export type ActivityRow = Activity & { businessName: string | null };

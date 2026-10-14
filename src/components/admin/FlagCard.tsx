@@ -1,7 +1,7 @@
 import { ArrowClockwise, ArrowSquareOut, Check, Clock, PencilSimple, Robot } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { approvePreviewAction, requestPreviewAction } from "@/app/admin/(panel)/leads/actions";
+import { approvePreviewAction, requestPreviewAction } from "@/app/admin/(panel)/sites/actions";
 import { handToClaudeAction, resolveFlagAction } from "@/app/admin/(panel)/review/actions";
 import { buttonClasses } from "@/components/Button";
 import { FIXER_LABEL, type Fixer } from "@/lib/flags";
@@ -162,7 +162,7 @@ function CardMeta({ row }: { row: FlagRow }) {
       {flag.priority === "urgent" && <span className="bg-bad text-paper rounded-full px-2.5 py-0.5 font-medium">Urgent</span>}
       {flag.needs === "fix" && <span className="text-ink font-medium">{FIXER_LABEL[flag.fixer as Fixer]}</span>}
       {flag.businessId && (
-        <Link href={`/admin/leads/${flag.businessId}`} className="hover:text-ink hover:underline">
+        <Link href={`/admin/sites/${flag.businessId}`} className="hover:text-ink hover:underline">
           {businessName ?? "Lead"}
         </Link>
       )}
