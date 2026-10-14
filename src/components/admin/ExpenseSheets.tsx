@@ -1,6 +1,6 @@
 import { ArrowsClockwise, Trash } from "@phosphor-icons/react/dist/ssr";
 import type { ReactNode } from "react";
-import { deleteExpenseAction, stopRecurringAction, updateExpenseCellAction, updateRecurringCellAction } from "@/app/admin/(panel)/expenses/actions";
+import { deleteExpenseAction, stopRecurringAction, updateExpenseCellAction, updateRecurringCellAction } from "@/app/admin/(panel)/money/actions";
 import { FOUNDERS } from "@/lib/founders";
 import { FREQUENCY_LABEL, nextDue } from "@/lib/recurrence";
 import type { Expense, ExpenseFrequency, RecurringExpense } from "@/server/db/schema";

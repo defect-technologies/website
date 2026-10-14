@@ -2,7 +2,7 @@
 
 import { FloppyDisk } from "@phosphor-icons/react";
 import { useActionState, useRef, useState } from "react";
-import { saveTemplateAction, type TemplateResult } from "@/app/admin/(panel)/template/actions";
+import { saveTemplateAction, type TemplateResult } from "@/app/admin/(panel)/setup/template/actions";
 import { PLACEHOLDERS, type OutreachSettings, type Placeholder, type TemplateValues } from "@/lib/emailTemplate";
 import { controlClass, TextField } from "./fields";
 import Letter from "./Letter";
@@ -100,18 +100,17 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
             value={requestSubject}
             onChange={(e) => setRequestSubject(e.target.value)}
             required
-            hint="Used when they asked through the form. When they emailed us, it answers in their thread instead."
           />
           <TemplateArea id="requestEmail" label="Email with their preview" value={requestEmail} onChange={setRequestEmail} />
         </fieldset>
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-2 text-lg font-semibold">Sender</legend>
           <TextField label="Name" name="senderName" value={senderName} onChange={(e) => setSenderName(e.target.value)} required />
-          <TextField label="Mailing address" name="mailingAddress" value={address} onChange={(e) => setAddress(e.target.value)} hint="The virtual mailing address. Every cold email has to carry one." />
+          <TextField label="Mailing address" name="mailingAddress" value={address} onChange={(e) => setAddress(e.target.value)} />
         </fieldset>
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-2 text-lg font-semibold">Pace</legend>
-          <TextField label="Emails a day" name="dailyLimit" type="number" min={1} max={50} defaultValue={settings.dailyLimit} hint="First emails and follow-ups together." />
+          <TextField label="Emails a day" name="dailyLimit" type="number" min={1} max={50} defaultValue={settings.dailyLimit} />
           <TextField label="Follow up after (days)" name="followUpAfterDays" type="number" min={1} max={30} defaultValue={settings.followUpAfterDays} />
         </fieldset>
         {state.message && <Notice tone={state.ok ? "good" : "bad"}>{state.message}</Notice>}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type KeyboardEvent } from "react";
-import type { CellResult } from "@/app/admin/(panel)/expenses/actions";
+import type { CellResult } from "@/app/admin/(panel)/money/actions";
 
 type Option = { value: string; label: string };
 

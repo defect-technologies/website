@@ -29,6 +29,6 @@ export async function POST(request: Request) {
     jobId: job.id,
     jobStatus: job.status,
     queued: createdJob,
-    admin: new URL(`/admin/pipeline/${lead.id}`, env.siteUrl()).toString(),
+    admin: new URL(`/admin/leads/${lead.id}`, env.siteUrl()).toString(),
   });
 }

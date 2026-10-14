@@ -9,7 +9,7 @@ import type { OutgoingEmail } from "./mime";
 
 export class NoSendingInbox extends Error {
   constructor() {
-    super("No sending inbox is connected. Connect it on the Projects page, then try again.");
+    super("No sending inbox is connected. Connect it in Setup > Connections, then try again.");
   }
 }
 

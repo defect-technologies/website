@@ -65,8 +65,8 @@ export async function requestPreviewAction(form: FormData) {
   if (!lead) return;
   const note = String(form.get("note") ?? "").trim().slice(0, 2000);
   await requestPreview(lead, founder.email, note);
-  revalidatePath(`/admin/pipeline/${lead.id}`);
-  revalidatePath("/admin/projects");
+  revalidatePath("/admin", "layout");
+  revalidatePath("/admin", "layout");
 }
 
 /** Queues a launch on the runner. When it finishes, the site is added to Sites so its owner can sign in at /edit. */
@@ -75,8 +75,8 @@ export async function launchSiteAction(form: FormData) {
   const lead = await businessById(String(form.get("id") ?? ""));
   if (!lead || launchBlocker(lead)) return;
   await requestPreview(lead, founder.email, "", "launch");
-  revalidatePath(`/admin/pipeline/${lead.id}`);
-  revalidatePath("/admin/sites");
+  revalidatePath("/admin", "layout");
+  revalidatePath("/admin", "layout");
 }
 
 /** A founder has looked at a preview the design critic held back, and it's fine to send. */
@@ -109,12 +109,12 @@ export async function saveBrandFileAction(file: z.input<typeof UploadedBrandFile
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Couldn't save that file." };
   }
-  revalidatePath(`/admin/pipeline/${leadId}`);
+  revalidatePath("/admin", "layout");
   return { ok: true, message: "" };
 }
 
 export async function removeBrandFileAction(leadId: string, form: FormData) {
   const founder = await requireFounder();
   await removeBrandFile(String(form.get("id") ?? ""), leadId, founder.email);
-  revalidatePath(`/admin/pipeline/${leadId}`);
+  revalidatePath("/admin", "layout");
 }

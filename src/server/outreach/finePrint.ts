@@ -16,7 +16,7 @@ export type FinePrinted = { ok: true; body: string } | { ok: false; error: strin
 export function withSalesFinePrint(business: Business, body: string, settings: OutreachSettings): FinePrinted {
   if (CLIENT_STAGES.includes(business.stage)) return { ok: true, body };
   const address = settings.mailingAddress.trim();
-  if (!address) return { ok: false, error: "Add the mailing address on the Template page first. The law requires it on email to prospects." };
+  if (!address) return { ok: false, error: "Add the mailing address in Setup > Email template first. The law requires it on email to prospects." };
   if (body.includes(address)) return { ok: true, body };
   return { ok: true, body: `${body.trimEnd()}\n\n${fillTemplate(SALES_FINE_PRINT, { address })}` };
 }

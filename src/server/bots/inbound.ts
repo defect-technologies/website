@@ -91,7 +91,7 @@ export async function sortInbound(key: BotKey, id: string, body: z.infer<typeof 
   mustBe(key, ["client_care"]);
   const request = await inboundById(id);
   if (!request) throw new BotError(404, "Nothing in the inbound list has that ID.");
-  if (request.kind !== "unsorted") throw new BotError(409, `This email was already sorted as ${request.kind}. A founder can move it on the Requests page.`);
+  if (request.kind !== "unsorted") throw new BotError(409, `This email was already sorted as ${request.kind}. A founder can move it from Today in the admin.`);
   const flagId = await flagFor(request, body);
   const details = { name: body.name, businessName: body.businessName, website: body.website, about: body.about };
   const [sorted] = await (await db())

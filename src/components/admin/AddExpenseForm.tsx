@@ -2,7 +2,7 @@
 
 import { Plus } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { addExpenseAction, type AddExpenseResult } from "@/app/admin/(panel)/expenses/actions";
+import { addExpenseAction, type AddExpenseResult } from "@/app/admin/(panel)/money/actions";
 import { FREQUENCIES, FREQUENCY_LABEL } from "@/lib/recurrence";
 import SubmitButton from "./SubmitButton";
 import { controlClass, TextField } from "./fields";

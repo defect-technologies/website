@@ -1,7 +1,7 @@
 import type { ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
 /**
- * The spreadsheet the Overview is built from: a sticky header, hairline
+ * The spreadsheet the Leads, Clients and Activity pages are built from: a sticky header, hairline
  * gridlines and compact rows inside one card. Below the lg breakpoint there
  * isn't room for the columns, so each row stacks into a block and cells name
  * themselves with their label. The explicit roles keep it a table to screen

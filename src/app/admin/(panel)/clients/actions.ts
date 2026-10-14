@@ -45,16 +45,16 @@ export async function addSiteAction(_previous: AddSiteResult, form: FormData): P
   if (!site) return { problems: [`There's already a site called ${slug}. Pick another slug.`], values };
 
   await record(founder.email, "added a site", { businessId: site.businessId, detail: `${site.url}, owned by ${site.ownerEmail}` });
-  revalidatePath("/admin/sites", "layout");
-  redirect(`/admin/sites/${encodeURIComponent(slug)}?added=1`);
+  revalidatePath("/admin", "layout");
+  redirect(`/admin/clients/${encodeURIComponent(slug)}?added=1`);
 }
 
-const sitePage = (slug: string, query: string) => `/admin/sites/${encodeURIComponent(slug)}?${query}`;
+const sitePage = (slug: string, query: string) => `/admin/clients/${encodeURIComponent(slug)}?${query}`;
 
 export async function sendLinkAction(form: FormData) {
   const founder = await requireFounder();
   const site = await clientSite(String(form.get("slug") ?? ""));
-  if (!site) redirect("/admin/sites");
+  if (!site) redirect("/admin/clients");
   if (!linksReady()) redirect(sitePage(site.slug, "link=not-ready"));
   try {
     await emailSignInLink(site);
@@ -70,7 +70,7 @@ export async function sendLinkAction(form: FormData) {
 export async function openEditorAction(form: FormData) {
   const founder = await requireFounder();
   const site = await clientSite(String(form.get("slug") ?? ""));
-  if (!site) redirect("/admin/sites");
+  if (!site) redirect("/admin/clients");
   if (!editorReady()) redirect(sitePage(site.slug, "editor=not-ready"));
   await record(founder.email, "opened a site's editor", { businessId: site.businessId, detail: site.url });
   redirect(await enterUrl(site, founder.email));
@@ -82,8 +82,8 @@ export async function changeOwnerAction(form: FormData) {
   const parsed = ownerEmail.safeParse(String(form.get("ownerEmail") ?? "").trim());
   if (!parsed.success) redirect(sitePage(slug, "owner=invalid"));
   const site = await changeSiteOwner(slug, parsed.data);
-  if (!site) redirect("/admin/sites");
+  if (!site) redirect("/admin/clients");
   await record(founder.email, "changed a site's owner", { businessId: site.businessId, detail: `${site.url} is now owned by ${site.ownerEmail}` });
-  revalidatePath("/admin/sites", "layout");
+  revalidatePath("/admin", "layout");
   redirect(sitePage(slug, "owner=changed"));
 }

@@ -94,7 +94,7 @@ function Header({ business, kind, editing }: { business: Business; kind: QueueCa
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <h3 className="text-xl font-semibold">
-        <Link href={`/admin/pipeline/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
+        <Link href={`/admin/leads/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
           {business.businessName}
         </Link>
       </h3>
@@ -249,7 +249,7 @@ function BodyField({ id, edits, onChange }: EditorProps) {
 function EmailEditor({ id, edits, onChange }: EditorProps) {
   return (
     <div className="bg-paper flex flex-col gap-4 rounded-xl p-4 sm:p-5">
-      <AddressField id={id} edits={edits} onChange={onChange} field="to" label="To" hint="Separate several addresses with commas." />
+      <AddressField id={id} edits={edits} onChange={onChange} field="to" label="To" />
       <CopyFields id={id} edits={edits} onChange={onChange} />
       <TextField id={`${id}-subject`} label="Subject" value={edits.subject} onChange={(event) => onChange("subject", event.target.value)} />
       <BodyField id={id} edits={edits} onChange={onChange} />
@@ -280,7 +280,7 @@ function EditControls({ editing, pending, onStart, onDiscard }: { editing: Email
     <>
       <SaveDraftButton editing={editing} busy={busy} />
       <Button variant="ghost" onClick={onDiscard} disabled={busy} icon={<ArrowCounterClockwise size={18} aria-hidden="true" />}>
-        Go back to the template
+        Use the template
       </Button>
     </>
   );

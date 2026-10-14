@@ -9,7 +9,7 @@ import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
 import type { FlagRow } from "../bots/flags";
 import { spentToday } from "../runner/jobs";
 
-const reviewLink = (flag?: Flag) => `${env.siteUrl()}/admin/review${flag ? `#flag-${flag.id}` : ""}`;
+const reviewLink = (flag?: Flag) => `${env.siteUrl()}/admin${flag ? `#flag-${flag.id}` : ""}`;
 
 export async function emailFounders(subject: string, body: string) {
   const to = env.founderEmails().join(", ");
@@ -20,7 +20,7 @@ export async function emailFounders(subject: string, body: string) {
 /** Who acts on the card, as the email and the review queue both say it. */
 export function whoActs(flag: Pick<Flag, "needs" | "fixer">): string {
   if (flag.needs === "decision") return "Needs a decision from either of you.";
-  if (flag.fixer === "claude") return "Claude can fix this: copy the fix prompt from the review queue into Claude Code.";
+  if (flag.fixer === "claude") return "Claude can fix this: press Hand to Claude on Today in the admin.";
   return `${FIXER_LABEL[flag.fixer as Fixer]} can fix this.`;
 }
 

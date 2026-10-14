@@ -1,4 +1,5 @@
-import { CheckCircle, Warning, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import type { Icon } from "@phosphor-icons/react";
+import { CheckCircle, Info, Warning, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { HTMLAttributes, ReactNode } from "react";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { Stage } from "@/server/db/schema";
@@ -13,6 +14,19 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
       <h1 className="font-display text-5xl leading-none font-black">{title}</h1>
       {children && <div className="flex flex-wrap items-center gap-3">{children}</div>}
     </header>
+  );
+}
+
+/** One kind of work on a page: a heading with its count, an optional action at the right, and the items. */
+export function Section({ id, title, count, action, children }: { id?: string; title: string; count?: number; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section id={id} aria-label={title} className="flex scroll-mt-6 flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionHeading count={count}>{title}</SectionHeading>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -107,5 +121,38 @@ export function When({ date }: { date: Date | null }) {
     <time dateTime={date.toISOString()} title={fullDate.format(date)}>
       {timeAgo(date)}
     </time>
+  );
+}
+
+export type StatusTone = "good" | "warn" | "bad" | "quiet" | "ink";
+
+const STATUS_TONE: Record<StatusTone, string> = { good: "text-good", warn: "text-warn", bad: "text-bad", quiet: "text-ink-faint", ink: "text-ink" };
+
+/** A state as an icon and a word or two. The sentence behind it is in the tooltip and read to screen readers. */
+export function StatusMark({ icon: MarkIcon, tone = "quiet", label, detail }: { icon: Icon; tone?: StatusTone; label: ReactNode; detail?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap ${STATUS_TONE[tone]}`} title={detail}>
+      <MarkIcon size={16} weight="fill" aria-hidden="true" className="shrink-0" />
+      {label}
+      {detail && <span className="sr-only">: {detail}</span>}
+    </span>
+  );
+}
+
+/** Help a founder only needs once: an info mark that shows the text on hover or keyboard focus. */
+export function InfoTip({ children, className = "" }: { children: string; className?: string }) {
+  return (
+    <span className={`group/tip relative inline-flex align-middle ${className}`}>
+      <span tabIndex={0} className="text-ink-faint hover:text-ink focus-visible:outline-ink inline-flex size-6 items-center justify-center rounded-full focus-visible:outline-2">
+        <Info size={16} aria-hidden="true" />
+        <span className="sr-only">{children}</span>
+      </span>
+      <span
+        aria-hidden="true"
+        className="bg-ink text-paper pointer-events-none invisible absolute bottom-full left-1/2 z-20 mb-1.5 w-max max-w-64 -translate-x-1/2 rounded-lg px-2.5 py-1.5 text-sm font-normal text-pretty opacity-0 shadow-lg transition-opacity duration-150 group-hover/tip:visible group-hover/tip:opacity-100 group-focus-within/tip:visible group-focus-within/tip:opacity-100"
+      >
+        {children}
+      </span>
+    </span>
   );
 }

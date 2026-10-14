@@ -18,7 +18,7 @@ export async function createBotKeyAction(_previous: CreateKeyState, form: FormDa
   if (!parsed.success) return { key: "", bot: String(form.get("bot") ?? ""), error: parsed.error.issues[0]?.message ?? "Check the form." };
   const { key } = await createBotKey(parsed.data.bot, parsed.data.name, founder.email);
   await record(founder.email, "created a bot key", { detail: `${BOT_LABEL[parsed.data.bot]}: ${parsed.data.name}` });
-  revalidatePath("/admin/bots");
+  revalidatePath("/admin", "layout");
   return { key, bot: parsed.data.bot, error: "" };
 }
 
@@ -26,7 +26,7 @@ export async function revokeBotKeyAction(form: FormData) {
   const founder = await requireFounder();
   const revoked = await revokeBotKey(String(form.get("id") ?? ""));
   if (revoked) await record(founder.email, "revoked a bot key", { detail: `${BOT_LABEL[revoked.bot]}: ${revoked.name}` });
-  revalidatePath("/admin/bots");
+  revalidatePath("/admin", "layout");
 }
 
 const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean(), autoQueue: z.boolean() });

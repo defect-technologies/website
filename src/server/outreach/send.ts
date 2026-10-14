@@ -61,7 +61,7 @@ function optedOutRecipient(edits: EmailEdits | undefined, blocked: Set<string>) 
 async function prepare(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<Prepared | string> {
   const [stored, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
   if (!stored) return "That business no longer exists.";
-  if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit on the Template page, or send tomorrow.`;
+  if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit in Setup > Email template, or send tomorrow.`;
   const optedOut = optedOutRecipient(edits, blocked);
   if (optedOut) return optedOut;
   const business = edits ? { ...stored, email: edits.to[0] } : stored;

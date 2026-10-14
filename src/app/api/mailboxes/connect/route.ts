@@ -7,6 +7,6 @@ import { env } from "@/server/env";
 export async function GET(request: NextRequest) {
   await requireFounder();
   const google = googleClient("mail");
-  if (!google) return NextResponse.redirect(new URL("/admin/projects?mailbox=not-configured", env.siteUrl()));
+  if (!google) return NextResponse.redirect(new URL("/admin/setup/connections?mailbox=not-configured", env.siteUrl()));
   return NextResponse.redirect(await authorizationUrl("mail", google, request.nextUrl.searchParams.get("hint") ?? ""));
 }

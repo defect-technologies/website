@@ -1,10 +1,10 @@
-import { Trash } from "@phosphor-icons/react/dist/ssr";
-import { removeBrandFileAction } from "@/app/admin/(panel)/pipeline/actions";
+import { Trash, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { removeBrandFileAction } from "@/app/admin/(panel)/leads/actions";
 import { MAX_BRAND_FILES } from "@/lib/brandFiles";
 import type { BrandFile } from "@/server/db/schema";
 import BrandFileUpload from "./BrandFileUpload";
 import ConfirmRowButton from "./ConfirmRowButton";
-import { Notice, SectionHeading } from "./ui";
+import { InfoTip, SectionHeading, StatusMark } from "./ui";
 
 function Tile({ file, leadId }: { file: BrandFile; leadId: string }) {
   return (
@@ -27,9 +27,11 @@ function Tile({ file, leadId }: { file: BrandFile; leadId: string }) {
 export default function BrandFiles({ leadId, files, canUpload }: { leadId: string; files: BrandFile[]; canUpload: boolean }) {
   return (
     <section className="flex flex-col gap-3">
-      <SectionHeading count={files.length || undefined}>Brand files</SectionHeading>
-      <p className="text-ink-soft text-sm text-pretty">The owner&apos;s logo, signs or artwork. The next build designs around them. PNG, JPG, WebP or SVG, up to 20 MB each.</p>
-      {!canUpload && <Notice tone="warn">Uploads start working once the defect-brand-files Blob store is connected to this project with the BRAND_FILES prefix.</Notice>}
+      <div className="flex items-center gap-1">
+        <SectionHeading count={files.length || undefined}>Brand files</SectionHeading>
+        <InfoTip>The owner&apos;s logo, signs or artwork. The next build designs around them. PNG, JPG, WebP or SVG, up to 20 MB each.</InfoTip>
+      </div>
+      {!canUpload && <StatusMark icon={WarningCircle} tone="warn" label="Uploads off" detail="Connect the defect-brand-files Blob store to this project with the BRAND_FILES prefix." />}
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3">
         {files.map((file) => (
           <Tile key={file.id} file={file} leadId={leadId} />
