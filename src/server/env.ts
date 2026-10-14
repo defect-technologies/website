@@ -50,4 +50,6 @@ export const env = {
   editorSecret: () => optional("EDITOR_SECRET"),
   /** Fine-grained, Contents read-only on defect-technologies/defect-tech. The bots' instructions are read from there. */
   githubReadToken: () => optional("GITHUB_READ_TOKEN"),
+  /** Writes product descriptions and alt text from photos for owners in their site editor. */
+  anthropicKey: () => optional("ANTHROPIC_API_KEY"),
 };
