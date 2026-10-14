@@ -33,7 +33,7 @@ export type JobKind = (typeof JOB_KINDS)[number];
 /** How many times a lead's build may fail in a row before it's left for a founder. */
 export const MAX_FAILED_BUILDS = 2;
 
-/** Settings the founders control from the Projects page. */
+/** Settings the founders control from Setup > Bots. */
 export type RunnerSettings = {
   dailyCap: number;
   pausedUntil: string | null;

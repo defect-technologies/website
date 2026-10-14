@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import AdminNav from "@/components/admin/AdminNav";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { endSession, requireFounder } from "@/server/auth/session";
-import { navCounts } from "@/server/navCounts";
+import { navCounts } from "@/server/today";
 
 async function signOut() {
   "use server";

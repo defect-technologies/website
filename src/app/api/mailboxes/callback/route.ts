@@ -8,7 +8,7 @@ import { env } from "@/server/env";
 import { seal } from "@/server/seal";
 
 function back(result: string) {
-  return NextResponse.redirect(new URL(`/admin/projects?mailbox=${result}`, env.siteUrl()));
+  return NextResponse.redirect(new URL(`/admin/setup/connections?mailbox=${result}`, env.siteUrl()));
 }
 
 export async function GET(request: NextRequest) {

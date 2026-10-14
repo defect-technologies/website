@@ -64,8 +64,8 @@ const CHECKS: Check[] = [
   { failed: (b) => !b.previewUrl, fix: "Build and deploy the preview first." },
   { failed: (b) => !b.priceArm, fix: "Pick $59 or $79 for this lead." },
   { failed: (b) => !(b.emailProblem || b.problemSummary), fix: "Write the problem line.", coldOnly: true, fixedByEditing: true },
-  { failed: (_b, s) => !s.mailingAddress, fix: "Add the mailing address on the Template page. The law requires it." },
-  { failed: (_b, s) => !s.senderName, fix: "Add the sender's name on the Template page.", coldOnly: true },
+  { failed: (_b, s) => !s.mailingAddress, fix: "Add the mailing address in Setup > Email template." },
+  { failed: (_b, s) => !s.senderName, fix: "Add the sender's name in Setup > Email template.", coldOnly: true },
 ];
 
 const OPT_OUT_NOTICE = /no thanks|unsubscribe|opt out/i;

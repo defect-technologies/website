@@ -4,7 +4,7 @@ import { CircleNotch, Plus } from "@phosphor-icons/react";
 import { upload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useId, useState, type ChangeEvent } from "react";
-import { saveBrandFileAction } from "@/app/admin/(panel)/pipeline/actions";
+import { saveBrandFileAction } from "@/app/admin/(panel)/leads/actions";
 import { brandFolder, BRAND_FILE_ACCEPT, BRAND_FILE_TYPES, MAX_BRAND_FILE_BYTES } from "@/lib/brandFiles";
 import { Notice } from "./ui";
 

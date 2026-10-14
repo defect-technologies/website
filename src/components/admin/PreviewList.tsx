@@ -1,6 +1,6 @@
 import { ArrowCounterClockwise, CaretRight, CheckCircle, Kanban } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { switchPreviewVersionAction } from "@/app/admin/(panel)/projects/actions";
+import { switchPreviewVersionAction } from "@/app/admin/(panel)/setup/connections/actions";
 import type { Business, Stage } from "@/server/db/schema";
 import { PREVIEW_LIFETIME_DAYS, type PreviewDeployment } from "@/server/integrations/vercel";
 import CopyLinkButton from "./CopyLinkButton";
@@ -12,7 +12,7 @@ import { StageChip, When } from "./ui";
 export type PreviewLead = Pick<Business, "id" | "slug" | "businessName" | "previewUrl" | "stage">;
 type PreviewSite = { key: string; name: string; versions: PreviewDeployment[]; owner: PreviewLead | undefined };
 
-/** The preview filters on the Projects page, as their URL values. */
+/** The preview filters on Leads > Previews, as their URL values. */
 export const PREVIEW_STATUSES: [string, string][] = [
   ["", "Any status"],
   ["unsent", "Not sent yet"],
@@ -167,7 +167,7 @@ function PreviewRow({ site }: { site: PreviewSite }) {
       <span className="col-start-2 row-start-1 flex items-center justify-end @[26rem]:col-start-auto @[26rem]:row-start-auto">
         <CopyLinkButton url={latest.url} />
         {site.owner ? (
-          <Link href={`/admin/pipeline/${site.owner.id}`} title="Open the lead" className="text-ink-faint hover:text-ink hover:bg-paper-shade grid size-9 place-items-center rounded-full">
+          <Link href={`/admin/leads/${site.owner.id}`} title="Open the lead" className="text-ink-faint hover:text-ink hover:bg-paper-shade grid size-9 place-items-center rounded-full">
             <Kanban size={18} aria-hidden="true" />
             <span className="sr-only">Open {site.name} in the pipeline</span>
           </Link>

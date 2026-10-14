@@ -1,36 +1,8 @@
-import { FloppyDisk, Play } from "@phosphor-icons/react/dist/ssr";
-import { resumeRunnerAction, saveRunnerSettingsAction } from "@/app/admin/(panel)/bots/actions";
+import { FloppyDisk } from "@phosphor-icons/react/dist/ssr";
+import { saveRunnerSettingsAction } from "@/app/admin/(panel)/setup/bots/actions";
 import type { RunnerSettings } from "@/lib/previewJobs";
-import type { RunnerDay } from "@/server/overview";
 import { TextField } from "./fields";
 import SubmitButton from "./SubmitButton";
-
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-const pacific = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles", timeZoneName: "short" });
-
-/** Builds since midnight Pacific against the daily cap, and what they'd have cost at API prices. */
-export function BuildsToday({ day }: { day: RunnerDay }) {
-  return (
-    <p className="tabular-nums">
-      <span className="font-semibold">{day.built}</span>
-      <span className="text-ink-faint"> of {day.settings.dailyCap} builds today</span>
-      {day.spent > 0 && <span className="text-ink-faint">, about {usd.format(day.spent)}</span>}
-    </p>
-  );
-}
-
-export function PausedNotice({ until }: { until: Date }) {
-  return (
-    <div className="bg-warn/10 text-warn flex flex-col items-start gap-2 rounded-xl px-3 py-2.5">
-      <p className="text-pretty">Claude&apos;s usage limit was hit. Builds wait until {pacific.format(until)}.</p>
-      <form action={resumeRunnerAction}>
-        <SubmitButton size="sm" icon={<Play size={16} aria-hidden="true" />}>
-          Resume now
-        </SubmitButton>
-      </form>
-    </div>
-  );
-}
 
 export function RunnerSettingsForm({ settings }: { settings: RunnerSettings }) {
   return (

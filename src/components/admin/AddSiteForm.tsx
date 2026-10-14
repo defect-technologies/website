@@ -2,7 +2,7 @@
 
 import { Plus } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { addSiteAction, type AddSiteResult } from "@/app/admin/(panel)/sites/actions";
+import { addSiteAction, type AddSiteResult } from "@/app/admin/(panel)/clients/actions";
 import SubmitButton from "./SubmitButton";
 import { SelectField, TextField } from "./fields";
 import { Card, Notice } from "./ui";
@@ -41,12 +41,11 @@ export default function AddSiteForm({ clients }: { clients: ClientOption[] }) {
           placeholder="sunrise-florist"
           autoCapitalize="none"
           spellCheck={false}
-          hint="Must match the slug in the site's site.config.ts. The site-sunrise-florist repo has the slug sunrise-florist."
         />
-        <TextField label="Owner's email" name="ownerEmail" type="email" required defaultValue={values.ownerEmail} autoComplete="off" hint="Sign-in links go here. Only this address can edit the site." />
-        <TextField label="Site's address" name="url" type="url" required defaultValue={values.url} placeholder="https://sunriseflorist.com" hint="Where the site is live. Sign-in links open its editor at /edit." />
+        <TextField label="Owner's email" name="ownerEmail" type="email" required defaultValue={values.ownerEmail} autoComplete="off" />
+        <TextField label="Site's address" name="url" type="url" required defaultValue={values.url} placeholder="https://sunriseflorist.com" />
         {clients.length > 0 && (
-          <SelectField label="Client" name="businessId" defaultValue={values.businessId} hint="Optional. Links the site to a paid lead in the pipeline.">
+          <SelectField label="Client" name="businessId" defaultValue={values.businessId}>
             <option value="">Not linked</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>

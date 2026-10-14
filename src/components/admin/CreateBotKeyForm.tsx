@@ -2,7 +2,7 @@
 
 import { Key } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { createBotKeyAction, type CreateKeyState } from "@/app/admin/(panel)/bots/actions";
+import { createBotKeyAction, type CreateKeyState } from "@/app/admin/(panel)/setup/bots/actions";
 import { keyHome, type Bot } from "@/lib/bots";
 import CopyCommand from "./CopyCommand";
 import { TextField } from "./fields";

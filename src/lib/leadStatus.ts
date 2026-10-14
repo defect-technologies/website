@@ -15,12 +15,12 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   queued: "Queued",
   building: "Building",
   build_failed: "Build failed",
-  skipped: "Skipped, site already good",
-  needs_a_look: "Built, needs a look",
-  ready_to_send: "Built, not emailed",
+  skipped: "Site already good",
+  needs_a_look: "Needs a look",
+  ready_to_send: "Ready to send",
   waiting: "Waiting for reply",
   negotiating: "Negotiating",
-  setting_up: "Paid, setting up",
+  setting_up: "Setting up",
   closed: "Closed",
 };
 

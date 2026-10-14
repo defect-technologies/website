@@ -12,7 +12,7 @@ export type ReplyState = { ok: boolean; error?: string; sentAt?: number };
 export async function replyAction(businessId: string, _previous: ReplyState, form: FormData): Promise<ReplyState> {
   const founder = await requireFounder();
   const result = await sendReply(businessId, String(form.get("body") ?? ""), founder);
-  if (result.ok) revalidatePath("/admin/messages");
+  if (result.ok) revalidatePath("/admin", "layout");
   return result.ok ? { ok: true, sentAt: Date.now() } : { ok: false, error: result.error };
 }
 
@@ -20,7 +20,7 @@ export async function checkMailAction(): Promise<{ summary: string }> {
   await requireFounder();
   const result = await syncMail();
   revalidatePath("/admin", "layout");
-  if (result.mailboxes === 0) return { summary: "No inbox is connected yet. Connect one on the Projects page." };
+  if (result.mailboxes === 0) return { summary: "No inbox is connected yet. Connect one in Setup > Connections." };
   if (result.errors.length > 0) return { summary: result.errors.join(" ") };
   return { summary: result.newMessages === 1 ? "1 new message." : `${result.newMessages} new messages.` };
 }

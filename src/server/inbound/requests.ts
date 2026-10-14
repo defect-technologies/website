@@ -26,7 +26,7 @@ const HOUR = 60 * 60 * 1000;
 /** One address may send the form this many times an hour, and the form takes this many requests a day in all. */
 const FORM_LIMITS = { perAddressPerHour: 3, perDay: 50 };
 
-export const requestLink = (id: string) => `${env.siteUrl()}/admin/requests#request-${id}`;
+export const requestLink = (id: string) => `${env.siteUrl()}/admin#request-${id}`;
 
 /** A keyed hash, so the stored value can't be turned back into the address. */
 export function hashAddress(ip: string): string {
@@ -115,14 +115,6 @@ export async function pastRequests(limit = 200): Promise<InboundRequest[]> {
   return (await db()).select().from(inboundRequests).where(ne(inboundRequests.status, "open")).orderBy(desc(inboundRequests.at)).limit(limit);
 }
 
-/** Requests and emails a founder has to answer, for the admin's nav. */
-export async function waitingRequestCount(): Promise<number> {
-  const [row] = await (await db())
-    .select({ count: sql<number>`count(*)::int` })
-    .from(inboundRequests)
-    .where(and(eq(inboundRequests.status, "open"), eq(inboundRequests.kind, "request")));
-  return row?.count ?? 0;
-}
 
 export type LeadMatcher = (fields: Pick<InboundRequest, "email" | "website">) => Business | null;
 
@@ -186,7 +178,7 @@ async function finish(request: InboundRequest, fields: Partial<InboundRequest>) 
     .update(inboundRequests)
     .set({ ...fields, decidedAt: new Date() })
     .where(eq(inboundRequests.id, request.id));
-  if (request.flagId) await resolveFlag(request.flagId, "closed", "Dealt with on the Requests page.", fields.decidedBy ?? "");
+  if (request.flagId) await resolveFlag(request.flagId, "closed", "Dealt with in the admin.", fields.decidedBy ?? "");
 }
 
 /** Makes the business a lead (or finds the one we have) and queues its preview. */

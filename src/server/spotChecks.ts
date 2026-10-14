@@ -50,10 +50,6 @@ export async function openSpotChecks(): Promise<SpotCheckRow[]> {
     .orderBy(spotChecks.sampledAt);
 }
 
-export async function openSpotCheckCount(): Promise<number> {
-  const [row] = await (await db()).select({ count: count() }).from(spotChecks).where(eq(spotChecks.status, "open"));
-  return row?.count ?? 0;
-}
 
 /** Rated spot checks, newest first. */
 export async function reviewedSpotChecks(limit = 100): Promise<SpotCheckRow[]> {

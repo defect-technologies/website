@@ -15,14 +15,14 @@ export async function makeSenderAction(mailboxId: string) {
   await database.update(mailboxes).set({ isSender: false }).where(ne(mailboxes.id, mailboxId));
   const [mailbox] = await database.update(mailboxes).set({ isSender: true }).where(eq(mailboxes.id, mailboxId)).returning();
   await record(founder.email, "changed sending inbox", { detail: mailbox?.email ?? "" });
-  revalidatePath("/admin/projects");
+  revalidatePath("/admin", "layout");
 }
 
 export async function disconnectMailboxAction(mailboxId: string) {
   const founder = await requireFounder();
   const [removed] = await (await db()).delete(mailboxes).where(eq(mailboxes.id, mailboxId)).returning();
   await record(founder.email, "disconnected inbox", { detail: removed?.email ?? "" });
-  revalidatePath("/admin/projects");
+  revalidatePath("/admin", "layout");
 }
 
 export async function syncPaymentsAction(): Promise<{ summary: string }> {

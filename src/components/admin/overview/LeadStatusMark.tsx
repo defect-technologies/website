@@ -16,7 +16,7 @@ const MARK: Record<Exclude<LeadStatus, "building">, { icon: Icon; className: str
   closed: { icon: XCircle, className: "text-ink-faint" },
 };
 
-/** A lead status as an icon and its name. Building gets the live dot every working thing on the Overview shares. */
+/** A lead status as an icon and its name. Building gets the live dot every working thing in the admin shares. */
 export default function LeadStatusMark({ status }: { status: LeadStatus }) {
   if (status === "building") {
     return (

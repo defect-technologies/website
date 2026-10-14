@@ -5,8 +5,6 @@ import { leadStatus, type LeadStatus } from "@/lib/leadStatus";
 import { db } from "./db/client";
 import { activity, botCalls, businesses, messages, previewJobs, type Activity, type BotKey, type Business, type Message, type PreviewJob } from "./db/schema";
 import { listBotKeys } from "./bots/keys";
-import { stripeSummary } from "./integrations/stripe";
-import { funnelByArm } from "./leads/businesses";
 import { buildsToday, spentToday } from "./runner/jobs";
 import { activePause, runnerSettings } from "./runner/settings";
 
@@ -30,25 +28,13 @@ async function lastEmails(): Promise<Map<string, LastEmail>> {
 }
 
 /** Every business with its latest build and email. Live ones are clients; the rest are leads. */
-export async function sheetRows(): Promise<{ leads: LeadRow[]; clients: LeadRow[] }> {
+export async function sheetRows(): Promise<{ leads: LeadRow[]; clients: LeadRow[]; readAt: number }> {
   const [all, jobs, emails] = await Promise.all([(await db()).select().from(businesses).orderBy(desc(businesses.updatedAt)), latestJobs(), lastEmails()]);
   const rows = all.map((lead) => {
     const job = jobs.get(lead.id) ?? null;
     return { lead, job, lastEmail: emails.get(lead.id) ?? null, status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? "") };
   });
-  return { leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live") };
-}
-
-export type EmailRow = Message & { businessName: string };
-
-export async function recentEmails(limit = 300): Promise<EmailRow[]> {
-  const rows = await (await db())
-    .select({ message: messages, businessName: businesses.businessName })
-    .from(messages)
-    .innerJoin(businesses, eq(messages.businessId, businesses.id))
-    .orderBy(desc(messages.at))
-    .limit(limit);
-  return rows.map(({ message, businessName }) => ({ ...message, businessName }));
+  return { leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live"), readAt: Date.now() };
 }
 
 export type ActivityRow = Activity & { businessName: string | null };
@@ -115,13 +101,7 @@ export async function agentStates(): Promise<AgentState[]> {
 
 export type RunnerDay = { settings: Awaited<ReturnType<typeof runnerSettings>>; built: number; spent: number; pausedUntil: Date | null };
 
-async function runnerDay(): Promise<RunnerDay> {
+export async function runnerDay(): Promise<RunnerDay> {
   const [settings, built, spent] = await Promise.all([runnerSettings(), buildsToday(), spentToday()]);
   return { settings, built, spent, pausedUntil: activePause(settings) };
-}
-
-/** Everything the Overview shows, read at one moment so "working now" and "updated" agree. */
-export async function overview() {
-  const [agents, sheets, emails, events, runner, money, arms] = await Promise.all([agentStates(), sheetRows(), recentEmails(), recentActivity(), runnerDay(), stripeSummary(), funnelByArm()]);
-  return { agents, ...sheets, emails, activity: events, runner, money, arms, readAt: Date.now() };
 }

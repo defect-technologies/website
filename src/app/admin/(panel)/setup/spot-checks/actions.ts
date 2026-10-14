@@ -51,5 +51,5 @@ export async function saveSpotCheckSettingsAction(form: FormData) {
   if (!parsed.success) return;
   await saveSpotCheckSettings({ share: parsed.data.percent / 100 }, founder.email);
   await record(founder.email, "changed spot check settings", { detail: `${parsed.data.percent}% of finished previews are picked` });
-  revalidatePath("/admin/spot-checks");
+  revalidatePath("/admin", "layout");
 }

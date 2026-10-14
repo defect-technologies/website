@@ -1,6 +1,6 @@
 import { PencilSimple } from "@phosphor-icons/react/dist/ssr";
 import type { ComponentProps } from "react";
-import { openEditorAction } from "@/app/admin/(panel)/sites/actions";
+import { openEditorAction } from "@/app/admin/(panel)/clients/actions";
 import SubmitButton from "./SubmitButton";
 
 type Props = { slug: string; label: string } & Pick<ComponentProps<typeof SubmitButton>, "variant" | "size" | "disabled">;

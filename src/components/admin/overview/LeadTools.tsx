@@ -15,7 +15,7 @@ function SampleButton() {
   );
 }
 
-/** Adding leads, and the price test, which the old Pipeline page held. */
+/** Adding leads, and the $59 against $79 price test. */
 export default function LeadTools({ arms, samples }: { arms: Funnel[]; samples: boolean }) {
   return (
     <div className="flex flex-col gap-3">

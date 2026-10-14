@@ -191,13 +191,6 @@ export async function resolvedFlags(limit = 20): Promise<FlagRow[]> {
     .limit(limit);
 }
 
-export async function openFlagCount(): Promise<number> {
-  const [row] = await (await db())
-    .select({ count: sql<number>`count(*)::int` })
-    .from(flags)
-    .where(and(eq(flags.status, "open"), ne(flags.needs, "nothing")));
-  return row?.count ?? 0;
-}
 
 export async function resolveFlag(id: string, status: Exclude<FlagStatus, "open">, note: string, reviewer: string) {
   const [flag] = await (await db()).update(flags).set({ status, note, reviewer, resolvedAt: new Date() }).where(eq(flags.id, id)).returning();

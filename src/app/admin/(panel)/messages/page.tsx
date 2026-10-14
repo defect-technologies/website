@@ -1,4 +1,3 @@
-import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 import EmptyState from "@/components/admin/EmptyState";
@@ -72,7 +71,7 @@ function ThreadView({ business, thread }: { business: Business; thread: Message[
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-2xl font-semibold">
-            <Link href={`/admin/pipeline/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
+            <Link href={`/admin/leads/${business.id}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">
               {business.businessName}
             </Link>
           </h2>
@@ -81,9 +80,9 @@ function ThreadView({ business, thread }: { business: Business; thread: Message[
         </div>
         {business.stage !== "opted_out" && <OptOutButton businessId={business.id} domain={domainOf(business.email)} suggested={suggestOptOut} />}
       </header>
-      {suggestOptOut && <Notice tone="warn">Their last message reads like a no. If it is, mark them opted out so they never hear from us again.</Notice>}
+      {suggestOptOut && <Notice tone="warn">Their last message reads like a no. Mark them opted out?</Notice>}
       {business.stage === "opted_out" ? (
-        <Notice tone="bad">They opted out. Nothing more can be sent to them.</Notice>
+        <Notice tone="bad">Opted out. Nothing more can be sent.</Notice>
       ) : (
         <Card className="p-4">
           <ReplyBox businessId={business.id} to={lastIncoming?.fromAddress ?? business.email} />
@@ -120,16 +119,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
         <CheckMailButton />
       </PageHeader>
       {threads.length === 0 ? (
-        <EmptyState
-          title="No conversations yet"
-          action={
-            <Link href="/admin" className="inline-flex items-center gap-2 font-medium underline underline-offset-4">
-              Go to the outreach queue <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-          }
-        >
-          Every email you send from the outreach queue starts a conversation here, and replies land under it.
-        </EmptyState>
+        <EmptyState title="No conversations yet" />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <ThreadList threads={threads} selected={business?.id} />

@@ -35,7 +35,7 @@ function submittedValues(form: FormData): ExpenseValues {
   return { spentOn: field("spentOn"), item: field("item"), amount: field("amount"), paidBy: field("paidBy"), frequency: field("frequency") };
 }
 
-const refresh = () => revalidatePath("/admin/expenses");
+const refresh = () => revalidatePath("/admin", "layout");
 
 export async function addExpenseAction(_previous: AddExpenseResult, form: FormData): Promise<AddExpenseResult> {
   const founder = await requireFounder();

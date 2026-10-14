@@ -1,8 +1,8 @@
 "use client";
 
-import { FloppyDisk } from "@phosphor-icons/react";
+import { CaretRight, FloppyDisk } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { saveLeadAction, type FormResult } from "@/app/admin/(panel)/pipeline/actions";
+import { saveLeadAction, type FormResult } from "@/app/admin/(panel)/leads/actions";
 import { STAGE_LABEL, STAGES } from "@/lib/stages";
 import type { Business } from "@/server/db/schema";
 import { SelectField, TextAreaField, TextField } from "./fields";
@@ -16,7 +16,7 @@ export default function LeadForm({ business }: { business: Business }) {
       <fieldset className="grid gap-4 sm:grid-cols-2">
         <legend className="sr-only">Outreach</legend>
         <TextField label="Business name" name="businessName" defaultValue={business.businessName} required />
-        <TextField label="Owner's first name" name="ownerFirstName" defaultValue={business.ownerFirstName} hint='Left empty, the email opens with "Hi there".' />
+        <TextField label="Owner's first name" name="ownerFirstName" defaultValue={business.ownerFirstName} placeholder="Hi there" />
         <TextField label="Email" name="email" type="email" defaultValue={business.email} />
         <SelectField label="Price" name="priceArm" defaultValue={business.priceArm ? String(business.priceArm) : ""}>
           <option value="">Not set</option>
@@ -30,7 +30,7 @@ export default function LeadForm({ business }: { business: Business }) {
             </option>
           ))}
         </SelectField>
-        <TextField label="Preview link" name="previewUrl" type="url" defaultValue={business.previewUrl} hint="Filled in by the preview builder." />
+        <TextField label="Preview link" name="previewUrl" type="url" defaultValue={business.previewUrl} />
         {business.source === "request" ? (
           <input type="hidden" name="emailProblem" value={business.emailProblem} />
         ) : (
@@ -39,22 +39,28 @@ export default function LeadForm({ business }: { business: Business }) {
               label="Problem line"
               name="emailProblem"
               defaultValue={business.emailProblem}
-              hint={`Follows "Hi ${business.ownerFirstName || "there"}," in the first email.${business.problemSummary ? ` The lead finder found: ${business.problemSummary}.` : ""}`}
+              placeholder={business.problemSummary}
             />
           </div>
         )}
       </fieldset>
-      <fieldset className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-2 text-lg font-semibold">After they pay</legend>
-        <TextField label="Owner email for change requests" name="ownerEmail" type="email" defaultValue={business.ownerEmail} />
-        <TextField label="Live site" name="siteUrl" type="url" defaultValue={business.siteUrl} />
-        <TextField label="Vercel project ID" name="vercelProjectId" defaultValue={business.vercelProjectId} className="font-mono" />
-      </fieldset>
+      <details open={Boolean(business.paidAt)} className="group/paid">
+        <summary className="text-ink-soft hover:text-ink flex w-fit cursor-pointer list-none items-center gap-1.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          <CaretRight size={14} weight="bold" className="transition-transform duration-150 group-open/paid:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
+          After they pay
+        </summary>
+        <fieldset className="mt-3 grid gap-4 sm:grid-cols-2">
+          <legend className="sr-only">After they pay</legend>
+          <TextField label="Owner email for change requests" name="ownerEmail" type="email" defaultValue={business.ownerEmail} />
+          <TextField label="Live site" name="siteUrl" type="url" defaultValue={business.siteUrl} />
+          <TextField label="Vercel project ID" name="vercelProjectId" defaultValue={business.vercelProjectId} className="font-mono" />
+        </fieldset>
+      </details>
       <TextAreaField label="Notes" name="note" defaultValue={business.note} rows={4} />
       {state.message && <Notice tone={state.ok ? "good" : "bad"}>{state.message}</Notice>}
       <div>
         <SubmitButton variant="solid" icon={<FloppyDisk size={18} aria-hidden="true" />}>
-          Save
+          Save details
         </SubmitButton>
       </div>
     </form>

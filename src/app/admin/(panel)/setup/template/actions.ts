@@ -27,5 +27,5 @@ export async function saveTemplateAction(_previous: TemplateResult, form: FormDa
   await saveOutreachSettings(parsed.data, founder.email);
   await record(founder.email, "edited the outreach template");
   revalidatePath("/admin", "layout");
-  return { ok: true, message: "Saved. Every email in the queue now uses this." };
+  return { ok: true, message: "Saved." };
 }
