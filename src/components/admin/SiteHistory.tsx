@@ -15,7 +15,7 @@ const KIND: Record<HistoryKind, { icon: Icon; className: string; label: string }
 };
 
 function who(item: HistoryItem) {
-  if (item.kind === "out") return senderName(item.who);
+  if (item.kind === "out" && !item.who.startsWith("bot:")) return senderName(item.who);
   return item.who === "Them" || !item.who ? item.who : actorLabel(item.who);
 }
 

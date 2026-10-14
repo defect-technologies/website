@@ -76,8 +76,6 @@ function facts(business: Business): [string, React.ReactNode][] {
   return rows;
 }
 
-const hostOf = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/$/, "");
-
 /** The links a founder reaches for first, as buttons that say where they go. */
 function Actions({ business, detail }: { business: Business; detail: SiteDetail }) {
   return (
@@ -86,7 +84,6 @@ function Actions({ business, detail }: { business: Business; detail: SiteDetail 
         <a href={business.previewUrl} target="_blank" rel="noreferrer" className={buttonClasses("solid", "md")}>
           <Eye size={18} aria-hidden="true" />
           Open preview
-          <span className="text-paper/60 hidden text-sm font-normal sm:inline">{hostOf(business.previewUrl).slice(0, 32)}</span>
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
       )}
