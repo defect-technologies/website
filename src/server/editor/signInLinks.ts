@@ -21,6 +21,11 @@ function editorSecret(): Uint8Array | null {
   return secret ? new TextEncoder().encode(secret) : null;
 }
 
+/** Whether defect.tech can sign anyone into a client's editor. Founders need only this; emailed links also need the sender. */
+export function editorReady(): boolean {
+  return editorSecret() !== null;
+}
+
 export function linksReady(): boolean {
   return signInLinkSender().ready && editorSecret() !== null;
 }

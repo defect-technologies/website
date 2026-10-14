@@ -2,14 +2,15 @@ import { ArrowLeft, ArrowSquareOut, EnvelopeSimple, UserSwitch } from "@phosphor
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import OpenEditorButton from "@/components/admin/OpenEditorButton";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { TextField } from "@/components/admin/fields";
 import { Card, KeyValue, Notice, SectionHeading, When } from "@/components/admin/ui";
-import { LINK_MINUTES, linksReady } from "@/server/editor/signInLinks";
+import { LINK_MINUTES, editorReady, linksReady } from "@/server/editor/signInLinks";
 import { clientSite, type ClientSiteRow } from "@/server/sites/clientSites";
 import { changeOwnerAction, sendLinkAction } from "../actions";
 
-type Query = { added?: string; link?: string; owner?: string };
+type Query = { added?: string; link?: string; owner?: string; editor?: string };
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Query> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -40,6 +41,7 @@ function notices(site: ClientSiteRow, query: Query) {
     [query.link === "sent", "good", `Emailed ${site.ownerEmail} a link to edit ${host}. It works once, within ${LINK_MINUTES} minutes.`],
     [query.link === "failed", "bad", "The email service refused the link, so nothing was sent. Check Resend's logs, then try again."],
     [query.owner === "changed", "good", `Sign-in links for ${host} now go to ${site.ownerEmail}.`],
+    [query.editor === "not-ready", "bad", "The editor can't be opened until EDITOR_SECRET is set on this Vercel project."],
     [query.owner === "invalid", "bad", "That email address doesn't look right, so the owner didn't change. Check it and try again."],
   ];
   return shown.filter(([visible]) => visible).map(([, tone, text]) => (
@@ -65,16 +67,17 @@ export default async function SitePage({ params, searchParams }: Props) {
       <Card className="p-6">
         <KeyValue rows={facts(site)} />
       </Card>
+      <OpenEditorButton slug={site.slug} label="Open the editor" variant="solid" disabled={!editorReady()} />
 
       <section className="flex flex-col gap-3">
         <SectionHeading>Owner</SectionHeading>
         <p className="text-ink-soft max-w-prose text-pretty">
-          The editor is at {new URL("/edit", site.url).toString()}. It opens only from a sign-in link sent to {site.ownerEmail}, and each link works once, within {LINK_MINUTES} minutes.
+          The editor is at {new URL("/edit", site.url).toString()}. The owner opens it from a sign-in link sent to {site.ownerEmail}, and each link works once, within {LINK_MINUTES} minutes.
         </p>
         {!ready && <Notice tone="warn">Sign-in links need SIGN_IN_EMAIL_API_KEY, SIGN_IN_EMAIL_FROM and EDITOR_SECRET set on this Vercel project.</Notice>}
         <form action={sendLinkAction}>
           <input type="hidden" name="slug" value={site.slug} />
-          <SubmitButton variant="solid" disabled={!ready} icon={<EnvelopeSimple size={18} aria-hidden="true" />}>
+          <SubmitButton variant="soft" disabled={!ready} icon={<EnvelopeSimple size={18} aria-hidden="true" />}>
             Email {site.ownerEmail} a sign-in link
           </SubmitButton>
         </form>
