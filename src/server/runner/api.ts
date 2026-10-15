@@ -60,6 +60,9 @@ function launchPayload(job: PreviewJob, lead: Business) {
   return { launch: { domain: launchDomainOf(lead) ?? "", editorSecret } };
 }
 
+/** Stages at which the owner has been sent their preview. */
+const OWNER_HAS_SEEN: Business["stage"][] = ["sent", "clicked", "replied", "paid", "live"];
+
 /** brandFiles are the owner's artwork; the runner downloads them into the lead's folder before the builder starts. */
 function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[]) {
   return {
@@ -71,6 +74,8 @@ function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand:
       website: lead.website,
       brief: buildBrief(lead),
       priceArm: lead.priceArm ?? 59,
+      // The preview the owner has been shown, once one was sent: their notes are changes to it, not a new design.
+      ownerPreviewUrl: OWNER_HAS_SEEN.includes(lead.stage) ? lead.previewUrl : "",
       checkoutUrl,
       brandFiles: brand.map(({ url, name }) => ({ url, name })),
     },
