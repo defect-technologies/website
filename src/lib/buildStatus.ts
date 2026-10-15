@@ -40,11 +40,29 @@ export function splitActive<T extends Pick<PreviewJob, "runnerName" | "startedAt
 
 export type Eta = { startedAt: Date; doneAt: Date; late: boolean };
 
-/** When the current build should finish: its start plus the usual build length. */
-export function etaFor(job: Pick<PreviewJob, "startedAt" | "claimedAt" | "createdAt">, minutes: number, now: number): Eta {
+/**
+ * Each pipeline step's usual share of a whole build (engine/preview/build_preview.sh): reading the site, the
+ * email opener and creating the site are quick, Claude's build is about half, the checks and repairs a tenth,
+ * three review rounds with their fixes a third. Estimates from the runner's logs; change them here.
+ */
+const STEP_SHARES = [0.04, 0.01, 0.03, 0.45, 0.12, 0.35];
+
+/** How much of a usual build is left at this step: the steps after it, and half of the one it's on. */
+export function shareLeft(step: string): number {
+  const { done } = stepParts(step);
+  if (done < 1) return 1;
+  const current = STEP_SHARES[done - 1] ?? 0;
+  return STEP_SHARES.slice(done).reduce((sum, share) => sum + share, 0) + current / 2;
+}
+
+/**
+ * When the current build should finish: now plus what's usually left from the step it's on. Counting from its
+ * start gave a resumed build at its last check an hour more than it had left (Talin Market, 14 October).
+ */
+export function etaFor(job: Pick<PreviewJob, "startedAt" | "claimedAt" | "createdAt" | "step">, minutes: number, now: number): Eta {
   const startedAt = startOf(job);
-  const doneAt = new Date(startedAt.getTime() + minutes * 60_000);
-  return { startedAt, doneAt, late: doneAt.getTime() < now };
+  const doneAt = new Date(now + shareLeft(job.step ?? "") * minutes * 60_000);
+  return { startedAt, doneAt, late: now - startedAt.getTime() > minutes * 1.5 * 60_000 };
 }
 
 /** When each queued job should start: after what's left of the current builds, one usual build length apart. */
