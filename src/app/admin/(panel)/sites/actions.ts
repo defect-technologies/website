@@ -77,13 +77,24 @@ export async function launchSiteAction(form: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/** A founder has looked at a preview the design critic held back, and it's fine to send. */
+/**
+ * A founder has looked at a held preview and it's fine: one the design critic held back goes to the outreach
+ * queue; a new one for an owner who already has a preview becomes the one their link shows.
+ */
 export async function approvePreviewAction(form: FormData) {
   const founder = await requireFounder();
   const lead = await businessById(String(form.get("id") ?? ""));
-  if (!lead || lead.stage !== "new" || !lead.previewUrl) return;
-  await updateBusiness(lead.id, { stage: "preview_built" });
-  await record(founder.email, "approved the preview", { businessId: lead.id });
+  const preview = String(form.get("preview") ?? "");
+  if (!lead) return;
+  if (lead.stage !== "new") {
+    if (!/^https:\/\/[a-z0-9-]+\.vercel\.app\/?$/.test(preview)) return;
+    await updateBusiness(lead.id, { previewUrl: preview });
+    await record(founder.email, "showed the owner a new preview", { businessId: lead.id, detail: preview });
+  } else {
+    if (!lead.previewUrl) return;
+    await updateBusiness(lead.id, { stage: "preview_built" });
+    await record(founder.email, "approved the preview", { businessId: lead.id });
+  }
   await closeFlagsOn(lead.id, ["preview-review"], "A founder marked the preview ready to send.", founder.email);
   revalidatePath("/admin", "layout");
 }

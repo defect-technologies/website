@@ -176,15 +176,36 @@ async function holdForReview(lead: Business, previewUrl: string, verdict: string
   await record(ACTOR, "held a preview for review", { businessId: lead.id, detail: verdict });
 }
 
+/**
+ * An owner who has been sent a preview keeps seeing it until a founder looks at the new one: a rebuild for Talin
+ * Market replaced the preview its owner had with an unreviewed redesign the moment it deployed.
+ */
+async function holdForOwner(lead: Business, previewUrl: string) {
+  await raiseFlag("runner" satisfies Bot, lead.id, {
+    headline: `Check ${lead.businessName}'s new preview before the owner sees it`,
+    needs: "decision",
+    ask: "The owner still sees the preview they were sent. Should their link show this one instead?",
+    options: ["Show it to the owner", "Rebuild with a note"],
+    fixer: "either",
+    topic: "preview-review",
+    urgent: false,
+    details: `The owner's link keeps showing ${lead.previewUrl} until a founder chooses.`,
+    link: previewUrl,
+  });
+  await record(ACTOR, "held a new preview until a founder looks", { businessId: lead.id, detail: previewUrl });
+}
+
 async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (!body.previewUrl) throw new BotError(400, "A finished build needs previewUrl, the deployed preview's https address.");
   await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
+  const ownerHasOne = OWNER_HAS_SEEN.includes(lead.stage) && Boolean(lead.previewUrl) && lead.previewUrl !== body.previewUrl;
   const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
-  await updateBusiness(lead.id, { previewUrl: body.previewUrl, previewBuiltAt: new Date(), ...ready });
+  await updateBusiness(lead.id, { ...(ownerHasOne ? {} : { previewUrl: body.previewUrl }), previewBuiltAt: new Date(), ...ready });
   await closeFlagsOn(lead.id, ["build", "preview-review"], "Closed itself: a new preview was built.", ACTOR);
   // A held preview already waits for a founder, so only the others are sampled for a spot check.
-  if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
+  if (ownerHasOne) await holdForOwner(lead, body.previewUrl);
+  else if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   else await maybePickForSpotCheck(lead, body.previewUrl, job.id, ACTOR);
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   // A launched site's rebuilt design waits for the owner's OK; the Client care bot publishes it by launching again.

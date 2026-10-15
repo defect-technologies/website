@@ -56,8 +56,9 @@ function PreviewReviewActions({ flag }: { flag: Flag }) {
     <>
       <form action={approvePreviewAction}>
         <input type="hidden" name="id" value={flag.businessId ?? ""} />
+        <input type="hidden" name="preview" value={flag.link ?? ""} />
         <SubmitButton variant="solid" size="sm" icon={<Check size={16} weight="bold" aria-hidden="true" />}>
-          Ready to send
+          {flag.options[0] ?? "Ready to send"}
         </SubmitButton>
       </form>
       {flag.link && (
