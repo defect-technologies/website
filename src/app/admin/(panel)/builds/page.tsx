@@ -6,7 +6,7 @@ import BuildProgress, { clockTime, minutesText } from "@/components/admin/BuildP
 import LiveRefresh from "@/components/admin/overview/LiveRefresh";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { Card, PageHeader, Section, StatusMark, When } from "@/components/admin/ui";
-import { actorLabel } from "@/lib/bots";
+import { requestSentence, stepParts } from "@/lib/buildStatus";
 import { isSkipped, JOB_STATUS_LABEL } from "@/lib/previewJobs";
 import { runnerDay } from "@/server/overview";
 import { runnerStatus, type CurrentBuild, type JobRow, type QueuedBuild } from "@/server/runner/status";
@@ -33,7 +33,7 @@ function Current({ job, now }: { job: CurrentBuild; now: number }) {
           <SiteLink job={job} />
         </h3>
         <span className="text-ink-faint text-sm" title={job.note || undefined}>
-          {job.kind === "launch" ? "Launch" : "Preview"} for {actorLabel(job.requestedBy)}, on {job.runnerName}
+          {requestSentence(job)}
         </span>
       </div>
       <BuildProgress step={job.step} eta={job.eta} now={now} />
@@ -67,9 +67,7 @@ function Queue({ jobs, now }: { jobs: QueuedBuild[]; now: number }) {
               <span className="min-w-0">
                 <SiteLink job={job} />
                 <span className="text-ink-faint ml-3 text-sm" title={job.note || undefined}>
-                  {job.kind === "launch" ? "Launch, " : ""}
-                  {actorLabel(job.requestedBy)}
-                  {job.note ? ", with a note" : ""}
+                  {requestSentence(job)}
                 </span>
               </span>
               <span className="text-ink-soft text-sm tabular-nums">starts ~{clockTime(job.startsAt, now)}</span>
@@ -104,7 +102,7 @@ function Abandoned({ jobs }: { jobs: JobRow[] }) {
             <li key={job.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
               <SiteLink job={job} />
               <span className="text-ink-faint min-w-0 flex-1 truncate text-sm" title={job.step}>
-                Stopped at {job.step || "the start"}, <When date={job.startedAt ?? job.claimedAt} />
+                Started <When date={job.startedAt ?? job.claimedAt} /> and stopped {job.step ? `at step ${stepParts(job.step).done} of ${stepParts(job.step).total}: ${stepParts(job.step).words.toLowerCase()}` : "before its first step"}.
               </span>
               <SettleButton job={job} intent="requeue" icon={<ArrowCounterClockwise size={16} aria-hidden="true" />}>
                 Put back in queue
@@ -142,9 +140,9 @@ function Recent({ jobs }: { jobs: JobRow[] }) {
                   <SiteLink job={job} />
                 </span>
                 <span className="text-ink-faint tabular-nums">
-                  {job.minutes ? `${minutesText(job.minutes)}, ` : ""}
-                  {job.apiEquivalentUsd ? `${usd.format(job.apiEquivalentUsd)}, ` : ""}
-                  <When date={job.finishedAt} />
+                  Finished <When date={job.finishedAt} />
+                  {job.minutes ? ` after ${minutesText(job.minutes)}` : ""}
+                  {job.apiEquivalentUsd ? ` (${usd.format(job.apiEquivalentUsd)} of Claude usage)` : ""}.
                 </span>
               </li>
             );

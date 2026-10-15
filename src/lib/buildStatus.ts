@@ -1,4 +1,6 @@
 import type { PreviewJob } from "@/server/db/schema";
+import { BOT_LABEL, type Bot } from "./bots";
+import { founderName } from "./founders";
 
 /** Used for ETAs until a few builds have finished with a recorded duration. */
 export const DEFAULT_BUILD_MINUTES = 60;
@@ -49,4 +51,27 @@ export function etaFor(job: Pick<PreviewJob, "startedAt" | "claimedAt" | "create
 export function queueStarts(count: number, currentDoneAt: Date | null, minutes: number, now: number): Date[] {
   const first = Math.max(now, currentDoneAt?.getTime() ?? now);
   return Array.from({ length: count }, (_, index) => new Date(first + index * minutes * 60_000));
+}
+
+/** Who asked for a job, as a sentence's subject; null when the admin queued it by itself. */
+function requester(actor: string): string | null {
+  if (actor === "bot:runner") return null;
+  if (actor.startsWith("bot:")) return `The ${BOT_LABEL[actor.slice("bot:".length) as Bot] ?? "unknown"} bot`;
+  if (actor.toLowerCase().startsWith("claude")) return "Claude";
+  if (!actor.includes("@")) return actor;
+  const name = founderName(actor);
+  if (name !== actor) return name;
+  const local = actor.split("@")[0].split(/[._-]/)[0];
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
+/**
+ * How a job came to be, as a sentence: "Claude queued this preview with notes for the builder." or "Queued again
+ * automatically after a failed build." The note itself is the line's tooltip.
+ */
+export function requestSentence(job: Pick<PreviewJob, "requestedBy" | "kind" | "note">): string {
+  const what = job.kind === "launch" ? "launch" : "preview";
+  const who = requester(job.requestedBy);
+  if (!who) return job.note ? "Queued again automatically after a failed build." : `Queued automatically as a new lead's ${what}.`;
+  return `${who} queued this ${what}${job.note ? " with notes for the builder" : ""}.`;
 }
