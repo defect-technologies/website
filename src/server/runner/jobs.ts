@@ -124,6 +124,19 @@ export async function claimNextJob(runnerName: string, kinds: JobKind[] = ["prev
   return job ?? null;
 }
 
+/**
+ * A runner builds one job at a time, so when it asks for the next one, any job still claimed or running under its
+ * name was cut off (the runner was killed before it could report) and goes back in the queue. Its next claim is a
+ * later attempt, which resumes it. Talin Market's build sat "running" for a day after one (13 October).
+ */
+export async function requeueOrphans(runnerName: string): Promise<PreviewJob[]> {
+  return (await db())
+    .update(previewJobs)
+    .set({ status: "queued", step: "", claimedAt: null, startedAt: null })
+    .where(and(eq(previewJobs.runnerName, runnerName), inArray(previewJobs.status, ["claimed", "running"])))
+    .returning();
+}
+
 export async function jobById(id: string): Promise<PreviewJob | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const [job] = await (await db()).select().from(previewJobs).where(eq(previewJobs.id, id));

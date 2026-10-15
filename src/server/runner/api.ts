@@ -16,7 +16,7 @@ import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
 import { updateBusiness } from "../leads/businesses";
 import { maybePickForSpotCheck } from "../spotChecks";
-import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requestPreview, updateJob } from "./jobs";
+import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
 
@@ -86,10 +86,13 @@ async function claimAutoQueued(runnerName: string, kinds: JobKind[]): Promise<Pr
 /** GET /api/runner/next: claims one queued build, or 204 with why there's nothing to do. */
 export async function claimNext(key: BotKey, request: Request) {
   const search = new URL(request.url).searchParams;
+  const runnerName = search.get("runner")?.slice(0, 60) || key.name;
+  for (const orphan of await requeueOrphans(runnerName)) {
+    await record(ACTOR, "put a cut-off build back in the queue", { businessId: orphan.businessId, detail: `${runnerName} asked for new work while it was still marked as building this one` });
+  }
   const noBuilds = await whyNoBuilds();
   const kinds = kindsAllowed(search, noBuilds);
   if (kinds.length === 0) return idle(noBuilds ?? "Nothing to do.");
-  const runnerName = search.get("runner")?.slice(0, 60) || key.name;
   const job = (await claimNextJob(runnerName, kinds)) ?? (noBuilds ? null : await claimAutoQueued(runnerName, kinds));
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
