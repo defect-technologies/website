@@ -135,7 +135,7 @@ export function monthlyPriceOf(business: Business) {
 
 /**
  * A checkout for the welcome page, embedded in it, tagged with the lead's ID so the payment is
- * matched back to it. The account email the owner chose fills Stripe's email field. Returns the client secret the page mounts Stripe's form with.
+ * matched back to it. The account email the owner chose fills Stripe's email field, and a code that makes it free skips the card. Returns the client secret the page mounts Stripe's form with.
  */
 export async function startWelcomeCheckout(business: Business, returnUrl: string, accountEmail: string): Promise<string> {
   if (!env.stripeKey()) throw new Error("STRIPE_API_KEY isn't set.");
@@ -146,6 +146,7 @@ export async function startWelcomeCheckout(business: Business, returnUrl: string
     "line_items[0][quantity]": "1",
     client_reference_id: business.id,
     allow_promotion_codes: "true",
+    payment_method_collection: "if_required",
     "excluded_payment_method_types[0]": "klarna",
     "consent_collection[terms_of_service]": "required",
     "custom_text[terms_of_service_acceptance][message]": `I agree to the [Terms of Service](${new URL("/terms", env.siteUrl())}).`,
