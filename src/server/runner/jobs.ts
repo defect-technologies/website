@@ -73,6 +73,15 @@ export async function failuresInARow(businessId: string): Promise<number> {
 export const AUTO_QUEUE_ACTOR = "auto-queue";
 
 /** The new lead most worth a preview: never requested, has a website and an email, highest outdated score first. */
+/** How many leads are waiting for the runner to queue them by itself (the same leads nextLeadToBuild picks from). */
+export async function leadsWaitingToBuild(): Promise<number> {
+  const [row] = await (await db())
+    .select({ count: sql<number>`count(*)::int` })
+    .from(businesses)
+    .where(and(eq(businesses.stage, "new"), ne(businesses.website, ""), ne(businesses.email, ""), eq(businesses.previewUrl, ""), isNull(businesses.previewRequestedAt)));
+  return row?.count ?? 0;
+}
+
 export async function nextLeadToBuild(): Promise<Business | null> {
   const [lead] = await (await db())
     .select()

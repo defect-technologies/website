@@ -3,6 +3,9 @@ import { z } from "zod";
 import { hasBearer } from "@/server/auth/bearer";
 import { env } from "@/server/env";
 import { queueSite } from "@/server/leads/queueSite";
+import { buildsToday, leadsWaitingToBuild } from "@/server/runner/jobs";
+import { runnerSettings } from "@/server/runner/settings";
+import { runnerStatus } from "@/server/runner/status";
 
 const QueueBody = z.object({
   website: z.url({ protocol: /^https?$/ }),
@@ -30,5 +33,22 @@ export async function POST(request: Request) {
     jobStatus: job.status,
     queued: createdJob,
     admin: new URL(`/admin/sites/${lead.id}`, env.siteUrl()).toString(),
+  });
+}
+
+/**
+ * GET /api/engine/queue: what the runner has to do, for founders' tools and Claude. The builds queued (in order),
+ * the one building, how many leads are waiting to be queued by themselves, and today's count against the cap.
+ */
+export async function GET(request: Request) {
+  if (!hasBearer(request, env.engineToken())) return NextResponse.json({ error: "Wrong or missing ENGINE_TOKEN." }, { status: 401 });
+  const [status, waiting, today, settings] = await Promise.all([runnerStatus(), leadsWaitingToBuild(), buildsToday(), runnerSettings()]);
+  const row = (job: { businessName: string; kind: string; requestedBy: string; note: string; createdAt: Date }) => ({ business: job.businessName, kind: job.kind, requestedBy: job.requestedBy, hasNote: job.note !== "", queuedAt: job.createdAt });
+  return NextResponse.json({
+    building: status.current.map(row),
+    queued: status.queue.map(row),
+    leadsWaitingToBeQueued: waiting,
+    buildsToday: today,
+    dailyCap: settings.dailyCap,
   });
 }
