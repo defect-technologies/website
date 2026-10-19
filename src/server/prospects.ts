@@ -228,3 +228,14 @@ export async function prospectFacets() {
   const signalRows = ((signals as unknown as { rows?: { value: string }[] }).rows ?? (signals as unknown as { value: string }[])) as { value: string }[];
   return { niches, areas, platforms, signals: signalRows.map((row) => row.value) };
 }
+
+/** Every prospect with a website, a page at a time, for founders' tools and Claude (GET /api/engine/prospects). */
+export async function prospectWebsites(offset: number, limit: number) {
+  return (await db())
+    .select({ id: prospects.id, businessName: prospects.businessName, website: prospects.website, platform: prospects.platform, siteScore: prospects.siteScore, leadType: prospects.leadType, isLead: isNotNull(prospects.businessId) })
+    .from(prospects)
+    .where(ne(prospects.website, ""))
+    .orderBy(desc(prospects.foundAt))
+    .limit(limit)
+    .offset(offset);
+}
