@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.mts"
+    "db:migrate": "tsx scripts/migrate.mts",
+    "test": "NODE_ENV=development node --test --experimental-test-module-mocks --import tsx \"src/**/*.test.mts\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

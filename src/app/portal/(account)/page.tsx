@@ -8,13 +8,13 @@ import { hasAnyData, insights, parseRange } from "@/lib/siteAnalytics";
 import { siteName } from "@/server/editor/signInLinks";
 import { siteAnalytics } from "@/server/integrations/webAnalytics";
 import GoingLiveSteps from "@/components/portal/GoingLive";
-import { analyticsProject, portalContext } from "@/server/portal/context";
+import { analyticsProject, isOwnerOf, portalContext } from "@/server/portal/context";
 import { goingLiveFor, isFinished, type GoingLive } from "@/server/portal/goingLive";
-import { isLive, type OwnerSite } from "@/server/sites/clientSites";
+import { isLive, type PortalSite } from "@/server/sites/clientSites";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-function SiteHeading({ site, name }: { site: OwnerSite; name: string }) {
+function SiteHeading({ site, name }: { site: PortalSite; name: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <h1 className="text-3xl font-semibold text-balance sm:text-4xl">{name}</h1>
@@ -34,7 +34,14 @@ function BeforeLaunch({ context, going, name }: { context: Awaited<ReturnType<ty
   return (
     <PortalShell context={context} path="/portal">
       <SiteHeading site={context.site} name={name} />
-      {going && <GoingLiveSteps going={going} slug={context.site.slug} name={name} />}
+      {going ? (
+        <GoingLiveSteps going={going} slug={context.site.slug} name={name} />
+      ) : (
+        <p className="text-ink-soft flex items-start gap-2 text-pretty">
+          <Clock size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
+          This website isn&apos;t live yet. You can edit it once it is.
+        </p>
+      )}
     </PortalShell>
   );
 }
@@ -50,7 +57,6 @@ export default async function PortalDashboard({ searchParams }: { searchParams: 
   const analytics = await siteAnalytics(analyticsProject(site), days);
   if (analytics.state !== "ok") console.error(`[portal] Analytics for ${site.slug} unavailable`, analytics);
   const several = context.sites.length > 1;
-  const changeEmail = `mailto:hello@defect.tech?subject=${encodeURIComponent(`A change to ${name}`)}`;
 
   return (
     <PortalShell context={context} path="/portal">
@@ -82,13 +88,24 @@ export default async function PortalDashboard({ searchParams }: { searchParams: 
           <BusiestTimes week={analytics.data.week} />
         </>
       )}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
-        <p className="text-ink-soft">Want something changed that the editor can&apos;t do?</p>
-        <a href={changeEmail} className={buttonClasses("soft", "sm")}>
-          <EnvelopeSimple size={16} aria-hidden="true" />
-          Email us a change
-        </a>
-      </div>
+      <BiggerChanges site={site} name={name} />
     </PortalShell>
+  );
+}
+
+/** We take change requests from the owner only, so an editor is pointed to them instead. */
+function BiggerChanges({ site, name }: { site: PortalSite; name: string }) {
+  if (!isOwnerOf(site)) {
+    return <p className="text-ink-soft pt-2 text-pretty">For changes the editor can&apos;t make, ask {site.ownerEmail}, who owns this website, to email us.</p>;
+  }
+  const changeEmail = `mailto:hello@defect.tech?subject=${encodeURIComponent(`A change to ${name}`)}`;
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
+      <p className="text-ink-soft">Want something changed that the editor can&apos;t do?</p>
+      <a href={changeEmail} className={buttonClasses("soft", "sm")}>
+        <EnvelopeSimple size={16} aria-hidden="true" />
+        Email us a change
+      </a>
+    </div>
   );
 }

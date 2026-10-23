@@ -11,14 +11,25 @@ import { BOT_READ_FRESH_MS, syncMailIfStale } from "../mail/sync";
 import { FlagBody, raiseFlag } from "./flags";
 import { actorOf, BotError } from "./http";
 import { checkBody, ReplyBody } from "./reply";
+import { normalizeEmail, sitesEditedBy, type EditedSiteOf } from "../sites/siteEditors";
 
 /** Client care sorts and answers mail from unknown senders; the Overseer may read it. */
 function mustBe(key: BotKey, bots: string[]) {
   if (!bots.includes(key.bot)) throw new BotError(403, "Emails from unknown senders belong to the Client care bot.");
 }
 
-function inboundView(request: InboundRequest) {
+/**
+ * The client sites the sender edits. An editor isn't the owner, so they aren't verified for change requests:
+ * the bot points them to their portal or to the owner (02-system/change-requests.md).
+ */
+function editorOf(request: InboundRequest, edited: EditedSiteOf[]) {
+  const sender = normalizeEmail(request.email);
+  return edited.filter((site) => site.email === sender).map(({ slug, url, businessId, ownerEmail }) => ({ leadId: businessId, slug, siteUrl: url, ownerEmail }));
+}
+
+function inboundView(request: InboundRequest, edited: EditedSiteOf[] = []) {
   return {
+    editorOf: editorOf(request, edited),
     id: request.id,
     at: request.at,
     source: request.source,
@@ -51,14 +62,15 @@ export async function listInbound(key: BotKey, query: z.infer<typeof InboundQuer
   await syncMailIfStale(BOT_READ_FRESH_MS);
   const kinds: InboundKind[] = query.kind ? [query.kind] : [...INBOUND_KINDS];
   const rows = query.status === "open" ? await openOfKinds(kinds) : (await pastRequests()).filter((row) => row.status === query.status && kinds.includes(row.kind));
-  return { inbound: rows.map(inboundView) };
+  const edited = await sitesEditedBy(rows.map((row) => row.email));
+  return { inbound: rows.map((row) => inboundView(row, edited)) };
 }
 
 export async function inboundForBot(key: BotKey, id: string) {
   mustBe(key, ["client_care", "overseer"]);
   const request = await inboundById(id);
   if (!request) throw new BotError(404, "Nothing in the inbound list has that ID.");
-  return inboundView(request);
+  return inboundView(request, await sitesEditedBy([request.email]));
 }
 
 const Text = (max: number) => z.string().trim().max(max).default("");

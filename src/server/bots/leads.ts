@@ -12,6 +12,7 @@ import { BOT_READ_FRESH_MS, syncMailIfStale } from "../mail/sync";
 import { previewLink, welcomeLink } from "../outreach/compose";
 import { actorOf, BotError } from "./http";
 import { buildAndLaunchState } from "./sites";
+import { editorEmailsOfBusiness } from "../sites/siteEditors";
 
 const NOTE_ACTIONS = ["note", "handoff note"];
 
@@ -120,7 +121,8 @@ export async function leadDetail(key: BotKey, id: string) {
   ]);
   const notes = history.filter((entry) => NOTE_ACTIONS.includes(entry.action)).map(({ at, actor, action, detail }) => ({ at, by: actor, handoff: action === "handoff note", text: detail }));
   const builds = await buildAndLaunchState(lead);
-  return { lead: leadView(lead), domain, ...builds, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
+  const editors = await editorEmailsOfBusiness(lead.id);
+  return { lead: { ...leadView(lead), editorEmails: editors }, domain, ...builds, messages: thread, notes, activity: history.map(({ at, actor, action, detail }) => ({ at, actor, action, detail })) };
 }
 
 export const NoteBody = z.object({ text: z.string().trim().min(1).max(4000), handoff: z.boolean().default(false) });

@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { emailPortalLink, safeNext, setPassword, signInWithLink, signInWithPassword, type PasswordChange } from "@/server/portal/accounts";
-import { endOwnerSession, requireOwner } from "@/server/portal/session";
+import { isOwnerOf, portalSite } from "@/server/portal/context";
+import { endPortalSession, requirePortalUser } from "@/server/portal/session";
 import { record } from "@/server/activity";
 import { launchDomainOf } from "@/server/integrations/domain";
 import { businessById } from "@/server/leads/businesses";
 import { launchBlocker, requestPreview } from "@/server/runner/jobs";
-import { clientSite, sitesForOwner } from "@/server/sites/clientSites";
+import { clientSite } from "@/server/sites/clientSites";
+import { addEditorAndRecord, removeEditorAndRecord } from "@/server/sites/siteEditors";
 
 export type SignInState = { status: "idle" | "sent" | "wrong" | "locked" | "invalid" | "not-ready"; email: string };
 
@@ -34,15 +36,15 @@ export async function openLinkAction(form: FormData) {
 }
 
 export async function signOutAction() {
-  await endOwnerSession();
+  await endPortalSession();
   redirect("/portal/sign-in");
 }
 
 export type PasswordState = { status: "idle" | PasswordChange };
 
 export async function setPasswordAction(_previous: PasswordState, form: FormData): Promise<PasswordState> {
-  const owner = await requireOwner();
-  const status = await setPassword(owner.email, String(form.get("current") ?? ""), String(form.get("password") ?? ""));
+  const user = await requirePortalUser();
+  const status = await setPassword(user.email, String(form.get("current") ?? ""), String(form.get("password") ?? ""));
   return { status };
 }
 
@@ -57,13 +59,37 @@ export async function emailOwnerLinkAction(form: FormData) {
 
 /** "Looks good, make it live" on the portal's checklist: the owner approves their preview and the launch starts. */
 export async function approvePreviewAction(form: FormData) {
-  const owner = await requireOwner();
+  const user = await requirePortalUser();
   const slug = String(form.get("site") ?? "");
-  const site = (await sitesForOwner(owner.email)).find((candidate) => candidate.slug === slug);
-  const lead = site?.businessId ? await businessById(site.businessId) : null;
+  const site = await portalSite(user, slug);
+  const lead = site?.businessId && isOwnerOf(site) ? await businessById(site.businessId) : null;
   if (!lead || launchBlocker(lead) || !launchDomainOf(lead)) redirect("/portal");
-  const { job, created } = await requestPreview(lead, owner.email, "The owner approved the preview in their portal.", "launch");
-  if (created && job.kind === "launch") await record(owner.email, "approved the preview and started the launch", { businessId: lead.id });
+  const { job, created } = await requestPreview(lead, user.email, "The owner approved the preview in their portal.", "launch");
+  if (created && job.kind === "launch") await record(user.email, "approved the preview and started the launch", { businessId: lead.id });
   revalidatePath("/portal");
   redirect(`/portal?site=${encodeURIComponent(slug)}`);
+}
+
+const accountPage = (slug: string, result: string) => `/portal/account?site=${encodeURIComponent(slug)}&editors=${result}`;
+
+/** The site an owner is changing editors on. Editors can't choose who else edits, so they land back on their account. */
+async function siteOwnedBySignedIn(form: FormData) {
+  const user = await requirePortalUser();
+  const site = await portalSite(user, String(form.get("site") ?? ""));
+  if (!site || !isOwnerOf(site)) redirect("/portal/account");
+  return { user, site };
+}
+
+export async function addEditorAction(form: FormData) {
+  const { user, site } = await siteOwnedBySignedIn(form);
+  const result = await addEditorAndRecord(site, String(form.get("email") ?? ""), user.email);
+  revalidatePath("/portal/account");
+  redirect(accountPage(site.slug, result));
+}
+
+export async function removeEditorAction(form: FormData) {
+  const { user, site } = await siteOwnedBySignedIn(form);
+  await removeEditorAndRecord(site, String(form.get("email") ?? ""), user.email);
+  revalidatePath("/portal/account");
+  redirect(accountPage(site.slug, "removed"));
 }

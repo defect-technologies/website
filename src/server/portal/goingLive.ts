@@ -3,7 +3,7 @@ import { ACTIVE_JOB_STATUSES, type PreviewJobStatus } from "@/lib/previewJobs";
 import { buildAndLaunchState } from "../bots/sites";
 import { domainFacts, launchDomainOf } from "../integrations/domain";
 import { businessById } from "../leads/businesses";
-import type { OwnerSite } from "../sites/clientSites";
+import type { PortalSite } from "../sites/clientSites";
 
 export type StepState = "done" | "current" | "waiting";
 
@@ -35,7 +35,9 @@ function stepsFor(launch: LaunchState, domain: string | null): GoingLive["steps"
   };
 }
 
-export async function goingLiveFor(site: OwnerSite): Promise<GoingLive | null> {
+/** The launch checklist is the owner's: editors never see it. */
+export async function goingLiveFor(site: PortalSite): Promise<GoingLive | null> {
+  if (site.role !== "owner") return null;
   const lead = site.businessId ? await businessById(site.businessId) : null;
   if (!lead) return null;
   const domain = launchDomainOf(lead);

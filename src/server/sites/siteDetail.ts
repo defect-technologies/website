@@ -10,6 +10,7 @@ import { brandFilesFor } from "../leads/brandFiles";
 import { threadFor } from "../mail/threads";
 import { buildFor, runnerStatus } from "../runner/status";
 import { openSpotChecks } from "../spotChecks";
+import { editorsOf } from "./siteEditors";
 
 export type HistoryKind = "in" | "out" | "build" | "change" | "event";
 export type HistoryItem = { key: string; at: Date; kind: HistoryKind; text: string; who: string };
@@ -48,7 +49,8 @@ export async function siteDetail(business: Business) {
     openSpotChecks(),
     runnerStatus(),
   ]);
-  const changes = site ? await changesFor(site.slug, [site.ownerEmail, business.ownerEmail, business.email]) : [];
+  const editorEmails = site ? (await editorsOf(site.id)).map((editor) => editor.email) : [];
+  const changes = site ? await changesFor(site.slug, [site.ownerEmail, business.ownerEmail, business.email, ...editorEmails]) : [];
   const emails: HistoryItem[] = thread.map((message) => ({
     key: `mail-${message.id}`,
     at: message.at,

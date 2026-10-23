@@ -5,7 +5,8 @@ import { buttonClasses } from "@/components/Button";
 import { Card, Notice } from "@/components/admin/ui";
 import PortalShell from "@/components/portal/PortalShell";
 import { clientPlan, type ClientPlan } from "@/server/integrations/stripe";
-import { portalContext } from "@/server/portal/context";
+import { isOwnerOf, portalContext, type PortalContext } from "@/server/portal/context";
+import { siteName } from "@/server/editor/signInLinks";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -30,11 +31,25 @@ function PlanStatus({ plan }: { plan: ClientPlan }) {
   return <p className={`flex items-start gap-2 ${line.tone}`}>{line.icon}<span>{line.text}</span></p>;
 }
 
+function BillingForEditor({ context }: { context: PortalContext }) {
+  return (
+    <PortalShell context={context} path="/portal/billing">
+      <h1 className="text-3xl font-semibold sm:text-4xl">Billing</h1>
+      <Card className="max-w-2xl p-6 sm:p-8">
+        <p className="text-ink-soft text-pretty">
+          {context.site.ownerEmail} owns {siteName(context.site.businessName, context.site.url)} and looks after its plan.
+        </p>
+      </Card>
+    </PortalShell>
+  );
+}
+
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ site?: string; problem?: string }> }) {
   const query = await searchParams;
   const context = await portalContext(query.site);
   const { site } = context;
-  const plan = site.stripeCustomerId ? await clientPlan(site.stripeCustomerId) : null;
+  if (!isOwnerOf(site)) return <BillingForEditor context={context} />;
+  const plan =site.stripeCustomerId ? await clientPlan(site.stripeCustomerId) : null;
   if (plan && plan.state !== "ok") console.error(`[portal] Plan for ${site.slug} unavailable`, plan);
   const current = plan?.state === "ok" ? plan.data : null;
 
