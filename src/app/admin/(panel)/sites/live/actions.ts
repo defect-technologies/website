@@ -8,6 +8,7 @@ import { requireFounder } from "@/server/auth/session";
 import { editorReady, emailSignInLink, enterUrl, linksReady } from "@/server/editor/signInLinks";
 import { businessById } from "@/server/leads/businesses";
 import { addClientSite, changeSiteOwner, clientSite } from "@/server/sites/clientSites";
+import { addEditorAndRecord, isSiteEditor, normalizeEmail, removeEditorAndRecord } from "@/server/sites/siteEditors";
 
 export type AddSiteValues = { slug: string; ownerEmail: string; url: string; businessId: string };
 export type AddSiteResult = { problems: string[]; values: AddSiteValues };
@@ -86,4 +87,39 @@ export async function changeOwnerAction(form: FormData) {
   await record(founder.email, "changed a site's owner", { businessId: site.businessId, detail: `${site.url} is now owned by ${site.ownerEmail}` });
   revalidatePath("/admin", "layout");
   redirect(sitePage(slug, "owner=changed"));
+}
+
+async function siteForEditors(form: FormData) {
+  const founder = await requireFounder();
+  const site = await clientSite(String(form.get("site") ?? ""));
+  if (!site) redirect("/admin/sites?status=live");
+  return { founder, site };
+}
+
+export async function addEditorAction(form: FormData) {
+  const { founder, site } = await siteForEditors(form);
+  const result = await addEditorAndRecord(site, String(form.get("email") ?? ""), founder.email);
+  redirect(sitePage(site.slug, `editors=${result}`));
+}
+
+export async function removeEditorAction(form: FormData) {
+  const { founder, site } = await siteForEditors(form);
+  await removeEditorAndRecord(site, String(form.get("email") ?? ""), founder.email);
+  redirect(sitePage(site.slug, "editors=removed"));
+}
+
+/** The same one-time editor link the owner gets, sent to one of the site's editors. */
+export async function sendEditorLinkAction(form: FormData) {
+  const { founder, site } = await siteForEditors(form);
+  const email = normalizeEmail(String(form.get("email") ?? ""));
+  if (!linksReady()) redirect(sitePage(site.slug, "link=not-ready"));
+  if (!(await isSiteEditor(site.id, email))) redirect(sitePage(site.slug, "editors=not-editor"));
+  try {
+    await emailSignInLink(site, email);
+  } catch (error) {
+    console.error(`[editor] Sign-in email for an editor of ${site.slug} failed to send`, error);
+    redirect(sitePage(site.slug, "link=failed"));
+  }
+  await record(founder.email, "emailed an editor a sign-in link", { businessId: site.businessId, detail: `${site.url} to ${email}` });
+  redirect(sitePage(site.slug, `link=sent&to=${encodeURIComponent(email)}`));
 }

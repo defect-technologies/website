@@ -3,14 +3,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import OpenEditorButton from "@/components/admin/OpenEditorButton";
+import SiteEditors from "@/components/admin/SiteEditors";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { TextField } from "@/components/admin/fields";
 import { Card, KeyValue, Notice, SectionHeading, StatusMark, When } from "@/components/admin/ui";
 import { LINK_MINUTES, editorReady, linksReady } from "@/server/editor/signInLinks";
 import { clientSite, type ClientSiteRow } from "@/server/sites/clientSites";
-import { changeOwnerAction, sendLinkAction } from "../actions";
+import { editorsOf } from "@/server/sites/siteEditors";
+import { addEditorAction, changeOwnerAction, removeEditorAction, sendEditorLinkAction, sendLinkAction } from "../actions";
 
-type Query = { added?: string; link?: string; owner?: string; editor?: string };
+type Query = { added?: string; link?: string; to?: string; owner?: string; editor?: string; editors?: string };
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Query> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -34,15 +36,31 @@ function facts(site: ClientSiteRow): [string, React.ReactNode][] {
   ];
 }
 
+const EDITOR_RESULTS: Record<string, ["good" | "bad", string]> = {
+  added: ["good", "Editor added. They can sign in at defect.tech/portal, or you can email them a link."],
+  "already-editor": ["good", "They can already edit this site."],
+  "is-owner": ["bad", "That's the owner's email. Owners can already edit their site."],
+  invalid: ["bad", "Check that editor's email address and try again."],
+  removed: ["good", "Editor removed. Their sign-in links stop working."],
+  "not-editor": ["bad", "That address isn't an editor of this site anymore."],
+};
+
+function editorNotices(result?: string): [boolean, "good" | "bad", string][] {
+  const found = result ? EDITOR_RESULTS[result] : undefined;
+  return found ? [[true, ...found]] : [];
+}
+
 function notices(site: ClientSiteRow, query: Query) {
   const host = new URL(site.url).host;
   const shown: [boolean, "good" | "bad" | "warn", string][] = [
     [Boolean(query.added), "good", "Site added."],
-    [query.link === "sent", "good", `Emailed ${site.ownerEmail} a link. It works once, within ${LINK_MINUTES} minutes.`],
+    [query.link === "sent", "good", `Emailed ${query.to || site.ownerEmail} a link. It works once, within ${LINK_MINUTES} minutes.`],
+    [query.link === "not-ready", "bad", "Sign-in links are off. Set SIGN_IN_EMAIL_API_KEY, SIGN_IN_EMAIL_FROM and EDITOR_SECRET on this Vercel project."],
     [query.link === "failed", "bad", "Resend refused the link, so nothing was sent. Check Resend's logs, then try again."],
     [query.owner === "changed", "good", `Sign-in links for ${host} now go to ${site.ownerEmail}.`],
     [query.editor === "not-ready", "bad", "Set EDITOR_SECRET on this Vercel project to open the editor."],
     [query.owner === "invalid", "bad", "Check that email address and try again."],
+    ...editorNotices(query.editors),
   ];
   return shown.filter(([visible]) => visible).map(([, tone, text]) => (
     <Notice key={text} tone={tone}>
@@ -56,6 +74,7 @@ export default async function SitePage({ params, searchParams }: Props) {
   if (!site) notFound();
   const query = await searchParams;
   const ready = linksReady();
+  const editors = await editorsOf(site.id);
 
   return (
     <>
@@ -91,6 +110,20 @@ export default async function SitePage({ params, searchParams }: Props) {
             </SubmitButton>
           </form>
         </Card>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <SectionHeading count={editors.length}>Editors</SectionHeading>
+        <SiteEditors
+          slug={site.slug}
+          editors={editors}
+          addAction={addEditorAction}
+          removeAction={removeEditorAction}
+          sendLinkAction={sendEditorLinkAction}
+          sendLinkDisabled={!ready}
+          showHistory
+          addHint="Editors sign in to the portal and edit this site. Billing and change requests stay with the owner."
+        />
       </section>
     </>
   );

@@ -10,7 +10,7 @@ import PortalSignInForm from "@/components/portal/PortalSignInForm";
 import { maskEmail, siteName } from "@/server/editor/signInLinks";
 import { env } from "@/server/env";
 import { safeNext } from "@/server/portal/accounts";
-import { currentOwner } from "@/server/portal/session";
+import { currentPortalUser } from "@/server/portal/session";
 import { clientSite, type ClientSiteRow } from "@/server/sites/clientSites";
 import { emailOwnerLinkAction } from "../actions";
 
@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Sign in" };
 
 const ERRORS: Record<string, string> = {
   google: "Google sign-in didn't work. Try again, or use your email.",
-  "no-site": "That Google account doesn't own a site with us. Sign in with the email address you gave us.",
+  "no-site": "That Google account can't edit a site with us. Sign in with the email address we have for you.",
 };
 
 /** When we know the site, its owner gets a link in one click, with no address to type. */
@@ -50,7 +50,7 @@ export default async function PortalSignInPage({ searchParams }: { searchParams:
   const { site: slug, result, error, next: rawNext } = await searchParams;
   const site = slug ? await clientSite(slug) : null;
   const next = site ? `/portal/edit/${site.slug}` : safeNext(rawNext);
-  if (await currentOwner()) redirect(next);
+  if (await currentPortalUser()) redirect(next);
   const sent = site && result === "sent";
   return (
     <main className="grid min-h-svh place-items-center px-4 py-12">

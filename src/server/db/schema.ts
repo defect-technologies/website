@@ -172,6 +172,23 @@ export const clientSites = pgTable(
 );
 
 /**
+ * People besides the owner who may sign in to the portal and edit a client site, such as a nonprofit's
+ * board. The owner alone handles billing and change requests. Emails are stored lowercased.
+ */
+export const clientSiteEditors = pgTable(
+  "client_site_editors",
+  {
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => clientSites.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    addedBy: text("added_by").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("client_site_editors_site_email").on(table.siteId, table.email), index("client_site_editors_email").on(table.email)],
+);
+
+/**
  * Emailed editor links. Each works once: opening it on defect.tech and pressing
  * the button marks it used and hands the owner a short-lived site-kit token.
  * Only a hash of the code is stored.
@@ -187,7 +204,7 @@ export const editorLinks = pgTable("editor_links", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** A client's sign-in to their portal. Anyone who owns a client site can sign in; the row appears on first sign-in. */
+/** A client's sign-in to their portal. Anyone who owns or edits a client site can sign in; the row appears on first sign-in. */
 export const portalAccounts = pgTable("portal_accounts", {
   email: text("email").primaryKey(),
   passwordHash: text("password_hash").notNull().default(""),
@@ -538,6 +555,7 @@ export type Message = typeof messages.$inferSelect;
 export type Mailbox = typeof mailboxes.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
 export type ClientSite = typeof clientSites.$inferSelect;
+export type ClientSiteEditor = typeof clientSiteEditors.$inferSelect;
 export type BotKey = typeof botKeys.$inferSelect;
 export type Flag = typeof flags.$inferSelect;
 export type PreviewJob = typeof previewJobs.$inferSelect;

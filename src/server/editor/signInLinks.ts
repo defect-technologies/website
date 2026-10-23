@@ -5,6 +5,7 @@ import { SignJWT } from "jose";
 import { db } from "../db/client";
 import { businesses, clientSites, editorLinks, type ClientSite } from "../db/schema";
 import { env, isDevelopment } from "../env";
+import { canEditSite } from "../sites/siteEditors";
 import { signInLinkSender } from "./linkSender";
 
 export const LINK_MINUTES = 10;
@@ -32,7 +33,7 @@ export function linksReady(): boolean {
 
 /**
  * The URL site-kit's /edit/enter route accepts: an HS256 token signed with the
- * EDITOR_SECRET every client site shares, naming the owner and this one site.
+ * EDITOR_SECRET every client site shares, naming who signs in (owner, editor or founder) and this one site.
  */
 export async function enterUrl(site: Pick<ClientSite, "slug" | "url">, email: string): Promise<string> {
   const key = editorSecret();
@@ -59,24 +60,28 @@ async function businessNameOf(businessId: string | null): Promise<string | null>
   return row?.name || null;
 }
 
-/** Stores a new one-time code for the site's owner and emails the link. Throws if the email service refuses it. */
-export async function emailSignInLink(site: Pick<ClientSite, "id" | "url" | "ownerEmail" | "businessId">) {
+/** Stores a new one-time code for the site's owner, or one of its editors, and emails the link. Throws if the email service refuses it. */
+export async function emailSignInLink(site: Pick<ClientSite, "id" | "url" | "ownerEmail" | "businessId">, to = site.ownerEmail) {
   const code = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + LINK_MINUTES * 60 * 1000);
-  await (await db()).insert(editorLinks).values({ codeHash: hash(code), siteId: site.id, email: site.ownerEmail, expiresAt });
+  await (await db()).insert(editorLinks).values({ codeHash: hash(code), siteId: site.id, email: to, expiresAt });
   const url = new URL("/edit/open", env.siteUrl());
   url.searchParams.set("code", code);
   const name = siteName(await businessNameOf(site.businessId), site.url);
-  await signInLinkSender().send({ to: site.ownerEmail, siteName: name, editUrl: `${site.url}/edit`, url: url.toString(), expiresInMinutes: LINK_MINUTES });
+  const askAgainAt = to === site.ownerEmail ? `${site.url}/edit` : new URL("/portal/sign-in", env.siteUrl()).toString();
+  await signInLinkSender().send({ to, siteName: name, editUrl: askAgainAt, url: url.toString(), expiresInMinutes: LINK_MINUTES });
 }
 
-export type LinkState = { state: "ready"; siteName: string } | { state: "used" | "expired"; slug: string } | { state: "unknown" };
+/** forOwner says whether a new link can go to the owner in one click. An editor asks for one from the portal instead. */
+export type LinkState = { state: "ready"; siteName: string } | { state: "used" | "expired"; slug: string; forOwner: boolean } | { state: "unknown" };
 
-type InspectedLink = { usedAt: Date | null; expiresAt: Date; email: string; ownerEmail: string; url: string; slug: string; businessName: string | null };
+type InspectedLink = { siteId: string; usedAt: Date | null; expiresAt: Date; email: string; ownerEmail: string; url: string; slug: string; businessName: string | null };
 
-function stateOf(link: InspectedLink): LinkState {
-  if (link.usedAt) return { state: "used", slug: link.slug };
-  if (link.expiresAt <= new Date() || link.email !== link.ownerEmail) return { state: "expired", slug: link.slug };
+async function stateOf(link: InspectedLink): Promise<LinkState> {
+  const spent = { slug: link.slug, forOwner: link.email === link.ownerEmail };
+  if (link.usedAt) return { state: "used", ...spent };
+  const stillAllowed = await canEditSite({ id: link.siteId, ownerEmail: link.ownerEmail }, link.email);
+  if (link.expiresAt <= new Date() || !stillAllowed) return { state: "expired", ...spent };
   return { state: "ready", siteName: siteName(link.businessName, link.url) };
 }
 
@@ -85,6 +90,7 @@ export async function inspectSignInLink(code: string): Promise<LinkState> {
   if (!code) return { state: "unknown" };
   const [link] = await (await db())
     .select({
+      siteId: editorLinks.siteId,
       usedAt: editorLinks.usedAt,
       expiresAt: editorLinks.expiresAt,
       email: editorLinks.email,
@@ -102,7 +108,7 @@ export async function inspectSignInLink(code: string): Promise<LinkState> {
 
 /**
  * Marks the link used and returns the client site's sign-in URL, or null if the
- * link is unknown, used, expired, or its site has a different owner now.
+ * link is unknown, used, expired, or the person it went to can't edit the site anymore.
  */
 export async function spendSignInLink(code: string): Promise<string | null> {
   if (!code) return null;
@@ -114,7 +120,7 @@ export async function spendSignInLink(code: string): Promise<string | null> {
     .returning({ siteId: editorLinks.siteId, email: editorLinks.email });
   if (!used) return null;
   const [site] = await database.select().from(clientSites).where(eq(clientSites.id, used.siteId));
-  if (!site || site.ownerEmail !== used.email) return null;
+  if (!site || !(await canEditSite(site, used.email))) return null;
   return enterUrl(site, used.email);
 }
 

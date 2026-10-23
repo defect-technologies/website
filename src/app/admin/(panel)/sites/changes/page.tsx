@@ -11,6 +11,7 @@ import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { recentSiteChanges } from "@/server/integrations/siteChanges";
 import { allClientSites, type ClientSiteRow } from "@/server/sites/clientSites";
+import { editorEmailsBySite } from "@/server/sites/siteEditors";
 
 export const metadata: Metadata = { title: "Site changes" };
 
@@ -21,15 +22,17 @@ const one = (value: string | undefined, allowed?: [string, string][]) => {
   return allowed && !allowed.some(([option]) => option === text) ? "" : text;
 };
 
-/** Client sites by slug, with the business name and every address their owner might sign in as. */
+/** Client sites by slug, with the business name and every address their owner or editors might sign in as. */
 async function siteDirectory(sites: ClientSiteRow[]): Promise<Map<string, SiteInfo>> {
   const leads = await (await db())
     .select({ id: businesses.id, slug: businesses.slug, name: businesses.businessName, url: businesses.siteUrl, ownerEmail: businesses.ownerEmail, email: businesses.email })
     .from(businesses);
+  const editors = await editorEmailsBySite();
   const directory = new Map<string, SiteInfo>();
   for (const site of sites) {
     const lead = leads.find((candidate) => candidate.id === site.businessId) ?? leads.find((candidate) => candidate.slug === site.slug);
-    directory.set(site.slug, { name: lead?.name ?? site.slug, url: site.url, ownerEmails: [site.ownerEmail, lead?.ownerEmail ?? "", lead?.email ?? ""].map((email) => email.toLowerCase()).filter(Boolean) });
+    const clientEmails = [site.ownerEmail, lead?.ownerEmail ?? "", lead?.email ?? "", ...(editors.get(site.id) ?? [])];
+    directory.set(site.slug, { name: lead?.name ?? site.slug, url: site.url, ownerEmails: clientEmails.map((email) => email.toLowerCase()).filter(Boolean) });
   }
   for (const lead of leads) {
     if (!directory.has(lead.slug)) directory.set(lead.slug, { name: lead.name, url: lead.url, ownerEmails: [lead.ownerEmail, lead.email].map((email) => email.toLowerCase()).filter(Boolean) });

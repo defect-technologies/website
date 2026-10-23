@@ -5,19 +5,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "../admin/KnifeStroke";
 
-const TABS: { href: string; label: string; icon: Icon }[] = [
+const TABS: { href: string; label: string; icon: Icon; ownerOnly?: boolean }[] = [
   { href: "/portal", label: "Dashboard", icon: ChartLine },
-  { href: "/portal/billing", label: "Billing", icon: CreditCard },
+  { href: "/portal/billing", label: "Billing", icon: CreditCard, ownerOnly: true },
   { href: "/portal/account", label: "Account", icon: UserCircle },
 ];
 
-/** The portal's sections. `site` keeps an owner with several sites on the one they picked. */
-export default function PortalTabs({ site }: { site?: string }) {
+/** The portal's sections. `site` keeps someone with several sites on the one they picked; `billing` is off for an editor. */
+export default function PortalTabs({ site, billing }: { site?: string; billing: boolean }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Portal" className="-mx-1 overflow-x-auto">
       <ul className="flex gap-1 px-1">
-        {TABS.map((tab, index) => {
+        {TABS.filter((tab) => billing || !tab.ownerOnly).map((tab, index) => {
           const current = pathname === tab.href;
           const TabIcon = tab.icon;
           return (

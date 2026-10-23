@@ -6,7 +6,8 @@ import { portalAccounts, portalFailedSignIns, portalLinks } from "../db/schema";
 import { emailReady, sendPlainEmail } from "../editor/linkSender";
 import { env } from "../env";
 import { hashPassword, passwordMatches, PASSWORD_MIN } from "./passwords";
-import { ownsASite, startOwnerSession } from "./session";
+import { hasPortalAccess } from "../sites/clientSites";
+import { startPortalSession } from "./session";
 
 const LINK_MINUTES = 15;
 const LINKS_PER_WINDOW = 3;
@@ -27,7 +28,7 @@ async function signIn(email: string) {
     .insert(portalAccounts)
     .values({ email, lastSignInAt: new Date() })
     .onConflictDoUpdate({ target: portalAccounts.email, set: { lastSignInAt: new Date() } });
-  await startOwnerSession(email);
+  await startPortalSession(email);
 }
 
 async function failuresSince(email: string, minutes: number) {
@@ -54,7 +55,7 @@ export async function signInWithPassword(rawEmail: string, password: string): Pr
   if ((await failuresSince(email, LOCKOUT_MINUTES)) >= FAILURES_ALLOWED) return "locked";
   const [account] = await (await db()).select().from(portalAccounts).where(eq(portalAccounts.email, email));
   const matches = Boolean(account?.passwordHash) && (await passwordMatches(password, account.passwordHash));
-  if (!matches || !(await ownsASite(email))) {
+  if (!matches || !(await hasPortalAccess(email))) {
     await (await db()).insert(portalFailedSignIns).values({ email });
     return "wrong";
   }
@@ -79,11 +80,11 @@ function linkEmailText(url: string): string {
 
 export type LinkRequest = "sent" | "not-ready";
 
-/** Emails a one-time sign-in link to an owner. Answers "sent" either way, so nobody learns who owns a site. */
+/** Emails a one-time sign-in link to an owner or editor. Answers "sent" either way, so nobody learns who has a site. */
 export async function emailPortalLink(rawEmail: string, next: string): Promise<LinkRequest> {
   if (!emailReady()) return "not-ready";
   const email = normalize(rawEmail);
-  if (!(await ownsASite(email))) return "sent";
+  if (!(await hasPortalAccess(email))) return "sent";
   if ((await linksSince(email, LINK_MINUTES)) >= LINKS_PER_WINDOW) return "sent";
   const code = randomBytes(32).toString("base64url");
   await (await db()).insert(portalLinks).values({ codeHash: hash(code), email, next: safeNext(next), expiresAt: new Date(Date.now() + LINK_MINUTES * 60 * 1000) });
@@ -115,14 +116,14 @@ export async function signInWithLink(code: string): Promise<string | null> {
     .set({ usedAt: new Date() })
     .where(and(eq(portalLinks.codeHash, hash(code)), isNull(portalLinks.usedAt), gt(portalLinks.expiresAt, new Date())))
     .returning({ email: portalLinks.email, next: portalLinks.next });
-  if (!link || !(await ownsASite(link.email))) return null;
+  if (!link || !(await hasPortalAccess(link.email))) return null;
   await signIn(link.email);
   return safeNext(link.next);
 }
 
-/** Signs in someone Google has vouched for, if they own a site. */
+/** Signs in someone Google has vouched for, if they own or edit a site. */
 export async function signInWithGoogle(email: string): Promise<boolean> {
-  if (!(await ownsASite(normalize(email)))) return false;
+  if (!(await hasPortalAccess(normalize(email)))) return false;
   await signIn(normalize(email));
   return true;
 }

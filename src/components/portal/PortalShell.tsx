@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/Button";
 import { siteName } from "@/server/editor/signInLinks";
-import type { PortalContext } from "@/server/portal/context";
+import { isOwnerOf, type PortalContext } from "@/server/portal/context";
 import { isLive } from "@/server/sites/clientSites";
 import PortalTabs from "./PortalTabs";
 
@@ -39,7 +39,7 @@ export default function PortalShell({ context, path, children }: { context: Port
             defect.tech
           </Link>
           <div className="order-3 w-full sm:order-none sm:w-auto sm:flex-1">
-            <PortalTabs site={several ? context.site.slug : undefined} />
+            <PortalTabs site={several ? context.site.slug : undefined} billing={isOwnerOf(context.site)} />
           </div>
           {/* A plain link, not next/link: prefetching would open the editor in the background. The editor lives on the website, so it opens once it's live. */}
           {isLive(context.site) && (

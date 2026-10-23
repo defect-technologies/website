@@ -26,20 +26,20 @@ function OpenForm({ code, siteName }: { code: string; siteName: string }) {
   );
 }
 
-/** A used or expired link knows its site, so asking again is one click to the same owner. */
-function SpentLink({ message, slug }: { message: string; slug?: string }) {
+/** A used or expired owner's link knows its site, so asking again is one click to the same owner. An editor signs in to the portal. */
+function SpentLink({ message, slug, forOwner }: { message: string; slug?: string; forOwner?: boolean }) {
   return (
     <div className="flex w-full flex-col items-center gap-4">
       <LinkBreak size={32} className="text-ink" aria-hidden="true" />
       <h1 className="text-2xl font-semibold text-balance">Ask for a new link</h1>
       <p className="text-ink-soft text-pretty">{message}</p>
-      {slug ? (
+      {slug && forOwner ? (
         <form action="/edit/request-link" method="post" className="w-full">
           <input type="hidden" name="site" value={slug} />
           <SubmitButton variant="solid">Email me a new link</SubmitButton>
         </form>
       ) : (
-        <ButtonLink href="/portal/sign-in">Email me a new link</ButtonLink>
+        <ButtonLink href={slug ? `/portal/sign-in?next=${encodeURIComponent(`/portal/edit/${slug}`)}` : "/portal/sign-in"}>Get a new link</ButtonLink>
       )}
     </div>
   );
@@ -56,7 +56,7 @@ export default async function OpenEditorPage({ searchParams }: { searchParams: P
     <main className="grid min-h-svh place-items-center px-4 py-12">
       <div className="flex w-full max-w-sm flex-col items-center gap-8 text-center">
         <EditorBrand />
-        {link.state === "ready" ? <OpenForm code={code} siteName={link.siteName} /> : <SpentLink message={SPENT[link.state]} slug={"slug" in link ? link.slug : undefined} />}
+        {link.state === "ready" ? <OpenForm code={code} siteName={link.siteName} /> : <SpentLink message={SPENT[link.state]} slug={"slug" in link ? link.slug : undefined} forOwner={"forOwner" in link && link.forOwner} />}
       </div>
     </main>
   );
