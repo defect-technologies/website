@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { env } from "@/server/env";
 import { isSignedByVercel, leadPreviewFrom } from "@/server/integrations/vercelDeployHook";
+import { previewSellsToLead } from "@/server/leads/previewChecks";
 import { recordBuiltPreview } from "@/server/leads/previewReports";
 
 /**
  * Vercel calls this when a deployment in the previews project succeeds. A deploy tagged `--meta lead=<slug>`
- * becomes that lead's preview link, the same as a report from the preview builder.
+ * becomes that lead's preview link, the same as a report from the preview builder, once its page is checked to
+ * sell to that lead.
  */
 export async function POST(request: Request) {
   const { webhookSecret, previewProject } = env.vercel();
@@ -15,6 +17,6 @@ export async function POST(request: Request) {
   }
   const preview = leadPreviewFrom(JSON.parse(rawBody), previewProject);
   if (!preview) return NextResponse.json({ ok: true, ignored: true });
-  const recorded = await recordBuiltPreview({ ...preview, actor: "Vercel" });
+  const recorded = await recordBuiltPreview({ ...preview, actor: "Vercel", guard: previewSellsToLead });
   return NextResponse.json({ ok: true, ...recorded });
 }
