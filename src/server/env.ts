@@ -37,6 +37,8 @@ export const env = {
     token: optional("VERCEL_TOKEN"),
     teamId: optional("VERCEL_TEAM_ID"),
     previewProject: optional("VERCEL_PREVIEW_PROJECT"),
+    /** The secret of the defect-previews deployment webhook, which points each lead's preview link at its newest deploy. */
+    webhookSecret: optional("VERCEL_WEBHOOK_SECRET"),
   }),
   healthchecksKey: () => optional("HEALTHCHECKS_API_KEY"),
   sitesDatabaseUrl: () => optional("SITES_DATABASE_URL"),
