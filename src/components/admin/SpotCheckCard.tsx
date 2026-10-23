@@ -55,7 +55,7 @@ export default function SpotCheckCard({ row }: { row: SpotCheckRow }) {
             <When date={check.sampledAt} />
           </span>
         </header>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="flex flex-col gap-4">
           {SPOT_CHECK_ASPECTS.map((aspect) => (
             <RatingField key={aspect.field} name={aspect.field} label={aspect.label} hint={aspect.hint} />
           ))}
