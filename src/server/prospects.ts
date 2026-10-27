@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, count, desc, eq, gte, ilike, isNotNull, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db/client";
-import { prospects, type Prospect } from "./db/schema";
+import { businesses, prospects, type Prospect } from "./db/schema";
 import { domainOf } from "./mail/mime";
 
 const text = (max: number) => z.string().trim().max(max).catch("").default("");
@@ -238,4 +238,30 @@ export async function prospectWebsites(offset: number, limit: number) {
     .orderBy(desc(prospects.foundAt))
     .limit(limit)
     .offset(offset);
+}
+
+export const ProspectRenames = z.object({
+  names: z.array(z.object({ id: z.uuid(), businessName: z.string().trim().min(1).max(200) })).min(1).max(500),
+});
+
+/**
+ * Corrects audited businesses' names, and the lead made from one while it's still new (never contacted, so no owner
+ * has seen the old name). The lead finder named some businesses after a city or a placeholder ('Los Angeles, CA',
+ * 'MySite'); a refreshed audit fixes the name too, but re-auditing would also replace everything else.
+ */
+export async function renameProspects(names: { id: string; businessName: string }[]): Promise<{ prospects: number; leads: number; renamed: { from: string; to: string; businessId: string | null }[] }> {
+  const database = await db();
+  const renamed: { from: string; to: string; businessId: string | null }[] = [];
+  let leads = 0;
+  for (const { id, businessName } of names) {
+    const [before] = await database.select({ name: prospects.businessName, businessId: prospects.businessId }).from(prospects).where(eq(prospects.id, id));
+    if (!before || before.name === businessName) continue;
+    await database.update(prospects).set({ businessName, updatedAt: new Date() }).where(eq(prospects.id, id));
+    if (before.businessId) {
+      const changed = await database.update(businesses).set({ businessName }).where(and(eq(businesses.id, before.businessId), eq(businesses.stage, "new"))).returning({ id: businesses.id });
+      leads += changed.length;
+    }
+    renamed.push({ from: before.name, to: businessName, businessId: before.businessId });
+  }
+  return { prospects: renamed.length, leads, renamed };
 }
