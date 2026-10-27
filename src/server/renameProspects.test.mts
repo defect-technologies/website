@@ -4,9 +4,9 @@ import { mock, test } from "node:test";
 mock.module("server-only", { namedExports: {} });
 
 test("a corrected name reaches the prospect and its lead while the lead is new, and never a contacted lead", async () => {
-  const { db } = await import("./db/client.ts");
-  const { businesses, prospects } = await import("./db/schema.ts");
-  const { ProspectInput, upsertProspects, renameProspects } = await import("./prospects.ts");
+  const { db } = await import("./db/client");
+  const { businesses, prospects } = await import("./db/schema");
+  const { ProspectInput, upsertProspects, renameProspects } = await import("./prospects");
   const { eq } = await import("drizzle-orm");
   const database = await db();
   const stamp = Date.now();
