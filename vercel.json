@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": { "deploymentEnabled": false },
   "crons": [
-    { "path": "/api/cron/sync", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/sync", "schedule": "5,35 * * * *" },
     { "path": "/api/cron/digest", "schedule": "0 2 * * *" },
     { "path": "/api/cron/analytics-spend", "schedule": "0 16 * * *" },
     { "path": "/api/cron/vercel-usage", "schedule": "0 17 9 * *" },
