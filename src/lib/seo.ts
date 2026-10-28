@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DEFECT } from "@/content/pricing";
+import { FOUNDERS } from "@/content/team";
 
 /**
  * The public site's canonical address, for search engines and link previews. Always production:
@@ -38,8 +39,6 @@ export const PUBLIC_PAGES = [
 /** Paths crawlers have no business in. */
 export const PRIVATE_PATHS = ["/admin", "/api", "/edit", "/portal", "/welcome", "/p/"];
 
-const FOUNDERS = ["Brendan Giang", "Boris Nezlobin"];
-
 const ORGANIZATION_ID = `${SITE_URL}/#organization`;
 
 /** Schema.org description of the studio, its site and its one service, as one graph for the home page. */
@@ -57,7 +56,7 @@ export function homeJsonLd() {
         image: `${SITE_URL}/opengraph-image.png`,
         description: DESCRIPTION,
         email: EMAIL,
-        founder: FOUNDERS.map((name) => ({ "@type": "Person", name })),
+        founder: FOUNDERS.map(({ name, site }) => ({ "@type": "Person", name, url: site })),
         contactPoint: { "@type": "ContactPoint", email: EMAIL, contactType: "customer service", availableLanguage: "English" },
         sameAs: ["https://github.com/defect-technologies"],
       },
@@ -105,7 +104,14 @@ export function teamJsonLd() {
     url: `${SITE_URL}/team`,
     name: `Team · ${SITE_NAME}`,
     about: { "@id": ORGANIZATION_ID },
-    mainEntity: FOUNDERS.map((name) => ({ "@type": "Person", name, jobTitle: "Founder", worksFor: { "@id": ORGANIZATION_ID } })),
+    mainEntity: FOUNDERS.map(({ name, site, bio }) => ({
+      "@type": "Person",
+      name,
+      url: site,
+      description: bio,
+      jobTitle: "Founder",
+      worksFor: { "@id": ORGANIZATION_ID },
+    })),
   };
 }
 
