@@ -7,7 +7,7 @@ import SiteNav from "@/components/SiteNav";
 import JsonLd from "@/components/JsonLd";
 import { pageAddress, teamJsonLd } from "@/lib/seo";
 import { TEAM_NAMES, TEAM_TITLE } from "@/content/headlines";
-import { FOUNDERS, siteLabel } from "@/content/team";
+import { FOUNDERS, TEAM_INTRO, siteLabel } from "@/content/team";
 
 export const metadata: Metadata = {
   title: "Team",
@@ -26,7 +26,10 @@ export default function TeamPage() {
       <JsonLd data={teamJsonLd()} />
       <SiteNav page="team" />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 pt-32 pb-[16vh] sm:px-8">
-        <PaintedHeadline as="h1" headline={TEAM_TITLE} style={{ fontSize: "clamp(3rem, 10vw, 8rem)" }} />
+        <div className="flex flex-col gap-6">
+          <PaintedHeadline as="h1" headline={TEAM_TITLE} style={{ fontSize: "clamp(3rem, 10vw, 8rem)" }} />
+          <p className={BIO}>{TEAM_INTRO}</p>
+        </div>
         <div className="grid gap-x-12 gap-y-20 md:grid-cols-2">
           {FOUNDERS.map((person) => (
             <figure key={person.key} className="flex flex-col gap-8">

@@ -5,12 +5,14 @@ export type Founder = {
   bio: string;
 };
 
+export const TEAM_INTRO = "Both of us have managed small-business websites that each get more than 100,000 users a year.";
+
 export const FOUNDERS: Founder[] = [
   {
     key: "brendan",
     name: "Brendan Giang",
     site: "https://brendangiang.com",
-    bio: "Brendan studies at USC and runs G Studio, his film studio. He has won all five hackathons he has entered.",
+    bio: "Brendan studies at the USC Iovine and Young Academy and runs G Studio, his film studio. He has won all five hackathons he has entered.",
   },
   {
     key: "boris",
