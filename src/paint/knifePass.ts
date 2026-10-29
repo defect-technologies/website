@@ -3,10 +3,13 @@
  * painting in under the knife; scraping takes whatever is there back off.
  * Adapted from the Wet Paint studio's KnifeReveal.
  *
- * Laying grows a mask and draws the painting through it once per frame. Drawing
- * the painting straight into each lane instead would stack its translucent
- * edges where lanes overlap, so it would darken and then lighten again when the
- * finished image replaced the canvas.
+ * Every frame redraws a mask of where the knife has been, each lane as one
+ * shape from where it set off to where it is now, and shows the painting
+ * through it (laying) or cuts the mask out of what was there (scraping).
+ * Painting or cutting only each frame's new slice instead would leave a faint
+ * hairline wherever two slices meet, because each slice only half covers the
+ * pixels on its antialiased edge. Drawing the painting straight into each lane
+ * would also stack its translucent edges where lanes overlap.
  */
 const LANES = 7;
 const BANDS = 5;
@@ -32,7 +35,6 @@ interface Lane {
 interface Band {
   across: number;
   delay: number;
-  reached: number;
   lanes: Lane[];
 }
 
@@ -84,16 +86,19 @@ export class KnifePass {
   private readonly bandWidth: number;
   private readonly bands: Band[];
   private readonly started = performance.now();
-  private readonly mask: HTMLCanvasElement | null;
+  private readonly mask: HTMLCanvasElement;
+  /** What the mask reveals when laying, or what it cuts into when scraping. */
+  private readonly source: CanvasImageSource | null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly mode: PassMode,
-    private readonly painting: CanvasImageSource | null = null,
+    painting: CanvasImageSource | null = null,
     angle = sidewaysAngle(),
   ) {
     this.context = canvas.getContext("2d");
-    this.mask = mode === "lay" ? blankLike(canvas) : null;
+    this.mask = blankLike(canvas);
+    this.source = mode === "lay" ? painting : copyOf(canvas);
     this.dir = { x: Math.cos(angle), y: Math.sin(angle) };
     this.normal = { x: -this.dir.y, y: this.dir.x };
     this.reach = Math.hypot(canvas.width, canvas.height);
@@ -101,7 +106,6 @@ export class KnifePass {
     this.bands = shuffledSlots().map((slot, index) => ({
       across: -this.reach / 2 + (slot + 0.5) * (this.reach / BANDS),
       delay: index * BAND_STAGGER_MS,
-      reached: 0,
       lanes: laneSet(this.bandWidth),
     }));
   }
@@ -111,42 +115,36 @@ export class KnifePass {
   }
 
   frame(): void {
-    if (!this.context) return;
+    const mask = this.mask.getContext("2d");
+    if (!this.context || !mask) return;
     const elapsed = performance.now() - this.started;
-    const target = this.mask?.getContext("2d") ?? this.context;
-    if (!target) return;
-    for (const band of this.bands) this.advance(target, band, elapsed);
-    if (this.mask) this.showThroughMask(this.context, this.mask);
+    mask.clearRect(0, 0, this.mask.width, this.mask.height);
+    for (const band of this.bands) this.traceBand(mask, band, elapsed);
+    this.composite(this.context);
   }
 
-  private showThroughMask(context: CanvasRenderingContext2D, mask: HTMLCanvasElement): void {
-    if (!this.painting) return;
+  private composite(context: CanvasRenderingContext2D): void {
+    if (!this.source) return;
     context.save();
     context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    context.drawImage(this.painting, 0, 0, this.canvas.width, this.canvas.height);
-    context.globalCompositeOperation = "destination-in";
-    context.drawImage(mask, 0, 0);
+    context.drawImage(this.source, 0, 0, this.canvas.width, this.canvas.height);
+    context.globalCompositeOperation = this.mode === "lay" ? "destination-in" : "destination-out";
+    context.drawImage(this.mask, 0, 0);
     context.restore();
   }
 
-  private advance(context: CanvasRenderingContext2D, band: Band, elapsed: number): void {
+  private traceBand(mask: CanvasRenderingContext2D, band: Band, elapsed: number): void {
     const progress = knifeEase(Math.min(1, Math.max(0, (elapsed - band.delay) / BAND_TRAVEL_MS)));
-    if (progress <= band.reached) return;
-    for (const lane of band.lanes) this.stroke(context, band, lane, progress);
-    band.reached = progress;
+    if (progress <= 0) return;
+    for (const lane of band.lanes) this.traceLane(mask, band, lane, progress);
   }
 
-  private stroke(context: CanvasRenderingContext2D, band: Band, lane: Lane, progress: number): void {
-    const from = this.pointOnBand(band, Math.min(1, band.reached * lane.pace));
+  private traceLane(mask: CanvasRenderingContext2D, band: Band, lane: Lane, progress: number): void {
+    const from = this.pointOnBand(band, 0);
     const to = this.pointOnBand(band, Math.min(1, progress * lane.pace + (progress >= 1 ? 0.1 : 0)));
-    context.save();
-    quadPath(context, from, to, this.normal, lane.offset, this.bandWidth / LANES + 0.6);
-    if (this.mode === "scrape") {
-      context.globalCompositeOperation = "destination-out";
-      context.globalAlpha = lane.strength;
-    }
-    context.fill();
-    context.restore();
+    quadPath(mask, from, to, this.normal, lane.offset, this.bandWidth / LANES + 0.6);
+    mask.globalAlpha = this.mode === "scrape" ? lane.strength : 1;
+    mask.fill();
   }
 
   private pointOnBand(band: Band, travel: number): Point {
@@ -163,6 +161,12 @@ function blankLike(canvas: HTMLCanvasElement): HTMLCanvasElement {
   blank.width = canvas.width;
   blank.height = canvas.height;
   return blank;
+}
+
+function copyOf(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const copy = blankLike(canvas);
+  copy.getContext("2d")?.drawImage(canvas, 0, 0);
+  return copy;
 }
 
 /** Scrapes a knife-wide path between two points, for dragging by hand. Round ends let consecutive drags join without gaps at the turns. */
