@@ -43,7 +43,11 @@ export default function KnifeCanvas({ className = "" }: { className?: string }) 
   };
 
   const drag = (event: PointerEvent<HTMLCanvasElement>) => {
-    brush.current?.drag(pointIn(event.currentTarget, event.clientX, event.clientY));
+    if (!brush.current) return;
+    const surface = event.currentTarget;
+    const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
+    const moves = coalesced.length > 0 ? coalesced : [event.nativeEvent];
+    brush.current.drag(moves.map((move) => pointIn(surface, move.clientX, move.clientY)));
   };
 
   const stop = () => {
