@@ -5,7 +5,7 @@ import { KnifeTiles } from "./knifeTiles";
 import { isSettled, smoothSegment, type PathSample } from "./strokeGeometry";
 
 /** How far, in CSS pixels, one load of paint lasts before the knife runs dry. */
-const LOAD_LENGTH = 900;
+const LOAD_LENGTH = 600;
 /** Points this close together, in CSS pixels, add nothing but jitter to the path. */
 const MIN_STEP = 2;
 /** How far the pointer travels before the blade's angle is set from the direction it went. */
