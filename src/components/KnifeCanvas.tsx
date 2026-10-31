@@ -1,62 +1,43 @@
 "use client";
 
-import { useEffect, useRef, type PointerEvent } from "react";
+import { useRef, type PointerEvent, type RefObject } from "react";
 import { BRUSH_PAINTS } from "@/content/headlines";
-import { fitToDisplay, pointIn } from "@/paint/canvas";
+import { usePagePaint } from "@/hooks/usePagePaint";
+import { pointIn } from "@/paint/canvas";
 import { KnifeBrush } from "@/paint/knifeBrush";
 
 const KNIFE_WIDTH = 34;
 
-/** Carries the painting over to a resized canvas instead of wiping it. */
-function refit(canvas: HTMLCanvasElement) {
-  const before = document.createElement("canvas");
-  before.width = canvas.width;
-  before.height = canvas.height;
-  before.getContext("2d")?.drawImage(canvas, 0, 0);
-  const context = fitToDisplay(canvas);
-  context?.drawImage(before, 0, 0, canvas.width, canvas.height);
-}
+type KnifeCanvasProps = {
+  /** What the paint is laid on: it scrolls with this element while the canvas stays on screen. */
+  page: RefObject<HTMLElement | null>;
+  className?: string;
+};
 
 /**
  * A surface you can drag a loaded palette knife across. Mouse and pen only:
  * on touch screens a drag has to stay a scroll.
  */
-export default function KnifeCanvas({ className = "" }: { className?: string }) {
+export default function KnifeCanvas({ page, className = "" }: KnifeCanvasProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const brush = useRef<KnifeBrush | null>(null);
-
-  useEffect(() => {
-    const surface = canvas.current;
-    if (!surface) return;
-    // The knife reads the paint under it, so the canvas stays in memory the CPU can read quickly.
-    surface.getContext("2d", { willReadFrequently: true });
-    fitToDisplay(surface);
-    const observer = new ResizeObserver(() => {
-      brush.current = null;
-      refit(surface);
-    });
-    observer.observe(surface);
-    return () => observer.disconnect();
-  }, []);
+  const { brushRef, lift } = usePagePaint(canvas, page);
 
   const start = (event: PointerEvent<HTMLCanvasElement>) => {
     if (event.pointerType === "touch" || event.button !== 0) return;
     const surface = event.currentTarget;
     surface.setPointerCapture(event.pointerId);
+    lift();
     const scale = surface.width / surface.clientWidth;
-    brush.current = new KnifeBrush(surface, BRUSH_PAINTS, KNIFE_WIDTH, scale, pointIn(surface, event.clientX, event.clientY));
+    brushRef.current = new KnifeBrush(surface, BRUSH_PAINTS, KNIFE_WIDTH, scale, pointIn(surface, event.clientX, event.clientY));
   };
 
   const drag = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (!brush.current) return;
+    const brush = brushRef.current;
+    if (!brush) return;
     const surface = event.currentTarget;
     const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
     const moves = coalesced.length > 0 ? coalesced : [event.nativeEvent];
-    brush.current.drag(moves.map((move) => pointIn(surface, move.clientX, move.clientY)));
-  };
-
-  const stop = () => {
-    brush.current = null;
+    brush.drag(moves.map((move) => pointIn(surface, move.clientX, move.clientY)));
   };
 
   return (
@@ -66,8 +47,8 @@ export default function KnifeCanvas({ className = "" }: { className?: string }) 
       className={`cursor-knife ${className}`}
       onPointerDown={start}
       onPointerMove={drag}
-      onPointerUp={stop}
-      onPointerCancel={stop}
+      onPointerUp={lift}
+      onPointerCancel={lift}
     />
   );
 }

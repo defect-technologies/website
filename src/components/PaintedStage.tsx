@@ -114,7 +114,7 @@ export default function PaintedStage() {
   return (
     <div ref={container} style={{ height: SCROLL_LENGTH }}>
       <div className="sticky top-0 h-svh overflow-hidden">
-        <KnifeCanvas className="absolute inset-0 size-full" />
+        <KnifeCanvas page={container} className="absolute inset-0 size-full" />
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center pb-[2vh]">
           <PaintedHeadline as="h1" headline={WORDMARK} shown={wordmarkShown} style={WORDMARK_SIZE} />
         </div>

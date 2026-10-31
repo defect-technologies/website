@@ -2,6 +2,7 @@ import { hexToRgb, srgbToOklch } from "./engine/color";
 import type { Point } from "./knifePass";
 import { sweep, type Blade, type Tip } from "./knifeSweep";
 import { KnifeTiles } from "./knifeTiles";
+import type { Area } from "./paintLayer";
 import { isSettled, smoothSegment, type PathSample } from "./strokeGeometry";
 
 /** How far, in CSS pixels, one load of paint lasts before the knife runs dry. */
@@ -90,6 +91,11 @@ export class KnifeBrush {
     for (const to of moves) this.follow(to);
     this.blade ??= this.settledBlade();
     if (this.blade && this.tiles) this.lay(this.blade, this.tiles);
+  }
+
+  /** The part of the canvas this stroke has painted, in canvas pixels. */
+  paintedArea(): Area | null {
+    return this.tiles?.area() ?? null;
   }
 
   private follow(to: Point): void {

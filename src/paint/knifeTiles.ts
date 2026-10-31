@@ -1,4 +1,5 @@
 import { reliefLight } from "./engine/knife/relief";
+import type { Area } from "./paintLayer";
 
 export const TILE = 64;
 
@@ -80,6 +81,17 @@ export class KnifeTiles {
       this.dirty.add(key);
     }
     this.saved = null;
+  }
+
+  /** The part of the canvas this stroke has reached, in canvas pixels. */
+  area(): Area | null {
+    const tiles = [...this.tiles.values()];
+    if (tiles.length === 0) return null;
+    const left = Math.min(...tiles.map((tile) => tile.left));
+    const top = Math.min(...tiles.map((tile) => tile.top));
+    const right = Math.max(...tiles.map((tile) => tile.left + TILE));
+    const bottom = Math.max(...tiles.map((tile) => tile.top + TILE));
+    return { left, top, width: right - left, height: bottom - top };
   }
 
   /** Lights every tile painted or rolled back since the last render and puts it on the canvas. */
