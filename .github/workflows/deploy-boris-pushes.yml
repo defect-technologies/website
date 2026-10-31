@@ -1,5 +1,6 @@
 # Vercel blocks deploys of commits by authors outside the Vercel team, and Boris isn't on it.
 # Deploying without the .git folder leaves Vercel no commit author to check.
+# Matched by GitHub username, since Boris commits from more than one email address.
 name: Deploy Boris's pushes
 
 on:
@@ -13,7 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.author.email == 'boris.nezlobin@gmail.com'
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.author.username == 'borisnezlobin'
     runs-on: ubuntu-latest
     env:
       VERCEL_ORG_ID: team_dwvhZslf3zImPm9iPzwTvxhq
