@@ -25,7 +25,7 @@ interface Drip {
   seed: number
 }
 
-function wetColor(color: Rgb): Rgb {
+export function wetColor(color: Rgb): Rgb {
   const [lightness, chroma, hue] = srgbToOklch(color)
   return oklchToSrgb([lightness * 0.93, chroma * 1.1, hue])
 }

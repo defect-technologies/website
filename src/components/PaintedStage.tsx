@@ -6,6 +6,7 @@ import { useMotionAllowed } from "@/hooks/useMotionAllowed";
 import { SCROLL_LENGTH, WORDMARK_SCRAPED_AT, lineThreshold, stageProgress } from "@/lib/choreography";
 import KnifeCanvas from "./KnifeCanvas";
 import PaintedHeadline from "./PaintedHeadline";
+import WordmarkFlourish from "./WordmarkFlourish";
 
 type StageState = { wordmarkShown: boolean; linesShown: number };
 
@@ -75,7 +76,9 @@ const WORDMARK_SIZE: CSSProperties = { fontSize: "clamp(4rem, 21vw, 12rem)" };
 function StillStage() {
   return (
     <section className="flex flex-col items-center gap-[14vh] px-4 py-[16vh]">
-      <PaintedHeadline as="h1" headline={WORDMARK} shown={EVERYTHING.wordmarkShown} style={WORDMARK_SIZE} />
+      <WordmarkFlourish shown={EVERYTHING.wordmarkShown} makeRoom>
+        <PaintedHeadline as="h1" headline={WORDMARK} shown={EVERYTHING.wordmarkShown} style={WORDMARK_SIZE} />
+      </WordmarkFlourish>
       <Conversation linesShown={EVERYTHING.linesShown} />
     </section>
   );
@@ -116,7 +119,9 @@ export default function PaintedStage() {
       <div className="sticky top-0 h-svh overflow-hidden">
         <KnifeCanvas className="absolute inset-0 size-full" />
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center pb-[2vh]">
-          <PaintedHeadline as="h1" headline={WORDMARK} shown={wordmarkShown} style={WORDMARK_SIZE} />
+          <WordmarkFlourish shown={wordmarkShown}>
+            <PaintedHeadline as="h1" headline={WORDMARK} shown={wordmarkShown} style={WORDMARK_SIZE} />
+          </WordmarkFlourish>
         </div>
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
           <Conversation linesShown={linesShown} />

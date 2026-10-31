@@ -34,10 +34,13 @@ function nearestHue(palette: readonly string[], paint: string): string {
   return others.reduce((nearest, other) => (hueGap(paint, other) < hueGap(paint, nearest) ? other : nearest), others[0] ?? paint);
 }
 
-function loadedBlade(palette: readonly string[], width: number, scale: number, start: Point, to: Point): Blade {
+/** Choices a stroke can fix instead of leaving to chance, for strokes the page lays itself. */
+export type Loadout = Partial<Pick<Blade, "reach" | "traceMix" | "tilt" | "ridgeSide" | "seed">> & { paint?: string };
+
+function loadedBlade(palette: readonly string[], width: number, scale: number, start: Point, to: Point, loadout: Loadout): Blade {
   const length = Math.hypot(to.x - start.x, to.y - start.y) || 1;
   const facing = { x: (to.x - start.x) / length, y: (to.y - start.y) / length };
-  const paint = pick(palette);
+  const { paint = pick(palette), ...fixed } = loadout;
   return {
     along: { x: -facing.y, y: facing.x },
     facing,
@@ -50,6 +53,7 @@ function loadedBlade(palette: readonly string[], width: number, scale: number, s
     tilt: between(-0.35, 0.35),
     ridgeSide: Math.random() < 0.5 ? -1 : 1,
     seed: Math.floor(Math.random() * 9973),
+    ...fixed,
   };
 }
 
@@ -78,6 +82,7 @@ export class KnifeBrush {
     private readonly width: number,
     private readonly scale: number,
     start: Point,
+    private readonly loadout: Loadout = {},
   ) {
     const context = canvas.getContext("2d", { willReadFrequently: true });
     this.tiles = context ? new KnifeTiles(context) : null;
@@ -92,6 +97,15 @@ export class KnifeBrush {
     if (this.blade && this.tiles) this.lay(this.blade, this.tiles);
   }
 
+  /** Where the blade's lower edge sits when the knife is at `point`, a little inside the paint: where a drip would leave it. */
+  lowerEdge(point: Point): Point | null {
+    const blade = this.blade;
+    if (!blade) return null;
+    const downward = blade.along.y >= 0 ? 1 : -1;
+    const reach = blade.half * 0.8 * downward;
+    return { x: point.x + blade.along.x * reach, y: point.y + blade.along.y * reach };
+  }
+
   private follow(to: Point): void {
     const last = this.points[this.points.length - 1];
     if (Math.hypot(to.x - last.x, to.y - last.y) >= MIN_STEP * this.scale) this.points.push(to);
@@ -101,7 +115,7 @@ export class KnifeBrush {
     const start = this.points[0];
     const to = this.points[this.points.length - 1];
     if (Math.hypot(to.x - start.x, to.y - start.y) < SETTLING_DISTANCE * this.scale) return null;
-    return loadedBlade(this.palette, this.width, this.scale, start, to);
+    return loadedBlade(this.palette, this.width, this.scale, start, to, this.loadout);
   }
 
   private lay(blade: Blade, tiles: KnifeTiles): void {
