@@ -28,8 +28,13 @@ export default function KnifeCanvas({ className = "" }: { className?: string }) 
   useEffect(() => {
     const surface = canvas.current;
     if (!surface) return;
+    // The knife reads the paint under it, so the canvas stays in memory the CPU can read quickly.
+    surface.getContext("2d", { willReadFrequently: true });
     fitToDisplay(surface);
-    const observer = new ResizeObserver(() => refit(surface));
+    const observer = new ResizeObserver(() => {
+      brush.current = null;
+      refit(surface);
+    });
     observer.observe(surface);
     return () => observer.disconnect();
   }, []);
