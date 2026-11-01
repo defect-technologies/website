@@ -48,10 +48,16 @@ async function tablesInOrder(sql: postgres.Sql): Promise<string[]> {
   return ordered;
 }
 
-/** A table's whole contents, hashed: the copy matches row for row and value for value, not only in number. */
+/**
+ * A table's whole contents, hashed: the copy matches row for row and value for value, not only in number. Decimals
+ * print at full precision on both sides, because Supabase's pooler otherwise rounds them where Neon doesn't.
+ */
 async function checksum(sql: postgres.Sql, table: string): Promise<string> {
-  const [row] = await sql`select md5(coalesce(json_agg(t)::text, '')) as hash from (select * from ${sql(table)} order by 1) t`;
-  return row.hash as string;
+  return sql.begin(async (transaction) => {
+    await transaction`set local extra_float_digits = 3`;
+    const [row] = await transaction`select md5(coalesce(json_agg(t)::text, '')) as hash from (select * from ${transaction(table)} order by 1) t`;
+    return row.hash as string;
+  });
 }
 
 async function count(sql: postgres.Sql, table: string): Promise<number> {
