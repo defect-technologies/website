@@ -1,32 +1,20 @@
-import { ArrowCounterClockwise, CheckCircle, HourglassMedium, MinusCircle, Moon, Play, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
-import type { Icon } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, HourglassMedium, Moon, Play, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
-import Link from "next/link";
+import BuildHistory, { SiteLink } from "@/components/admin/BuildHistory";
 import BuildProgress, { clockTime, minutesText } from "@/components/admin/BuildProgress";
 import LiveRefresh from "@/components/admin/overview/LiveRefresh";
-import Pager, { pageFrom } from "@/components/admin/Pager";
+import { pageFrom } from "@/components/admin/Pager";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { Card, PageHeader, Section, StatusMark, When } from "@/components/admin/ui";
-import { jobsByDay, requestSentence, stepParts } from "@/lib/buildStatus";
-import { isSkipped, JOB_STATUS_LABEL } from "@/lib/previewJobs";
+import { requestSentence, stepParts } from "@/lib/buildStatus";
+import { hiddenOutcomes } from "@/lib/previewJobs";
 import { runnerDay } from "@/server/overview";
-import { buildHistory, type BuildHistory } from "@/server/runner/history";
+import { buildHistory } from "@/server/runner/history";
 import { runnerStatus, type CurrentBuild, type JobRow, type QueuedBuild } from "@/server/runner/status";
 import { resumeRunnerAction } from "../setup/bots/actions";
 import { settleAbandonedJobAction } from "../sites/actions";
 
 export const metadata: Metadata = { title: "Builds" };
-
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-const finishedClock = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" });
-
-function SiteLink({ job }: { job: JobRow }) {
-  return (
-    <Link href={`/admin/sites/${job.businessId}`} className="font-semibold hover:underline">
-      {job.businessName}
-    </Link>
-  );
-}
 
 function Current({ job, now }: { job: CurrentBuild; now: number }) {
   return (
@@ -121,53 +109,6 @@ function Abandoned({ jobs }: { jobs: JobRow[] }) {
   );
 }
 
-function outcomeOf(job: JobRow): { icon: Icon; tone: "good" | "bad" | "quiet" | "warn"; label: string } {
-  if (isSkipped(job)) return { icon: MinusCircle, tone: "quiet", label: "Skipped" };
-  if (job.status === "done") return { icon: CheckCircle, tone: "good", label: job.kind === "launch" ? "Launched" : "Built" };
-  if (job.status === "waiting_for_usage") return { icon: HourglassMedium, tone: "warn", label: "Paused" };
-  return { icon: WarningCircle, tone: "bad", label: JOB_STATUS_LABEL[job.status] };
-}
-
-function FinishedBuild({ job }: { job: JobRow }) {
-  const outcome = outcomeOf(job);
-  return (
-    <li className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5 px-5 py-3 text-sm sm:grid-cols-[6rem_minmax(0,1fr)_auto]">
-      <StatusMark icon={outcome.icon} tone={outcome.tone} label={outcome.label} detail={job.criticVerdict || job.step || undefined} />
-      <span className="min-w-0 truncate">
-        <SiteLink job={job} />
-      </span>
-      <span className="text-ink-faint col-start-2 tabular-nums sm:col-start-3">
-        {job.finishedAt && <time dateTime={job.finishedAt.toISOString()}>{finishedClock.format(job.finishedAt)}</time>}
-        {job.minutes ? ` after ${minutesText(job.minutes)}` : ""}
-        {job.apiEquivalentUsd ? ` (${usd.format(job.apiEquivalentUsd)} of Claude usage)` : ""}
-      </span>
-    </li>
-  );
-}
-
-function History({ history, now }: { history: BuildHistory; now: number }) {
-  if (history.total === 0) return null;
-  return (
-    <Section id="history" title="History" count={history.total}>
-      <div className="flex flex-col gap-6">
-        {jobsByDay(history.jobs, now).map((day) => (
-          <div key={day.label} className="flex flex-col gap-2">
-            <h3 className="text-ink-soft text-sm font-semibold">{day.label}</h3>
-            <Card>
-              <ul className="divide-ink/8 divide-y">
-                {day.jobs.map((job) => (
-                  <FinishedBuild key={job.id} job={job} />
-                ))}
-              </ul>
-            </Card>
-          </div>
-        ))}
-      </div>
-      <Pager page={history.page} pages={history.pages} back="Newer" forward="Older" href={(page) => `/admin/builds${page > 1 ? `?page=${page}` : ""}#history`} />
-    </Section>
-  );
-}
-
 function Paused({ until, now }: { until: Date; now: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -181,9 +122,9 @@ function Paused({ until, now }: { until: Date; now: number }) {
   );
 }
 
-export default async function BuildsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const { page } = await searchParams;
-  const [status, day, history] = await Promise.all([runnerStatus(), runnerDay(), buildHistory(pageFrom(page))]);
+export default async function BuildsPage({ searchParams }: { searchParams: Promise<{ page?: string; hide?: string }> }) {
+  const { page, hide } = await searchParams;
+  const [status, day, history] = await Promise.all([runnerStatus(), runnerDay(), buildHistory(pageFrom(page), hiddenOutcomes(hide))]);
 
   return (
     <>
@@ -197,7 +138,7 @@ export default async function BuildsPage({ searchParams }: { searchParams: Promi
       <Section title="Now building">{status.current.length > 0 ? status.current.map((job) => <Current key={job.id} job={job} now={status.now} />) : <Idle last={status.lastFinished} />}</Section>
       <Queue jobs={status.queue} now={status.now} />
       <Abandoned jobs={status.abandoned} />
-      <History history={history} now={status.now} />
+      <BuildHistory history={history} now={status.now} />
     </>
   );
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNotNull, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, max, sql, type SQL } from "drizzle-orm";
 import { cache } from "react";
 import { DEFAULT_BUILD_MINUTES, etaFor, median, queueStarts, splitActive, type Eta } from "@/lib/buildStatus";
 import { FINISHED_JOB_STATUSES } from "@/lib/previewJobs";
@@ -25,12 +25,12 @@ async function queuedOrActiveJobs(statuses: readonly PreviewJob["status"][]): Pr
 }
 
 /** Finished builds, newest first. The tie-breaks keep a row on one page while pages are turned. */
-export async function finishedJobs(limit: number, offset = 0): Promise<JobRow[]> {
+export async function finishedJobs(limit: number, offset = 0, matching?: SQL): Promise<JobRow[]> {
   const rows = await (await db())
     .select(withName)
     .from(previewJobs)
     .innerJoin(businesses, eq(previewJobs.businessId, businesses.id))
-    .where(inArray(previewJobs.status, [...FINISHED_JOB_STATUSES]))
+    .where(and(inArray(previewJobs.status, [...FINISHED_JOB_STATUSES]), matching))
     .orderBy(sql`${previewJobs.finishedAt} desc nulls last`, desc(previewJobs.createdAt), asc(previewJobs.id))
     .limit(limit)
     .offset(offset);

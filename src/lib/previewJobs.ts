@@ -26,6 +26,25 @@ export function isSkipped(job: { status: PreviewJobStatus; step?: string | null 
   return job?.status === "failed" && job.step === SKIPPED_STEP;
 }
 
+/** How a finished build ended, in the order the Builds page lists them. */
+export const BUILD_OUTCOMES = ["built", "launched", "failed", "skipped", "paused"] as const;
+export type BuildOutcome = (typeof BUILD_OUTCOMES)[number];
+
+export const BUILD_OUTCOME_LABEL: Record<BuildOutcome, string> = { built: "Built", launched: "Launched", failed: "Failed", skipped: "Skipped", paused: "Paused" };
+
+export function buildOutcome(job: { status: PreviewJobStatus; step?: string | null; kind?: string | null }): BuildOutcome {
+  if (isSkipped(job)) return "skipped";
+  if (job.status === "failed") return "failed";
+  if (job.status === "waiting_for_usage") return "paused";
+  return job.kind === "launch" ? "launched" : "built";
+}
+
+/** The outcomes a `?hide=failed,skipped` value names. Anything else in it is ignored. */
+export function hiddenOutcomes(value: string | undefined): BuildOutcome[] {
+  const named = new Set((value ?? "").split(","));
+  return BUILD_OUTCOMES.filter((outcome) => named.has(outcome));
+}
+
 /** A preview build (or rebuild with a note), or a launch onto the client's own Vercel project. */
 export const JOB_KINDS = ["preview", "launch"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];

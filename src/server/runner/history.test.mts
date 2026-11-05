@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mock, test } from "node:test";
+import { after, mock, test } from "node:test";
 
 mock.module("server-only", { namedExports: {} });
 
@@ -27,7 +27,43 @@ test("the history reaches every finished build a page at a time, newest first", 
   const past = await buildHistory(99_999);
   assert.equal(past.page, past.pages);
   assert.ok(past.jobs.length > 0);
+});
 
+test("hiding an outcome takes it out of the rows and the page count, and the query agrees with buildOutcome", async () => {
+  const { db } = await import("../db/client");
+  const { businesses, previewJobs } = await import("../db/schema");
+  const { buildHistory } = await import("./history");
+  const { buildOutcome, SKIPPED_STEP } = await import("../../lib/previewJobs");
+  const database = await db();
+  const stamp = Date.now();
+  const [lead] = await database.insert(businesses).values({ businessName: "Outcome test", slug: `outcome-${stamp}`, linkCode: `outcome-${stamp}`, stage: "new" } as never).returning({ id: businesses.id });
+  const before = (await buildHistory(1)).counts;
+  const finishedAt = new Date(Date.UTC(3000, 0, 1));
+  const base = { businessId: lead.id, requestedBy: "test", finishedAt };
+  await database.insert(previewJobs).values([
+    { ...base, status: "done" },
+    { ...base, status: "done", kind: "launch" },
+    { ...base, status: "failed", step: "Building" },
+    { ...base, status: "failed", step: SKIPPED_STEP },
+    { ...base, status: "waiting_for_usage" },
+  ]);
+
+  const everything = await buildHistory(1);
+  for (const outcome of ["built", "launched", "failed", "skipped", "paused"] as const) assert.equal(everything.counts[outcome], before[outcome] + 1, outcome);
+  assert.deepEqual(everything.jobs.slice(0, 5).map(buildOutcome).sort(), ["built", "failed", "launched", "paused", "skipped"]);
+  const total = Object.values(everything.counts).reduce((sum, value) => sum + value, 0);
+  assert.equal(everything.shown, total);
+
+  const hidden = await buildHistory(1, ["failed", "skipped"]);
+  assert.equal(hidden.shown, total - everything.counts.failed - everything.counts.skipped);
+  assert.ok(hidden.jobs.every((job) => !["failed", "skipped"].includes(buildOutcome(job))));
+  assert.deepEqual(hidden.counts, everything.counts);
+
+  assert.equal((await buildHistory(1, ["built", "launched", "failed", "skipped", "paused"])).jobs.length, 0);
+});
+
+after(async () => {
+  const { db } = await import("../db/client");
   // The in-process Postgres stays open otherwise, and the test run never ends.
-  await (database as unknown as { $client?: { close?: () => Promise<void> } }).$client?.close?.();
+  await ((await db()) as unknown as { $client?: { close?: () => Promise<void> } }).$client?.close?.();
 });

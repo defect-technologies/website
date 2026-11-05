@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { jobsByDay } from "./buildStatus";
+import { hiddenOutcomes } from "./previewJobs";
 
 const job = (finishedAt: string | null) => ({ finishedAt: finishedAt ? new Date(finishedAt) : null, createdAt: new Date("2026-01-02T20:00:00Z") });
 const NOON_NOV_4_LA = Date.parse("2026-11-04T20:00:00Z");
@@ -17,4 +18,9 @@ test("older days are named, with the year once it isn't this year's", () => {
 
 test("a finished build with no finish time falls on the day it was requested", () => {
   assert.equal(jobsByDay([job(null)], NOON_NOV_4_LA)[0].label, "Fri, Jan 2");
+});
+
+test("a hide value names only real outcomes, in a fixed order", () => {
+  assert.deepEqual(hiddenOutcomes("skipped,nonsense,failed"), ["failed", "skipped"]);
+  assert.deepEqual(hiddenOutcomes(undefined), []);
 });
