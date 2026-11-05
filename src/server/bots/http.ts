@@ -48,17 +48,24 @@ async function respond(handler: Handler, context: BotContext): Promise<Response>
   }
 }
 
+/** Bots share addresses and differ only by key, and reach us through a proxy, so no cache may keep an answer for the next caller. */
+function neverCached(response: Response): Response {
+  response.headers.set("Cache-Control", "private, no-store");
+  response.headers.set("Vary", "Authorization");
+  return response;
+}
+
 /** Wraps a bot API route: checks the key, runs the handler, logs the call. A handler may return its own Response. */
 export function botRoute(handler: Handler, missingKeyHint = "Authorization: Bearer <your bot's key>") {
   return async (request: Request, context: RouteContext) => {
     const key = await keyFromRequest(request);
     if (!key) {
       await logCall(request, null, 401);
-      return NextResponse.json({ error: `Missing, wrong or revoked key. Send it as ${missingKeyHint}.` }, { status: 401 });
+      return neverCached(NextResponse.json({ error: `Missing, wrong or revoked key. Send it as ${missingKeyHint}.` }, { status: 401 }));
     }
     const response = await respond(handler, { key, request, params: (await context.params) ?? {} });
     await logCall(request, key, response.status);
-    return response;
+    return neverCached(response);
   };
 }
 
