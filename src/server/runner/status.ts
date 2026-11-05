@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNotNull, max } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, max, sql } from "drizzle-orm";
 import { cache } from "react";
 import { DEFAULT_BUILD_MINUTES, etaFor, median, queueStarts, splitActive, type Eta } from "@/lib/buildStatus";
 import { FINISHED_JOB_STATUSES } from "@/lib/previewJobs";
@@ -13,14 +13,27 @@ export type QueuedBuild = JobRow & { startsAt: Date };
 const withName = { job: previewJobs, businessName: businesses.businessName };
 const flatten = (rows: { job: PreviewJob; businessName: string }[]): JobRow[] => rows.map(({ job, businessName }) => ({ ...job, businessName }));
 
-async function jobsWhere(statuses: readonly PreviewJob["status"][], order: "queue" | "recent", limit = 200): Promise<JobRow[]> {
+async function queuedOrActiveJobs(statuses: readonly PreviewJob["status"][]): Promise<JobRow[]> {
   const rows = await (await db())
     .select(withName)
     .from(previewJobs)
     .innerJoin(businesses, eq(previewJobs.businessId, businesses.id))
     .where(inArray(previewJobs.status, [...statuses]))
-    .orderBy(order === "queue" ? asc(previewJobs.createdAt) : desc(previewJobs.finishedAt))
-    .limit(limit);
+    .orderBy(asc(previewJobs.createdAt))
+    .limit(200);
+  return flatten(rows);
+}
+
+/** Finished builds, newest first. The tie-breaks keep a row on one page while pages are turned. */
+export async function finishedJobs(limit: number, offset = 0): Promise<JobRow[]> {
+  const rows = await (await db())
+    .select(withName)
+    .from(previewJobs)
+    .innerJoin(businesses, eq(previewJobs.businessId, businesses.id))
+    .where(inArray(previewJobs.status, [...FINISHED_JOB_STATUSES]))
+    .orderBy(sql`${previewJobs.finishedAt} desc nulls last`, desc(previewJobs.createdAt), asc(previewJobs.id))
+    .limit(limit)
+    .offset(offset);
   return flatten(rows);
 }
 
@@ -45,12 +58,12 @@ async function lastFinishedByRunner(): Promise<Map<string, Date>> {
   return new Map(rows.filter((row) => row.at).map((row) => [row.runnerName, row.at as Date]));
 }
 
-/** What the preview runner is doing: the build in progress, the queue with start estimates, abandoned jobs and recent results. */
+/** What the preview runner is doing: the build in progress, the queue with start estimates, abandoned jobs and its last result. */
 async function readStatus() {
-  const [active, queued, recent, minutes, finished] = await Promise.all([
-    jobsWhere(["claimed", "running"], "queue"),
-    jobsWhere(["queued"], "queue"),
-    jobsWhere(FINISHED_JOB_STATUSES, "recent", 15),
+  const [active, queued, [lastFinished], minutes, finished] = await Promise.all([
+    queuedOrActiveJobs(["claimed", "running"]),
+    queuedOrActiveJobs(["queued"]),
+    finishedJobs(1),
     usualMinutes(),
     lastFinishedByRunner(),
   ]);
@@ -63,7 +76,7 @@ async function readStatus() {
     current: building,
     queue: queued.map((job, index): QueuedBuild => ({ ...job, startsAt: starts[index] })),
     abandoned,
-    recent,
+    lastFinished,
     minutes,
     now,
   };

@@ -1,10 +1,11 @@
-import { ArrowSquareOut, CaretLeft, CaretRight, EnvelopeSimple, InstagramLogo, Phone } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, CaretRight, EnvelopeSimple, InstagramLogo, Phone } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
 import FilterBar from "@/components/admin/FilterBar";
+import Pager, { pageFrom } from "@/components/admin/Pager";
 import { controlClass } from "@/components/admin/fields";
 import { Card, KeyValue, PageHeader, When } from "@/components/admin/ui";
 import { scoreTone, signalLabel } from "@/lib/prospects";
@@ -49,7 +50,7 @@ function readFilters(search: Search): ProspectFilters {
     hasEmail: value(search, "email") === "1",
     lead: lead === "yes" || lead === "no" ? lead : "",
     sort: PROSPECT_SORTS.some(([option]) => option === sort) ? (sort as ProspectSort) : "newest",
-    page: Math.max(1, Math.floor(Number(value(search, "page")) || 1)),
+    page: pageFrom(value(search, "page")),
   };
 }
 
@@ -212,29 +213,7 @@ function ProspectRow({ prospect }: { prospect: Prospect }) {
 
 function Pages({ filters, total }: { filters: ProspectFilters; total: number }) {
   const pages = Math.max(1, Math.ceil(total / PROSPECTS_PER_PAGE));
-  if (pages === 1) return null;
-  const link = (page: number) => `/admin/setup/prospects?${params(filters, { page: page > 1 ? String(page) : "" })}`;
-  return (
-    <nav aria-label="Pages" className="flex items-center justify-between gap-3 text-sm">
-      {filters.page > 1 ? (
-        <Link href={link(filters.page - 1)} className={buttonClasses("soft", "sm")}>
-          <CaretLeft size={14} aria-hidden="true" /> Previous
-        </Link>
-      ) : (
-        <span />
-      )}
-      <span className="text-ink-faint tabular-nums">
-        Page {filters.page} of {pages}
-      </span>
-      {filters.page < pages ? (
-        <Link href={link(filters.page + 1)} className={buttonClasses("soft", "sm")}>
-          Next <CaretRight size={14} aria-hidden="true" />
-        </Link>
-      ) : (
-        <span />
-      )}
-    </nav>
-  );
+  return <Pager page={filters.page} pages={pages} href={(page) => `/admin/setup/prospects?${params(filters, { page: page > 1 ? String(page) : "" })}`} />;
 }
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<Search> }) {

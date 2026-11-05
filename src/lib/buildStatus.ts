@@ -93,3 +93,28 @@ export function requestSentence(job: Pick<PreviewJob, "requestedBy" | "kind" | "
   if (!who) return job.note ? "Queued again automatically after a failed build." : `Queued automatically as a new lead's ${what}.`;
   return `${who} queued this ${what}${job.note ? " with notes for the builder" : ""}.`;
 }
+
+const BUSINESS_TIME_ZONE = "America/Los_Angeles";
+const calendarDay = new Intl.DateTimeFormat("en-CA", { timeZone: BUSINESS_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const dayThisYear = new Intl.DateTimeFormat("en-US", { timeZone: BUSINESS_TIME_ZONE, weekday: "short", month: "short", day: "numeric" });
+const dayOtherYear = new Intl.DateTimeFormat("en-US", { timeZone: BUSINESS_TIME_ZONE, weekday: "short", month: "short", day: "numeric", year: "numeric" });
+const DAY_MS = 86_400_000;
+
+function dayLabel(date: Date, now: number): string {
+  const day = calendarDay.format(date);
+  if (day === calendarDay.format(now)) return "Today";
+  if (day === calendarDay.format(now - DAY_MS)) return "Yesterday";
+  return (day.slice(0, 4) === calendarDay.format(now).slice(0, 4) ? dayThisYear : dayOtherYear).format(date);
+}
+
+/** Splits a newest-first list of finished builds into the days they finished on, in the business's time zone. */
+export function jobsByDay<Job extends { finishedAt: Date | null; createdAt: Date }>(jobs: Job[], now: number): { label: string; jobs: Job[] }[] {
+  const days: { label: string; jobs: Job[] }[] = [];
+  for (const job of jobs) {
+    const label = dayLabel(job.finishedAt ?? job.createdAt, now);
+    const latest = days[days.length - 1];
+    if (latest?.label === label) latest.jobs.push(job);
+    else days.push({ label, jobs: [job] });
+  }
+  return days;
+}

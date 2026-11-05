@@ -17,7 +17,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   const counts = await navCounts();
 
   return (
-    <div className="mx-auto grid w-full max-w-[90rem] grid-cols-1 gap-6 px-4 pt-4 pb-16 sm:px-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10 lg:pt-8">
+    <div className="mx-auto grid w-full max-w-[90rem] grid-cols-1 gap-6 px-4 pt-4 pb-16 sm:px-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10 lg:pt-8 lg:pb-0">
       <aside className="flex flex-col gap-4 lg:sticky lg:top-8 lg:h-[calc(100svh-4rem)]">
         <Link href="/" className="font-script text-ink w-fit rounded-md px-3 text-3xl leading-[1.4] focus-visible:outline-2 focus-visible:outline-ink">
           defect.tech
@@ -32,7 +32,8 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           </SubmitButton>
         </form>
       </aside>
-      <main className="flex min-w-0 flex-col gap-8">{children}</main>
+      {/* The bottom space belongs to the content: on the grid it would end the sticky sidebar's track early and push the sidebar up. */}
+      <main className="flex min-w-0 flex-col gap-8 lg:pb-16">{children}</main>
     </div>
   );
 }
