@@ -4,10 +4,10 @@ import { ArrowSquareOut, CaretLeft, CaretRight, Check, CircleNotch, Desktop, Dev
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { approveReviewAction, sendReviewAction, type ReviewResult } from "@/app/admin/(panel)/review/studioActions";
+import { addPointingAction, approveReviewAction, sendReviewAction, type ReviewResult } from "@/app/admin/(panel)/review/studioActions";
 import { useDictation } from "@/hooks/useDictation";
 import { useHydrated } from "@/hooks/useHydrated";
-import { useReviewBridge } from "@/hooks/useReviewBridge";
+import { type BridgeState, useReviewBridge } from "@/hooks/useReviewBridge";
 import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
 import { askAnchor, samePage } from "@/lib/reviewAsks";
@@ -165,6 +165,37 @@ function useNotes(item: StudioItem) {
   return { notes, setNotes, change, remove, add };
 }
 
+/** What the dock shows above its buttons: the last result, or why the mic can't be used. */
+function dockNotice(result: ReviewResult | null, micError: string) {
+  if (result?.message) return { text: result.message, bad: !result.ok };
+  return micError ? { text: micError, bad: true } : null;
+}
+
+type PointOptions = {
+  bridgeState: BridgeState;
+  businessId: string;
+  /** Notes not sent yet would be lost when the rebuild replaces this preview. */
+  hasNotes: boolean;
+  setPointing: (update: (on: boolean) => boolean) => void;
+  setResult: (result: ReviewResult) => void;
+  startTransition: (work: () => Promise<void>) => void;
+  leave: () => void;
+};
+
+/** Points when the preview can; a preview built before pointing worked is rebuilt on the newest kit instead. */
+function pointHandler({ bridgeState, businessId, hasNotes, setPointing, setResult, startTransition, leave }: PointOptions) {
+  return () => {
+    if (bridgeState === "connected") return setPointing((on) => !on);
+    if (bridgeState === "connecting") return setResult({ ok: false, message: "Still connecting to the preview. Try again in a moment." });
+    if (hasNotes) return setResult({ ok: false, message: "This preview can't point yet. Send your notes: their rebuild adds pointing." });
+    startTransition(async () => {
+      const outcome = await addPointingAction(businessId);
+      setResult(outcome);
+      if (outcome.ok) window.setTimeout(leave, 2500);
+    });
+  };
+}
+
 function Studio({ item, ...queue }: Props) {
   const router = useRouter();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -241,7 +272,10 @@ function Studio({ item, ...queue }: Props) {
     });
   };
 
-  useStudioShortcuts({ point: () => bridge.state === "connected" && setPointing((on) => !on), stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
+  const nextHref = queue.nextId ? `/admin/review?id=${queue.nextId}` : "/admin/review";
+  const point = pointHandler({ bridgeState: bridge.state, businessId: item.id, hasNotes: notes.length > 0 || Boolean(draft.text.trim()), setPointing, setResult, startTransition, leave: () => router.replace(nextHref) });
+
+  useStudioShortcuts({ point, stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
   const count = notes.length + (draft.text.trim() ? 1 : 0);
   const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit, ask: { open: Boolean(currentAsk), answered: flow.noted } });
 
@@ -265,7 +299,7 @@ function Studio({ item, ...queue }: Props) {
             {notes.length ? <NoteList notes={notes} onChange={change} onRemove={remove} /> : <NoNotesYet />}
           </div>
           <div className="border-ink/8 border-t">
-            <NoteComposer field={field} draft={target} path={bridge.path} bridge={bridge.state} pointing={pointing} dictation={dictation} onDraft={setDraft} onPoint={() => setPointing((on) => !on)} onAdd={addDraft} />
+            <NoteComposer field={field} draft={target} path={bridge.path} bridge={bridge.state} pointing={pointing} dictation={dictation} onDraft={setDraft} onPoint={point} onAdd={addDraft} />
           </div>
           <div className="hidden flex-col gap-2 px-4 pb-4 lg:flex">
             <Verdict count={count} pending={pending} onSubmit={submit} />
@@ -277,12 +311,12 @@ function Studio({ item, ...queue }: Props) {
       </div>
       <PhoneDock
         pointing={pointing}
-        canPoint={bridge.state === "connected"}
-        onPoint={() => setPointing((on) => !on)}
+        onPoint={point}
+        typing={{ text: draft.text, onChange: (text) => setDraft((current) => ({ ...current, text })), onAdd: addDraft }}
         talk={{ supported: dictation.supported, listening: dictation.listening, onToggle: phone.toggleTalk }}
         spoken={`${draft.text} ${dictation.interim}`.trim()}
         splitting={phone.splitting}
-        problem={result?.ok === false ? result.message : dictation.error}
+        notice={dockNotice(result, dictation.error)}
         count={count}
         pending={pending}
         armed={armed}

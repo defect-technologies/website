@@ -26,9 +26,9 @@ const TOOL = "focus-visible:outline-ink inline-flex min-h-10 items-center gap-2 
 const TOOL_ON = "bg-ink text-paper shadow-[0_0_0_3px_rgb(226_66_27/0.35)]";
 const TOOL_OFF = "bg-paper-shade text-ink hover:bg-paper-shade/70";
 
-function PointButton({ on, bridge, onPoint }: { on: boolean; bridge: BridgeState; onPoint: () => void }) {
+function PointButton({ on, onPoint }: { on: boolean; onPoint: () => void }) {
   return (
-    <button type="button" aria-pressed={on} disabled={bridge !== "connected"} onClick={onPoint} className={`${TOOL} ${on ? TOOL_ON : TOOL_OFF}`}>
+    <button type="button" aria-pressed={on} onClick={onPoint} className={`${TOOL} ${on ? TOOL_ON : TOOL_OFF}`}>
       <Crosshair size={18} weight={on ? "bold" : "regular"} aria-hidden="true" />
       Point at it
       <Key>P</Key>
@@ -50,7 +50,7 @@ function TalkButton({ dictation }: { dictation: Dictation }) {
 
 function BridgeHint({ bridge }: { bridge: BridgeState }) {
   if (bridge !== "unavailable") return null;
-  return <p className="text-ink-faint text-sm text-pretty">This preview was built before pointing worked, so say which part you mean. Its next build adds pointing.</p>;
+  return <p className="text-ink-faint text-sm text-pretty">This preview was built before pointing worked. Point at it updates it, and it comes back here when it&rsquo;s built.</p>;
 }
 
 /**
@@ -83,7 +83,7 @@ export default function NoteComposer({ field, draft, path, bridge, pointing, dic
         {dictation.error || dictation.interim}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <PointButton on={pointing} bridge={bridge} onPoint={onPoint} />
+        <PointButton on={pointing} onPoint={onPoint} />
         <TalkButton dictation={dictation} />
         <ScopeToggle scope={draft.scope} onChange={(scope) => onDraft({ ...draft, scope })} />
         <Button size="sm" variant="ghost" className="ml-auto" disabled={!draft.text.trim()} onClick={onAdd} icon={<Plus size={16} weight="bold" aria-hidden="true" />}>

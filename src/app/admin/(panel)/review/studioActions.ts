@@ -99,6 +99,21 @@ export async function reviewAsksAction(businessId: string): Promise<{ previewUrl
   return { previewUrl: lead.previewUrl, asks: await writeReviewAsks(lead.businessName, lead.previewUrl) };
 }
 
+/** The rebuild a preview gets so the review page can point at its elements; it only moves the site to the newest kit. */
+const POINTING_NOTE =
+  "Rebuild only to take the newest site-kit, so the founders' review page can point at elements in this preview. Keep the design, content, pages and wording exactly as they are.";
+
+/** Queues the kit-only rebuild for a preview built before pointing worked. */
+export async function addPointingAction(businessId: string): Promise<ReviewResult> {
+  const founder = await requireFounder();
+  const id = z.uuid().safeParse(businessId);
+  const lead = id.success ? await businessById(id.data) : null;
+  if (!lead) return { ok: false, message: "That lead isn't here any more." };
+  // No revalidation here: the page shows its message, then opens the next preview itself.
+  const { created } = await requestPreview(lead, founder.email, POINTING_NOTE);
+  return created ? { ok: true, message: "Updating this preview so you can point at it. It comes back here when it's built." } : { ok: false, message: "This preview is already rebuilding." };
+}
+
 const LessonId = z.uuid();
 
 export async function addTasteLessonAction(form: FormData) {
