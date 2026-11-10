@@ -71,12 +71,9 @@ export default function AskCard({ state, flow, className = "" }: Props) {
       {state.status === "ready" && flow.finished && <Finished />}
       {ask && (
         <>
-          <div className="flex items-start gap-2.5">
-            <TopicIcon size={20} aria-hidden="true" className="text-ink-soft mt-0.5 shrink-0" />
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-base font-medium text-pretty">{ask.question}</p>
-              {ask.why && <p className="text-ink-soft text-sm text-pretty">{ask.why}</p>}
-            </div>
+          <div className="flex items-center gap-2.5">
+            <TopicIcon size={22} aria-hidden="true" className="text-ink-soft shrink-0" />
+            <p className="min-w-0 text-lg font-semibold text-pretty">{ask.question}</p>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={flow.good} className={`${CHOICE} bg-paper-shade text-ink hover:bg-paper-shade/70`}>

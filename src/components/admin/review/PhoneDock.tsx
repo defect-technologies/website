@@ -61,7 +61,7 @@ function SendButton({ count, pending, armed, onSubmit }: Pick<Props, "count" | "
       onClick={onSubmit}
       disabled={pending}
       aria-busy={pending}
-      className="bg-ink text-paper relative inline-flex min-h-12 min-w-32 items-center justify-center overflow-hidden rounded-full px-4 text-base font-medium transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-45"
+      className="bg-ink text-paper shadow-lifted relative inline-flex min-h-14 min-w-32 items-center justify-center overflow-hidden rounded-full px-4 text-base font-medium transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-45"
     >
       {armed && !pending && <span aria-hidden="true" className="bg-paper/20 animate-countdown absolute inset-0 origin-left motion-reduce:animate-none" />}
       <span className="relative inline-flex items-center gap-2 tabular-nums">
@@ -80,7 +80,7 @@ function MicButton({ talk, splitting }: { talk: Props["talk"]; splitting: boolea
       onClick={talk.onToggle}
       disabled={splitting}
       aria-pressed={talk.listening}
-      className={`bg-ink text-paper grid size-16 place-items-center rounded-full transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink disabled:opacity-45 ${talk.listening ? "animate-listening motion-reduce:animate-none" : ""}`}
+      className={`bg-ink text-paper shadow-lifted grid size-16 place-items-center rounded-full transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink disabled:opacity-45 ${talk.listening ? "animate-listening motion-reduce:animate-none" : ""}`}
     >
       {talk.listening ? <Stop size={26} weight="fill" aria-hidden="true" /> : <Microphone size={28} weight="fill" aria-hidden="true" />}
       <span className="sr-only">{talk.listening ? "Done talking" : "Talk about this preview"}</span>
@@ -95,7 +95,7 @@ function PointButton({ pointing, canPoint, onPoint }: Pick<Props, "pointing" | "
       onClick={onPoint}
       disabled={!canPoint}
       aria-pressed={pointing}
-      className={`flex min-h-12 min-w-20 flex-col items-center justify-center gap-0.5 rounded-2xl text-sm font-medium transition-[color,background-color,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-35 ${pointing ? "bg-ink text-paper shadow-pointing" : "text-ink-soft"}`}
+      className={`shadow-lifted flex min-h-14 min-w-16 flex-col items-center justify-center gap-0.5 rounded-full px-3 text-xs font-medium backdrop-blur transition-[color,background-color,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-60 ${pointing ? "bg-ink text-paper shadow-pointing" : "bg-paper/95 text-ink"}`}
     >
       <Crosshair size={22} weight={pointing ? "bold" : "regular"} aria-hidden="true" />
       Point
@@ -103,38 +103,24 @@ function PointButton({ pointing, canPoint, onPoint }: Pick<Props, "pointing" | "
   );
 }
 
+/** The floating surface for anything shown above the dock's buttons. */
+export const CARD = "bg-paper/95 shadow-lifted pointer-events-auto rounded-2xl px-4 py-3 text-pretty backdrop-blur";
+
 function SpokenBubble({ spoken, listening, splitting, problem }: { spoken: string; listening: boolean; splitting: boolean; problem: string }) {
   if (problem) {
     return (
-      <p role="alert" className="text-bad px-1 text-sm font-medium text-pretty">
+      <p role="alert" className={`${CARD} text-bad text-sm font-medium`}>
         {problem}
       </p>
     );
   }
   if (!listening && !splitting) return null;
   return (
-    <p className="flex items-start gap-2 px-1 text-base text-pretty">
+    <p className={`${CARD} flex items-start gap-2 text-base`}>
       {splitting && <CircleNotch size={18} className="text-ink-soft mt-0.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
       <span className={spoken ? "text-ink" : "text-ink-faint"}>{spoken || "Listening. Say what's wrong, then tap the mic again."}</span>
     </p>
   );
-}
-
-/** The dock's height as --phone-dock-height on the page, so the preview fills exactly the space above it. */
-function useDockHeight() {
-  const dock = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const element = dock.current;
-    if (!element) return;
-    const root = document.documentElement;
-    const observer = new ResizeObserver(([entry]) => root.style.setProperty("--phone-dock-height", `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`));
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty("--phone-dock-height");
-    };
-  }, []);
-  return dock;
 }
 
 /**
@@ -142,14 +128,13 @@ function useDockHeight() {
  * Notes split from speech send themselves after a countdown that any touch stops.
  */
 export default function PhoneDock({ pointing, canPoint, onPoint, talk, spoken, splitting, problem, count, pending, armed, onSubmit, ask }: Props) {
-  const dock = useDockHeight();
   return (
-    <div ref={dock} className="bg-paper/95 shadow-lifted fixed inset-x-0 bottom-0 z-30 flex flex-col gap-3 rounded-t-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
       {ask}
-      <div aria-live="polite">
+      <div aria-live="polite" className="empty:hidden">
         <SpokenBubble spoken={spoken} listening={talk.listening} splitting={splitting} problem={problem} />
       </div>
-      <div className="flex items-center justify-between gap-2">
+      <div className="pointer-events-auto flex items-center justify-between gap-2">
         <PointButton pointing={pointing} canPoint={canPoint} onPoint={onPoint} />
         <MicButton talk={talk} splitting={splitting} />
         <SendButton count={count} pending={pending} armed={armed} onSubmit={onSubmit} />

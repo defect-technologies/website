@@ -91,8 +91,14 @@ export function useReviewBridge(frame: RefObject<HTMLIFrameElement | null>, prev
   }, [post]);
 
   const setPicking = useCallback((on: boolean) => post({ type: "pick", on }), [post]);
-  /** Asks the preview to go to a page, scroll to an element and mark it. Previews built before kit 0.11.7 ignore it. */
-  const show = useCallback((target: { path: string; selector: string }) => post({ type: "show", path: target.path, selector: target.selector }), [post]);
+  /**
+   * Asks the preview to go to a page, scroll to an element, outline it and pin the question beside it. Previews built
+   * before kit 0.11.7 ignore it; 0.11.7 outlines without the question.
+   */
+  const show = useCallback(
+    (target: { path: string; selector: string; question: string }) => post({ type: "show", path: target.path, selector: target.selector, label: target.question }),
+    [post],
+  );
 
   return { state, path, greet, setPicking, show };
 }
