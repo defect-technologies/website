@@ -4,6 +4,7 @@ import { BOTS, FLAG_STATUSES } from "../../lib/bots";
 import type { SavedDraft } from "../../lib/emailDraft";
 import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
 import type { InboundKind, InboundSource, InboundStatus } from "../../lib/inbound";
+import type { ReviewNote, ReviewVerdict } from "../../lib/review";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
 import type { SpotCheckStatus } from "../../lib/spotChecks";
 import { STAGES, type Stage } from "../../lib/stages";
@@ -443,6 +444,39 @@ export const spotChecks = pgTable(
   (table) => [uniqueIndex("spot_checks_preview_url").on(table.previewUrl), index("spot_checks_status").on(table.status, table.sampledAt)],
 );
 
+/** A founder's verdict on one preview from the review page: approved as it is, or sent back with notes. */
+export const previewReviews = pgTable(
+  "preview_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    previewUrl: text("preview_url").notNull(),
+    verdict: text("verdict").$type<ReviewVerdict>().notNull(),
+    notes: jsonb("notes").$type<ReviewNote[]>().notNull().default([]),
+    jobId: uuid("job_id").references(() => previewJobs.id),
+    reviewedBy: text("reviewed_by").notNull(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("preview_reviews_business").on(table.businessId, table.reviewedAt), index("preview_reviews_preview_url").on(table.previewUrl)],
+);
+
+/** A founder's standing rule of taste. Every preview build, the design critic and the outside review read the active ones. */
+export const tasteLessons = pgTable(
+  "taste_lessons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    text: text("text").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** The preview the lesson came from, if it came from a review. */
+    sourceBusinessId: uuid("source_business_id").references(() => businesses.id),
+    retiredAt: timestamp("retired_at", { withTimezone: true }),
+  },
+  (table) => [index("taste_lessons_active").on(table.retiredAt, table.createdAt)],
+);
+
 /**
  * Every business the lead finder audited, whether or not it became a lead, so a
  * new niche or area can start from what's already been collected. Only the
@@ -567,3 +601,5 @@ export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type ExpenseFrequency = RecurringExpense["frequency"];
 export type PortalAccount = typeof portalAccounts.$inferSelect;
 export type BrandFile = typeof brandFiles.$inferSelect;
+export type PreviewReview = typeof previewReviews.$inferSelect;
+export type TasteLesson = typeof tasteLessons.$inferSelect;

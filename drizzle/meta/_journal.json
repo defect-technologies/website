@@ -134,6 +134,13 @@
       "when": 1792718100476,
       "tag": "0018_site_editors",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794275534224,
+      "tag": "0019_review_studio",
+      "breakpoints": true
     }
   ]
 }

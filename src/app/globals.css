@@ -23,9 +23,32 @@
   --font-body: var(--font-geist), system-ui, sans-serif;
 
   --shadow-lifted: 0 1px 2px rgb(23 22 26 / 0.08), 0 12px 32px -8px rgb(23 22 26 / 0.22);
+  /* The review page's frame while the founder points at an element: the accent as light, not paint. */
+  --shadow-pointing: 0 0 0 2px var(--color-vermilion), 0 0 40px -6px rgb(226 66 27 / 0.55), 0 12px 32px -8px rgb(23 22 26 / 0.22);
   --ease-knife: cubic-bezier(0.2, 0, 0, 1);
 
   --animate-trickle: trickle 2.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  /* Fills the phone review's Send button over its countdown (AUTO_SEND_SECONDS in lib/review.ts). */
+  --animate-countdown: countdown 5s linear forwards;
+  --animate-listening: listening 1.6s cubic-bezier(0.2, 0, 0, 1) infinite;
+
+  @keyframes countdown {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes listening {
+    0% {
+      box-shadow: 0 0 0 0 rgb(226 66 27 / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 22px rgb(226 66 27 / 0);
+    }
+  }
 
   @keyframes trickle {
     0% {
