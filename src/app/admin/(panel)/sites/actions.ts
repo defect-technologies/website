@@ -8,10 +8,10 @@ import { requireFounder } from "@/server/auth/session";
 import { STAGES } from "@/server/db/schema";
 import { BRAND_FILE_TYPES, MAX_BRAND_FILE_BYTES } from "@/lib/brandFiles";
 import { isUploadFor, removeBrandFile, saveBrandFile } from "@/server/leads/brandFiles";
+import { approvePreview } from "@/server/leads/approvePreview";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
 import { isActive, jobById, launchBlocker, requestPreview, updateJob } from "@/server/runner/jobs";
-import { closeFlagsOn } from "@/server/bots/flags";
 
 export type FormResult = { ok: boolean; message: string };
 
@@ -77,26 +77,12 @@ export async function launchSiteAction(form: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/**
- * A founder has looked at a held preview and it's fine: one the design critic held back goes to the outreach
- * queue; a new one for an owner who already has a preview becomes the one their link shows.
- */
+/** A founder has looked at a held preview and it's fine (see approvePreview). */
 export async function approvePreviewAction(form: FormData) {
   const founder = await requireFounder();
   const lead = await businessById(String(form.get("id") ?? ""));
-  const preview = String(form.get("preview") ?? "");
   if (!lead) return;
-  if (lead.stage !== "new") {
-    if (!/^https:\/\/[a-z0-9-]+\.vercel\.app\/?$/.test(preview)) return;
-    await updateBusiness(lead.id, { previewUrl: preview });
-    await record(founder.email, "showed the owner a new preview", { businessId: lead.id, detail: preview });
-  } else {
-    if (!lead.previewUrl) return;
-    await updateBusiness(lead.id, { stage: "preview_built" });
-    await record(founder.email, "approved the preview", { businessId: lead.id });
-  }
-  await closeFlagsOn(lead.id, ["preview-review"], "A founder marked the preview ready to send.", founder.email);
-  revalidatePath("/admin", "layout");
+  if (await approvePreview(lead, String(form.get("preview") ?? ""), founder.email)) revalidatePath("/admin", "layout");
 }
 
 const UploadedBrandFile = z.object({

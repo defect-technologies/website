@@ -26,6 +26,27 @@
   --ease-knife: cubic-bezier(0.2, 0, 0, 1);
 
   --animate-trickle: trickle 2.4s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  /* Fills a bar left to right over the taste review's send countdown (TASTE_SEND_SECONDS). */
+  --animate-countdown: countdown 5s linear forwards;
+  --animate-listening: listening 1.6s cubic-bezier(0.2, 0, 0, 1) infinite;
+
+  @keyframes countdown {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes listening {
+    0% {
+      box-shadow: 0 0 0 0 rgb(226 66 27 / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 22px rgb(226 66 27 / 0);
+    }
+  }
 
   @keyframes trickle {
     0% {

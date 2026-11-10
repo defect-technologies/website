@@ -134,6 +134,13 @@
       "when": 1792718100476,
       "tag": "0018_site_editors",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794300455538,
+      "tag": "0019_taste_reviews",
+      "breakpoints": true
     }
   ]
 }

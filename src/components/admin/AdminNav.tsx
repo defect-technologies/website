@@ -9,6 +9,7 @@ import {
   Eye,
   GearSix,
   Hammer,
+  Microphone,
   type Icon,
   PencilSimpleLine,
   PlugsConnected,
@@ -86,10 +87,11 @@ function SetupGroup({ pathname }: { pathname: string }) {
   );
 }
 
-export default function AdminNav({ counts, building }: { counts: { today: number; messages: number }; building: boolean }) {
+export default function AdminNav({ counts, building }: { counts: { today: number; messages: number; taste: number }; building: boolean }) {
   const pathname = usePathname();
   const items: Item[] = [
     { href: "/admin", label: "Today", icon: SunHorizon, count: counts.today },
+    { href: "/admin/taste", label: "Taste review", icon: Microphone, count: counts.taste },
     { href: "/admin/builds", label: "Builds", icon: Hammer, live: building },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },

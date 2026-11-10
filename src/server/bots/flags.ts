@@ -43,7 +43,7 @@ const priorityOf = (flag: Pick<NewFlag, "needs" | "urgent">) => (flag.urgent ? "
 
 const stamp = (by: string) => `${actorLabel(by)}, ${new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles", dateStyle: "medium", timeStyle: "short" })}`;
 
-async function openFlagOn(businessId: string, topic: FlagTopic): Promise<Flag | null> {
+export async function openFlagOn(businessId: string, topic: FlagTopic): Promise<Flag | null> {
   const [flag] = await (await db())
     .select()
     .from(flags)

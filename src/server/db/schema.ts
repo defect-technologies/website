@@ -6,6 +6,7 @@ import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
 import type { InboundKind, InboundSource, InboundStatus } from "../../lib/inbound";
 import { ACTIVE_JOB_STATUSES, PREVIEW_JOB_STATUSES } from "../../lib/previewJobs";
 import type { SpotCheckStatus } from "../../lib/spotChecks";
+import type { TasteCategory, TasteItemStatus, TasteScope, TasteVerdict } from "../../lib/taste";
 import { STAGES, type Stage } from "../../lib/stages";
 
 export { STAGES, type Stage };
@@ -443,6 +444,47 @@ export const spotChecks = pgTable(
   (table) => [uniqueIndex("spot_checks_preview_url").on(table.previewUrl), index("spot_checks_status").on(table.status, table.sampledAt)],
 );
 
+/** A founder's taste review of one finished preview, given by voice on /admin/taste. One per preview. */
+export const tasteReviews = pgTable(
+  "taste_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    jobId: uuid("job_id").references(() => previewJobs.id),
+    previewUrl: text("preview_url").notNull(),
+    verdict: text("verdict").$type<TasteVerdict>().notNull(),
+    /** What the founder said, as the phone heard it. */
+    transcript: text("transcript").notNull().default(""),
+    /** The rebuild this review queued, if any. */
+    rebuildJobId: uuid("rebuild_job_id").references(() => previewJobs.id),
+    reviewedBy: text("reviewed_by").notNull(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("taste_reviews_preview_url").on(table.previewUrl), index("taste_reviews_reviewed_at").on(table.reviewedAt)],
+);
+
+/** One point from a taste review: a fix for this site, or a rule for every site. */
+export const tasteNotes = pgTable(
+  "taste_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => tasteReviews.id, { onDelete: "cascade" }),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    scope: text("scope").$type<TasteScope>().notNull(),
+    category: text("category").$type<TasteCategory>().notNull(),
+    text: text("text").notNull(),
+    status: text("status").$type<TasteItemStatus>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("taste_notes_scope_status").on(table.scope, table.status, table.createdAt)],
+);
+
 /**
  * Every business the lead finder audited, whether or not it became a lead, so a
  * new niche or area can start from what's already been collected. Only the
@@ -562,6 +604,8 @@ export type PreviewJob = typeof previewJobs.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
 export type SpotCheck = typeof spotChecks.$inferSelect;
+export type TasteReview = typeof tasteReviews.$inferSelect;
+export type TasteNoteRow = typeof tasteNotes.$inferSelect;
 export type Prospect = typeof prospects.$inferSelect;
 export type RecurringExpense = typeof recurringExpenses.$inferSelect;
 export type ExpenseFrequency = RecurringExpense["frequency"];

@@ -8,6 +8,7 @@ import { threadSummaries } from "./mail/threads";
 import { outreachQueue } from "./outreach/queue";
 import { runnerStatus } from "./runner/status";
 import { openSpotChecks } from "./spotChecks";
+import { tasteQueue } from "./taste";
 
 /** The layout's badges and the Today page both read these in one request; React's cache runs each once. */
 const queue = cache(outreachQueue);
@@ -56,12 +57,13 @@ export async function today() {
 
 /** The nav's badges. Today counts what a founder has to do; Messages counts what they haven't read. */
 export async function navCounts() {
-  const [flags, inbound, sendQueue, spotChecks, monthRows, threadRows] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), threads()]);
+  const [flags, inbound, sendQueue, spotChecks, monthRows, threadRows, taste] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), threads(), tasteQueue()]);
   const sendable = [...sendQueue.requested, ...sendQueue.followUps, ...sendQueue.firstEmails].filter((item) => item.blockers.length === 0).length;
   const builds = await runnerStatus();
   return {
     building: builds.current.length > 0,
     today: flags.length + inbound.length + sendable + spotChecks.length + settleDue(monthRows).length,
     messages: threadRows.reduce((total, thread) => total + thread.unread, 0),
+    taste: taste.length,
   };
 }

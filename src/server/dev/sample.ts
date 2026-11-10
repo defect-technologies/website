@@ -48,12 +48,15 @@ async function hasBuilds(samples: Business[]) {
   return Boolean(job);
 }
 
-/** One build of each kind, so the Overview shows a running, a queued and a failed build. */
+/** One build of each kind, so the Overview shows a running, a queued and a failed build, plus finished ones to review. */
 async function sampleBuilds(bySlug: Map<string, Business>) {
   const jobs = [
     { slug: "marigold-bakery", status: "running" as const, requestedBy: "bot:outreach", step: "Writing the home page from the old site's photos", runnerName: "runner-1", claimedAt: minutesAgo(9), startedAt: minutesAgo(8) },
     { slug: "eastside-electric", status: "queued" as const, requestedBy: "bot:outreach" },
     { slug: "juniper-yoga", status: "failed" as const, requestedBy: "sample@dev.localhost", criticVerdict: "The old site blocks scraping, so there were no photos to use", finishedAt: daysAgo(1) },
+    // Finished previews nobody has given taste notes on, for /admin/taste.
+    { slug: "fern-co-dog-grooming", status: "done" as const, requestedBy: "bot:outreach", previewUrl: "https://example.com/?preview=fern-co-dog-grooming", finishedAt: minutesAgo(30) },
+    { slug: "pine-hill-hvac", status: "done" as const, requestedBy: "bot:outreach", previewUrl: "https://example.com/?preview=pine-hill-hvac", finishedAt: daysAgo(1) },
   ];
   for (const { slug, ...job } of jobs) {
     const business = bySlug.get(slug);
