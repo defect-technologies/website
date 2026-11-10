@@ -29,6 +29,8 @@ export type ReviewNote = {
 };
 
 export const MAX_NOTE_TEXT = 2000;
+/** On a phone, notes send themselves this many seconds after the founder stops talking, unless they touch the page. */
+export const AUTO_SEND_SECONDS = 5;
 export const MAX_NOTES = 40;
 /** The runner passes the whole note on the command line, so the compiled note stays well under argv limits. */
 export const MAX_COMPILED_NOTE = 16000;

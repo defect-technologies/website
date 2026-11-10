@@ -10,6 +10,7 @@ import { db } from "@/server/db/client";
 import { isDevelopment } from "@/server/env";
 import { previewReviews, type Business } from "@/server/db/schema";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
+import { splitSpokenNotes, type SplitNote } from "@/server/review/noteWriter";
 import { addTasteLessons, restoreTasteLesson, retireTasteLesson, updateTasteLesson } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
 
@@ -76,6 +77,15 @@ export async function approveReviewAction(input: z.input<typeof Review>): Promis
   await record(founder.email, "approved the preview", { businessId: lead.id });
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Approved." };
+}
+
+const Spoken = z.string().trim().min(1).max(8000);
+
+/** Splits what the founder said on the phone into separate notes, each for this site or every site. */
+export async function splitSpokenNotesAction(transcript: string): Promise<SplitNote[]> {
+  await requireFounder();
+  const parsed = Spoken.safeParse(transcript);
+  return parsed.success ? splitSpokenNotes(parsed.data) : [];
 }
 
 const LessonId = z.uuid();

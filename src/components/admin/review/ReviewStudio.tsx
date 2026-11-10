@@ -12,9 +12,11 @@ import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
 import NoteComposer from "./NoteComposer";
 import NoteList from "./NoteList";
+import PhoneDock from "./PhoneDock";
 import { Key } from "./NoteParts";
 import PreviewStage from "./PreviewStage";
 import { appendPhrase, type Draft, EMPTY_DRAFT, isTyping, noteFromDraft, readSavedNotes, saveNotes } from "./reviewDraft";
+import { usePhoneReview } from "./usePhoneReview";
 
 export type StudioItem = { id: string; businessName: string; website: string; previewUrl: string; held: boolean };
 
@@ -162,13 +164,20 @@ function Studio({ item, ...queue }: Props) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [pointing, setPointing] = useState(false);
   const [result, setResult] = useState<ReviewResult | null>(null);
+  const [armed, setArmed] = useState(false);
   const [pending, startTransition] = useTransition();
   const { notes, change, remove, add } = useNotes(item);
   const live = useRef({ draft, pointing, device, path: "/" });
+  const stage = useRef<HTMLElement>(null);
+  // On a phone the admin nav fills the first screen, so the preview scrolls up to meet the dock.
+  useEffect(() => {
+    if (window.matchMedia("(width < 64rem)").matches) stage.current?.scrollIntoView({ block: "start" });
+  }, []);
 
   const onPicked = useCallback(
     (anchor: NoteAnchor) => {
       const { draft: current, device: width, path } = live.current;
+      setArmed(false);
       if (current.text.trim()) add(noteFromDraft(current, width, path));
       setDraft({ text: "", anchor, pickedOn: width, scope: current.text.trim() ? "site" : current.scope });
       field.current?.focus({ preventScroll: true });
@@ -210,12 +219,13 @@ function Studio({ item, ...queue }: Props) {
 
   useStudioShortcuts({ point: () => bridge.state === "connected" && setPointing((on) => !on), stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
   const count = notes.length + (draft.text.trim() ? 1 : 0);
+  const phone = usePhoneReview({ draft, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit });
 
   return (
-    <div className="flex flex-col gap-4 lg:-mb-16 lg:h-[calc(100svh-4rem)]">
+    <div className="flex flex-col gap-4 pb-40 lg:-mb-16 lg:h-[calc(100svh-4rem)] lg:pb-0">
       <StudioBar item={item} {...queue} />
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <section aria-label="Preview" className="flex h-[75svh] min-h-0 flex-col gap-3 lg:h-auto">
+        <section ref={stage} aria-label="Preview" className="flex h-[75svh] min-h-0 flex-col gap-3 lg:h-auto">
           <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} />
           <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} />
         </section>
@@ -226,7 +236,7 @@ function Studio({ item, ...queue }: Props) {
           <div className="border-ink/8 border-t">
             <NoteComposer field={field} draft={draft} path={bridge.path} bridge={bridge.state} pointing={pointing} dictation={dictation} onDraft={setDraft} onPoint={() => setPointing((on) => !on)} onAdd={addDraft} />
           </div>
-          <div className="flex flex-col gap-2 px-4 pb-4">
+          <div className="hidden flex-col gap-2 px-4 pb-4 lg:flex">
             <Verdict count={count} pending={pending} onSubmit={submit} />
             <p role="status" className={`min-h-5 text-sm ${result?.ok === false ? "text-bad font-medium" : "text-ink-faint"}`}>
               {result?.message ?? ""}
@@ -234,6 +244,19 @@ function Studio({ item, ...queue }: Props) {
           </div>
         </aside>
       </div>
+      <PhoneDock
+        pointing={pointing}
+        canPoint={bridge.state === "connected"}
+        onPoint={() => setPointing((on) => !on)}
+        talk={{ supported: dictation.supported, listening: dictation.listening, onToggle: phone.toggleTalk }}
+        spoken={`${draft.text} ${dictation.interim}`.trim()}
+        splitting={phone.splitting}
+        problem={result?.ok === false ? result.message : dictation.error}
+        count={count}
+        pending={pending}
+        armed={armed}
+        onSubmit={phone.tapSend}
+      />
     </div>
   );
 }
