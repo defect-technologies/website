@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CircleNotch, Crosshair, Microphone, PaperPlaneTilt, Stop } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AUTO_SEND_SECONDS } from "@/lib/review";
 
 type Props = {
@@ -16,6 +16,8 @@ type Props = {
   pending: boolean;
   armed: boolean;
   onSubmit: () => void;
+  /** The open question about the preview, shown above the controls. */
+  ask: ReactNode;
 };
 
 /** Seconds left before onFire runs, counting only while armed. */
@@ -46,7 +48,7 @@ function useCountdown(armed: boolean, onFire: () => void) {
 function sendLabel(count: number, armed: boolean, left: number) {
   if (armed) return count ? `Sending in ${left}` : `Approving in ${left}`;
   if (count) return `Send ${count}`;
-  return "Looks good";
+  return "Approve";
 }
 
 function SendButton({ count, pending, armed, onSubmit }: Pick<Props, "count" | "pending" | "armed" | "onSubmit">) {
@@ -118,13 +120,32 @@ function SpokenBubble({ spoken, listening, splitting, problem }: { spoken: strin
   );
 }
 
+/** The dock's height as --phone-dock-height on the page, so the preview fills exactly the space above it. */
+function useDockHeight() {
+  const dock = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = dock.current;
+    if (!element) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(([entry]) => root.style.setProperty("--phone-dock-height", `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`));
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--phone-dock-height");
+    };
+  }, []);
+  return dock;
+}
+
 /**
  * The review page's controls on a phone, within thumb reach: point at a part of the preview, talk, and send.
  * Notes split from speech send themselves after a countdown that any touch stops.
  */
-export default function PhoneDock({ pointing, canPoint, onPoint, talk, spoken, splitting, problem, count, pending, armed, onSubmit }: Props) {
+export default function PhoneDock({ pointing, canPoint, onPoint, talk, spoken, splitting, problem, count, pending, armed, onSubmit, ask }: Props) {
+  const dock = useDockHeight();
   return (
-    <div className="bg-paper/95 shadow-lifted fixed inset-x-0 bottom-0 z-30 flex flex-col gap-3 rounded-t-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+    <div ref={dock} className="bg-paper/95 shadow-lifted fixed inset-x-0 bottom-0 z-30 flex flex-col gap-3 rounded-t-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+      {ask}
       <div aria-live="polite">
         <SpokenBubble spoken={spoken} listening={talk.listening} splitting={splitting} problem={problem} />
       </div>

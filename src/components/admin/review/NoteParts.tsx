@@ -22,7 +22,7 @@ export function NoteTarget({ anchor, path, onClear }: { anchor: NoteAnchor | nul
     <span className="text-ink-soft flex min-w-0 items-center gap-1.5 text-sm">
       <TargetIcon size={16} aria-hidden="true" className="shrink-0" />
       <span className="min-w-0 truncate" title={anchor ? `${anchor.selector} on ${anchor.path}` : undefined}>
-        {anchor ? <span className="text-ink font-medium">{anchor.text || `<${anchor.tag}>`}</span> : "Whole page"}
+        {anchor ? <span className="text-ink font-medium">{anchor.text || (anchor.tag ? `<${anchor.tag}>` : anchor.selector)}</span> : "Whole page"}
         <span className="text-ink-faint"> on {anchor?.path ?? path}</span>
       </span>
       {onClear && (

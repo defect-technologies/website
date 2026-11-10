@@ -91,6 +91,8 @@ export function useReviewBridge(frame: RefObject<HTMLIFrameElement | null>, prev
   }, [post]);
 
   const setPicking = useCallback((on: boolean) => post({ type: "pick", on }), [post]);
+  /** Asks the preview to go to a page, scroll to an element and mark it. Previews built before kit 0.11.7 ignore it. */
+  const show = useCallback((target: { path: string; selector: string }) => post({ type: "show", path: target.path, selector: target.selector }), [post]);
 
-  return { state, path, greet, setPicking };
+  return { state, path, greet, setPicking, show };
 }
