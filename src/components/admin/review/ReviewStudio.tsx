@@ -10,7 +10,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { useReviewBridge } from "@/hooks/useReviewBridge";
 import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
-import { askAnchor } from "@/lib/reviewAsks";
+import { askAnchor, samePage } from "@/lib/reviewAsks";
 import AskCard from "./AskCard";
 import NoteComposer from "./NoteComposer";
 import NoteList from "./NoteList";
@@ -207,9 +207,16 @@ function Studio({ item, ...queue }: Props) {
   // Until the founder points somewhere else, a note answers the open question about its element.
   const target: Draft = draft.anchor || !currentAsk ? draft : { ...draft, anchor: askAnchor(currentAsk) };
   const { show } = bridge;
+  const shownAsk = useRef<string | null>(null);
+  const onAskPage = Boolean(currentAsk) && samePage(bridge.path, currentAsk?.path ?? "");
+  // A new question takes the preview to its element. Once there, the element is marked again whenever the founder
+  // comes back to that page, but wandering off to another page never pulls them back.
   useEffect(() => {
-    if (bridgeState === "connected" && currentAsk?.selector) show(currentAsk);
-  }, [bridgeState, show, currentAsk]);
+    if (bridgeState !== "connected" || !currentAsk?.selector) return;
+    if (shownAsk.current === currentAsk.id && !onAskPage) return;
+    shownAsk.current = currentAsk.id;
+    show(currentAsk);
+  }, [bridgeState, show, currentAsk, onAskPage]);
 
   const addDraft = () => {
     if (!target.text.trim()) return;
