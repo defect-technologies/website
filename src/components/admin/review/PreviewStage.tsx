@@ -18,8 +18,15 @@ function useSize(element: RefObject<HTMLElement | null>) {
   return size;
 }
 
+/** Below this stage width the founder is on a phone, so a phone preview fills the stage instead of keeping a phone's height. */
+const PHONE_STAGE_WIDTH = 640;
+
 function frameBox(device: Device, stage: { width: number; height: number }) {
   const width = DEVICE_WIDTH[device];
+  if (device === "phone" && stage.width < PHONE_STAGE_WIDTH) {
+    const scale = Math.min(1, stage.width / width);
+    return { width, height: stage.height / scale, scale };
+  }
   if (device === "phone") {
     const scale = Math.min(1, stage.height / PHONE_HEIGHT, stage.width / width);
     return { width, height: Math.min(PHONE_HEIGHT, stage.height / scale), scale };

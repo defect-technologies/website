@@ -41,7 +41,7 @@ function quoted(text: string): string {
 
 function whereLine(note: ReviewNote): string {
   const width = `${note.device} width, ${DEVICE_WIDTH[note.device]} px`;
-  if (note.anchor) return `On ${note.anchor.path} at ${width}, the <${note.anchor.tag}> at \`${note.anchor.selector}\`${quoted(note.anchor.text)}`;
+  if (note.anchor) return `On ${note.anchor.path} at ${width}, the ${note.anchor.tag ? `<${note.anchor.tag}>` : "element"} at \`${note.anchor.selector}\`${quoted(note.anchor.text)}`;
   return `On ${note.path || "/"} at ${width}, the page as a whole`;
 }
 

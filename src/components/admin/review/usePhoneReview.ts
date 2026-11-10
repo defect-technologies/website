@@ -18,6 +18,8 @@ type Options = {
   armed: boolean;
   setArmed: (armed: boolean) => void;
   submit: () => void;
+  /** The open question, if any: talking answers it instead of starting the countdown. */
+  ask: { open: boolean; answered: () => void };
 };
 
 const isSendButton = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest("[data-send]"));
@@ -38,7 +40,7 @@ function useStopOnTouch(armed: boolean, setArmed: (armed: boolean) => void) {
  * The phone flow: talking ends with a tap on the mic, Claude splits what was said into notes (each for this site or
  * every site, all pointing where the draft pointed), and the notes then send themselves after a countdown.
  */
-export function usePhoneReview({ draft, setDraft, dictation, add, device, path, count, armed, setArmed, submit }: Options) {
+export function usePhoneReview({ draft, setDraft, dictation, add, device, path, count, armed, setArmed, submit, ask }: Options) {
   const [splitting, setSplitting] = useState(false);
   useStopOnTouch(armed, setArmed);
 
@@ -51,7 +53,9 @@ export function usePhoneReview({ draft, setDraft, dictation, add, device, path, 
     setSplitting(false);
     for (const note of notes) add(noteFromDraft({ ...draft, text: note.text, scope: draft.scope === "every" ? "every" : note.scope }, device, path));
     setDraft({ ...EMPTY_DRAFT });
-    if (notes.length) setArmed(true);
+    if (!notes.length) return;
+    if (ask.open) ask.answered();
+    else setArmed(true);
   };
 
   const toggleTalk = () => {

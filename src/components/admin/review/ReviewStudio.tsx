@@ -10,13 +10,17 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { useReviewBridge } from "@/hooks/useReviewBridge";
 import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
+import { askAnchor } from "@/lib/reviewAsks";
+import AskCard from "./AskCard";
 import NoteComposer from "./NoteComposer";
 import NoteList from "./NoteList";
 import PhoneDock from "./PhoneDock";
 import { Key } from "./NoteParts";
 import PreviewStage from "./PreviewStage";
 import { appendPhrase, type Draft, EMPTY_DRAFT, isTyping, noteFromDraft, readSavedNotes, saveNotes } from "./reviewDraft";
+import { useAskFlow } from "./useAskFlow";
 import { usePhoneReview } from "./usePhoneReview";
+import { useReviewAsks } from "./useReviewAsks";
 
 export type StudioItem = { id: string; businessName: string; website: string; previewUrl: string; held: boolean };
 
@@ -196,15 +200,27 @@ function Studio({ item, ...queue }: Props) {
 
   const dictation = useDictation((phrase) => setDraft((current) => ({ ...current, text: appendPhrase(current.text, phrase) })));
 
+  const asks = useReviewAsks(item.id, item.previewUrl, queue.nextId);
+  // On a phone the last answer starts the send countdown; on a desktop the founder sends with the button.
+  const flow = useAskFlow(asks.asks, () => window.matchMedia("(width < 64rem)").matches && setArmed(true));
+  const currentAsk = flow.current;
+  // Until the founder points somewhere else, a note answers the open question about its element.
+  const target: Draft = draft.anchor || !currentAsk ? draft : { ...draft, anchor: askAnchor(currentAsk) };
+  const { show } = bridge;
+  useEffect(() => {
+    if (bridgeState === "connected" && currentAsk?.selector) show(currentAsk);
+  }, [bridgeState, show, currentAsk]);
+
   const addDraft = () => {
-    if (!draft.text.trim()) return;
-    add(noteFromDraft(draft, device, bridge.path));
+    if (!target.text.trim()) return;
+    add(noteFromDraft(target, device, bridge.path));
     setDraft({ ...EMPTY_DRAFT });
+    if (currentAsk) flow.noted();
   };
 
   const submit = () => {
     if (pending) return;
-    const all = draft.text.trim() ? [...notes, noteFromDraft(draft, device, bridge.path)] : notes;
+    const all = target.text.trim() ? [...notes, noteFromDraft(target, device, bridge.path)] : notes;
     const input = { businessId: item.id, previewUrl: item.previewUrl, notes: all };
     startTransition(async () => {
       const outcome = all.length ? await sendReviewAction(input) : await approveReviewAction(input);
@@ -219,22 +235,23 @@ function Studio({ item, ...queue }: Props) {
 
   useStudioShortcuts({ point: () => bridge.state === "connected" && setPointing((on) => !on), stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
   const count = notes.length + (draft.text.trim() ? 1 : 0);
-  const phone = usePhoneReview({ draft, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit });
+  const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit, ask: { open: Boolean(currentAsk), answered: flow.noted } });
 
   return (
     <div className="flex flex-col gap-4 pb-40 lg:-mb-16 lg:h-[calc(100svh-4rem)] lg:pb-0">
       <StudioBar item={item} {...queue} />
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <section ref={stage} aria-label="Preview" className="flex h-[75svh] min-h-0 flex-col gap-3 lg:h-auto">
+        <section ref={stage} aria-label="Preview" className="flex h-[calc(100svh-var(--phone-dock-height,9rem))] min-h-0 flex-col gap-3 lg:h-auto">
           <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} />
           <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} />
         </section>
         <aside aria-label="Notes" className="bg-surface shadow-card flex min-h-0 flex-col overflow-hidden rounded-2xl">
+          <AskCard state={asks} flow={flow} className="border-ink/8 hidden border-b p-4 lg:flex" />
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {notes.length ? <NoteList notes={notes} onChange={change} onRemove={remove} /> : <NoNotesYet />}
           </div>
           <div className="border-ink/8 border-t">
-            <NoteComposer field={field} draft={draft} path={bridge.path} bridge={bridge.state} pointing={pointing} dictation={dictation} onDraft={setDraft} onPoint={() => setPointing((on) => !on)} onAdd={addDraft} />
+            <NoteComposer field={field} draft={target} path={bridge.path} bridge={bridge.state} pointing={pointing} dictation={dictation} onDraft={setDraft} onPoint={() => setPointing((on) => !on)} onAdd={addDraft} />
           </div>
           <div className="hidden flex-col gap-2 px-4 pb-4 lg:flex">
             <Verdict count={count} pending={pending} onSubmit={submit} />
@@ -256,6 +273,7 @@ function Studio({ item, ...queue }: Props) {
         pending={pending}
         armed={armed}
         onSubmit={phone.tapSend}
+        ask={<AskCard state={asks} flow={flow} />}
       />
     </div>
   );

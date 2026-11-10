@@ -10,6 +10,8 @@ import { db } from "@/server/db/client";
 import { isDevelopment } from "@/server/env";
 import { previewReviews, type Business } from "@/server/db/schema";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
+import type { ReviewAsk } from "@/lib/reviewAsks";
+import { writeReviewAsks } from "@/server/review/askWriter";
 import { splitSpokenNotes, type SplitNote } from "@/server/review/noteWriter";
 import { addTasteLessons, restoreTasteLesson, retireTasteLesson, updateTasteLesson } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
@@ -86,6 +88,15 @@ export async function splitSpokenNotesAction(transcript: string): Promise<SplitN
   await requireFounder();
   const parsed = Spoken.safeParse(transcript);
   return parsed.success ? splitSpokenNotes(parsed.data) : [];
+}
+
+/** Claude's questions about a lead's current preview, with the preview they're about so the page can keep them. */
+export async function reviewAsksAction(businessId: string): Promise<{ previewUrl: string; asks: ReviewAsk[] }> {
+  await requireFounder();
+  const id = z.uuid().safeParse(businessId);
+  const lead = id.success ? await businessById(id.data) : null;
+  if (!lead?.previewUrl) return { previewUrl: "", asks: [] };
+  return { previewUrl: lead.previewUrl, asks: await writeReviewAsks(lead.businessName, lead.previewUrl) };
 }
 
 const LessonId = z.uuid();
