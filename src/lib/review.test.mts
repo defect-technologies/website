@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compileReviewNote, tasteMarkdown, type ReviewNote } from "./review";
+import { samePage } from "./reviewAsks";
 
 const pointed: ReviewNote = {
   id: "a",
@@ -25,4 +26,10 @@ test("taste lessons are a markdown list, and nothing at all when there are none"
   const markdown = tasteMarkdown([{ text: "No pills.\nEver." }]);
   assert.match(markdown, /^# Founder taste lessons/);
   assert.match(markdown, /^- No pills\. Ever\.$/m);
+});
+
+test("samePage matches a page whatever its query, hash or trailing slash", () => {
+  assert.equal(samePage("/menu", "/menu/?from=nav#top"), true);
+  assert.equal(samePage("/", "/?preview=1"), true);
+  assert.equal(samePage("/menu", "/contact"), false);
 });

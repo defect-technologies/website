@@ -26,3 +26,12 @@ export function askAnchor(ask: ReviewAsk): NoteAnchor | null {
   if (!ask.selector) return null;
   return { path: ask.path, selector: ask.selector, tag: "", text: ask.quote };
 }
+
+/** The page part of a path, so "/menu/?a=1" and "/menu" count as the same page. Matches site-kit's samePage. */
+export function samePage(a: string, b: string): boolean {
+  const page = (path: string) => {
+    const bare = path.split(/[?#]/)[0] || "/";
+    return bare.length > 1 ? bare.replace(/\/+$/, "") : bare;
+  };
+  return page(a) === page(b);
+}
