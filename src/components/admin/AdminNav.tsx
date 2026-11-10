@@ -6,7 +6,9 @@ import {
   CaretRight,
   ChatsCircle,
   ClockCounterClockwise,
+  Crosshair,
   Eye,
+  Eyedropper,
   GearSix,
   Hammer,
   type Icon,
@@ -30,6 +32,7 @@ const SETUP: Item[] = [
   { href: "/admin/setup/template", label: "Email template", icon: PencilSimpleLine },
   { href: "/admin/setup/connections", label: "Connections", icon: PlugsConnected },
   { href: "/admin/setup/spot-checks", label: "Spot checks", icon: Eye },
+  { href: "/admin/setup/taste", label: "Taste lessons", icon: Eyedropper },
   { href: "/admin/setup/prospects", label: "Prospects", icon: AddressBook },
   { href: "/admin/setup/activity", label: "Activity log", icon: ClockCounterClockwise },
   { href: "/admin/setup/video", label: "Welcome video", icon: VideoCamera },
@@ -86,10 +89,11 @@ function SetupGroup({ pathname }: { pathname: string }) {
   );
 }
 
-export default function AdminNav({ counts, building }: { counts: { today: number; messages: number }; building: boolean }) {
+export default function AdminNav({ counts, building }: { counts: { today: number; review: number; messages: number }; building: boolean }) {
   const pathname = usePathname();
   const items: Item[] = [
     { href: "/admin", label: "Today", icon: SunHorizon, count: counts.today },
+    { href: "/admin/review", label: "Review", icon: Crosshair, count: counts.review },
     { href: "/admin/builds", label: "Builds", icon: Hammer, live: building },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },
