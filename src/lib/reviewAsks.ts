@@ -8,9 +8,8 @@ export type AskTopic = (typeof ASK_TOPICS)[number];
 export type ReviewAsk = {
   id: string;
   topic: AskTopic;
+  /** At most MAX_ASK_WORDS words: the outlined element on the page says what it's about. */
   question: string;
-  /** Why Claude asks: what it saw, or what the design critic said. */
-  why: string;
   path: string;
   selector: string;
   /** Words from the element, so the founder and the builder can find it without the selector. */
@@ -19,7 +18,8 @@ export type ReviewAsk = {
 
 export const MIN_ASKS = 3;
 export const MAX_ASKS = 5;
-export const MAX_ASK_TEXT = 300;
+export const MAX_ASK_WORDS = 8;
+export const MAX_ASK_TEXT = 80;
 
 /** The element a question is about, as the anchor of the founder's answer. */
 export function askAnchor(ask: ReviewAsk): NoteAnchor | null {

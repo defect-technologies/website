@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowSquareOut, CaretLeft, CaretRight, Check, CircleNotch, Desktop, DeviceMobile, PaperPlaneTilt } from "@phosphor-icons/react";
+import { ArrowSquareOut, CaretLeft, CaretRight, Check, CircleNotch, Desktop, DeviceMobile, PaperPlaneTilt, X } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -14,7 +14,8 @@ import { askAnchor, samePage } from "@/lib/reviewAsks";
 import AskCard from "./AskCard";
 import NoteComposer from "./NoteComposer";
 import NoteList from "./NoteList";
-import PhoneDock from "./PhoneDock";
+import PhoneDock, { CARD } from "./PhoneDock";
+import PhoneTopBar from "./PhoneTopBar";
 import { Key } from "./NoteParts";
 import PreviewStage from "./PreviewStage";
 import { appendPhrase, type Draft, EMPTY_DRAFT, isTyping, noteFromDraft, readSavedNotes, saveNotes } from "./reviewDraft";
@@ -79,9 +80,13 @@ function QueueSteps({ position, total, previousId, nextId }: Omit<Props, "item">
 
 function StudioBar({ item, ...queue }: Props) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h1 className="font-display min-w-0 truncate text-4xl leading-none font-black">{item.businessName}</h1>
+    <header className="flex items-center justify-between gap-x-6 max-lg:hidden">
+      <div className="flex min-w-0 items-center gap-x-4">
+        <Link href="/admin" className={buttonClasses("ghost", "icon")}>
+          <X size={20} aria-hidden="true" />
+          <span className="sr-only">Close review and go back to Today</span>
+        </Link>
+        <h1 className="font-display min-w-0 truncate text-3xl leading-none font-black">{item.businessName}</h1>
         {item.held && <span className="text-warn text-sm font-medium">Held from outreach until approved</span>}
         {item.website && (
           <a href={item.website} target="_blank" rel="noreferrer" className="text-ink-soft hover:text-ink inline-flex items-center gap-1 text-sm underline decoration-ink/25 underline-offset-4">
@@ -169,14 +174,10 @@ function Studio({ item, ...queue }: Props) {
   const [pointing, setPointing] = useState(false);
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [armed, setArmed] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const { notes, change, remove, add } = useNotes(item);
   const live = useRef({ draft, pointing, device, path: "/" });
-  const stage = useRef<HTMLElement>(null);
-  // On a phone the admin nav fills the first screen, so the preview scrolls up to meet the dock.
-  useEffect(() => {
-    if (window.matchMedia("(width < 64rem)").matches) stage.current?.scrollIntoView({ block: "start" });
-  }, []);
 
   const onPicked = useCallback(
     (anchor: NoteAnchor) => {
@@ -245,14 +246,20 @@ function Studio({ item, ...queue }: Props) {
   const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit, ask: { open: Boolean(currentAsk), answered: flow.noted } });
 
   return (
-    <div className="flex flex-col gap-4 pb-40 lg:-mb-16 lg:h-[calc(100svh-4rem)] lg:pb-0">
+    <div className="bg-paper fixed inset-0 z-20 flex flex-col gap-3 lg:p-4">
       <StudioBar item={item} {...queue} />
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <section ref={stage} aria-label="Preview" className="flex h-[calc(100svh-var(--phone-dock-height,9rem))] min-h-0 flex-col gap-3 lg:h-auto">
-          <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} />
+      <PhoneTopBar item={item} position={queue.position} total={queue.total} nextId={queue.nextId} notes={count} notesOpen={notesOpen} onNotes={() => setNotesOpen((open) => !open)} />
+      <div className="relative grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section aria-label="Preview" className="flex min-h-0 flex-col gap-3 max-lg:absolute max-lg:inset-0">
+          <div className="max-lg:hidden">
+            <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} />
+          </div>
           <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} />
         </section>
-        <aside aria-label="Notes" className="bg-surface shadow-card flex min-h-0 flex-col overflow-hidden rounded-2xl">
+        <aside
+          aria-label="Notes"
+          className={`bg-surface shadow-card flex min-h-0 flex-col overflow-hidden rounded-2xl ${notesOpen ? "max-lg:fixed max-lg:inset-x-3 max-lg:top-[calc(env(safe-area-inset-top)+4.5rem)] max-lg:bottom-3 max-lg:z-40 max-lg:shadow-lifted" : "max-lg:hidden"}`}
+        >
           <AskCard state={asks} flow={flow} className="border-ink/8 hidden border-b p-4 lg:flex" />
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {notes.length ? <NoteList notes={notes} onChange={change} onRemove={remove} /> : <NoNotesYet />}
@@ -280,7 +287,7 @@ function Studio({ item, ...queue }: Props) {
         pending={pending}
         armed={armed}
         onSubmit={phone.tapSend}
-        ask={<AskCard state={asks} flow={flow} />}
+        ask={<AskCard state={asks} flow={flow} className={CARD} />}
       />
     </div>
   );
@@ -289,7 +296,7 @@ function Studio({ item, ...queue }: Props) {
 function NoNotesYet() {
   return (
     <div className="text-ink-soft flex h-full min-h-32 flex-col justify-end gap-2 p-4 text-sm text-pretty">
-      <p className="hidden flex-wrap items-center gap-1.5 lg:flex">
+      <p className="hidden lg:block">
         Press <Key>P</Key> and click anything in the preview, then <Key>M</Key> and talk.
       </p>
       <p className="lg:hidden">Tap Point at it, tap the part of the preview you mean, then Talk or type.</p>

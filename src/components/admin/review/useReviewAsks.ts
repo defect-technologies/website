@@ -6,7 +6,8 @@ import type { ReviewAsk } from "@/lib/reviewAsks";
 
 export type AsksState = { status: "loading" | "ready" | "none"; asks: ReviewAsk[] };
 
-const keyOf = (businessId: string, previewUrl: string) => `review-asks:${businessId}:${previewUrl}`;
+/** v2: questions became a few words each, so the long ones saved before are written again. */
+const keyOf = (businessId: string, previewUrl: string) => `review-asks-v2:${businessId}:${previewUrl}`;
 
 function readCached(businessId: string, previewUrl: string): ReviewAsk[] | null {
   try {

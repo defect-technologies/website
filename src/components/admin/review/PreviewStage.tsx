@@ -18,15 +18,13 @@ function useSize(element: RefObject<HTMLElement | null>) {
   return size;
 }
 
-/** Below this stage width the founder is on a phone, so a phone preview fills the stage instead of keeping a phone's height. */
+/** Below this stage width the founder is on a phone, so a phone preview fills the stage instead of keeping a phone's size. */
 const PHONE_STAGE_WIDTH = 640;
 
 function frameBox(device: Device, stage: { width: number; height: number }) {
   const width = DEVICE_WIDTH[device];
-  if (device === "phone" && stage.width < PHONE_STAGE_WIDTH) {
-    const scale = Math.min(1, stage.width / width);
-    return { width, height: stage.height / scale, scale };
-  }
+  // On a phone the preview is the phone's own width at full size, so the founder sees exactly what a visitor sees.
+  if (device === "phone" && stage.width < PHONE_STAGE_WIDTH) return { width: stage.width, height: stage.height, scale: 1 };
   if (device === "phone") {
     const scale = Math.min(1, stage.height / PHONE_HEIGHT, stage.width / width);
     return { width, height: Math.min(PHONE_HEIGHT, stage.height / scale), scale };
@@ -56,7 +54,7 @@ export default function PreviewStage({ frame, previewUrl, businessName, device, 
     <div ref={stage} className="relative min-h-0 flex-1 overflow-hidden">
       {size.width > 0 && (
         <div
-          className={`absolute top-0 left-1/2 overflow-hidden rounded-xl bg-white transition-shadow duration-150 ${pointing ? "shadow-pointing" : "shadow-lifted"}`}
+          className={`absolute top-0 left-1/2 overflow-hidden bg-white transition-shadow duration-150 max-lg:rounded-none lg:rounded-xl ${pointing ? "shadow-pointing" : "lg:shadow-lifted"}`}
           style={{ width: box.width * box.scale, height: box.height * box.scale, translate: "-50% 0" }}
         >
           <iframe
