@@ -19,6 +19,7 @@ export const CriticSettingsInput = z.object({
 export async function criticSettings(): Promise<CriticSettings> {
   const [row] = await (await db()).select().from(settings).where(eq(settings.key, CRITICS_KEY));
   const merged = { ...DEFAULT_CRITIC_SETTINGS, ...((row?.value as Partial<CriticSettings>) ?? {}) };
+  if (typeof merged.minutes === "number") merged.minutes = Math.min(Math.max(merged.minutes, MIN_CRITIC_MINUTES), MAX_CRITIC_MINUTES);
   const parsed = CriticSettingsInput.safeParse(merged);
   return parsed.success ? parsed.data : DEFAULT_CRITIC_SETTINGS;
 }

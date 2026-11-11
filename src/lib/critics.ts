@@ -40,8 +40,8 @@ export type CriticSettings = {
 
 export const DEFAULT_CRITIC_SETTINGS: CriticSettings = { enabled: false, minutes: 20, apply: [], maxNotes: 24, secondBuilder: false };
 
-export const MIN_CRITIC_MINUTES = 1;
-export const MAX_CRITIC_MINUTES = 120;
+export const MIN_CRITIC_MINUTES = 2;
+export const MAX_CRITIC_MINUTES = 90;
 
 export const KIND_LABEL: Record<CriticKind, string> = {
   sense: "Presentation makes no sense",
