@@ -31,7 +31,7 @@ export function isSkipped(job: { status: PreviewJobStatus; step?: string | null 
  * that builds the site. Stored as a done job with this step (no migration needed). It builds nothing, so it isn't
  * counted against the daily cap or as a success after failures.
  */
-export const BOARDS_STEP = "Boards sent: a founder chooses the design";
+export const BOARDS_STEP = "Three designs for a founder to choose from";
 
 export function isBoards(job: { status: PreviewJobStatus; step?: string | null } | null | undefined): boolean {
   return job?.status === "done" && job.step === BOARDS_STEP;

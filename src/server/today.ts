@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { monthOf, todayInPacific, type MonthBalance } from "@/lib/settleUp";
+import { countBoardsWaiting } from "./boards/store";
 import { openFlags, resolvedFlags } from "./bots/flags";
 import { balances } from "./expenses/expenses";
 import { leadMatcher, openOfKinds, pastRequests } from "./inbound/requests";
@@ -62,9 +63,10 @@ export async function today() {
 export async function navCounts() {
   const [flags, inbound, sendQueue, spotChecks, monthRows, unreadMessages] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), unreadMessageCount()]);
   const sendable = [...sendQueue.requested, ...sendQueue.followUps, ...sendQueue.firstEmails].filter((item) => item.blockers.length === 0).length;
-  const [builds, review] = await Promise.all([runnerStatus(), reviewQueueCount()]);
+  const [builds, review, designs] = await Promise.all([runnerStatus(), reviewQueueCount(), countBoardsWaiting()]);
   return {
     review,
+    designs,
     building: builds.current.length > 0,
     today: flags.length + inbound.length + sendable + spotChecks.length + settleDue(monthRows).length,
     messages: unreadMessages,
