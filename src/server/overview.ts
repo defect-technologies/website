@@ -9,11 +9,25 @@ import { buildsToday, spentToday } from "./runner/jobs";
 import { activePause, runnerSettings } from "./runner/settings";
 
 export type LastEmail = Pick<Message, "at" | "direction" | "sentBy" | "subject">;
-export type LeadRow = { lead: Business; job: PreviewJob | null; lastEmail: LastEmail | null; status: LeadStatus };
+/** The build columns the Sites sheet reads. The log, critic notes and launch result stay in the database. */
+export type SheetJob = Pick<PreviewJob, "id" | "businessId" | "status" | "step" | "runnerName" | "requestedBy" | "criticVerdict" | "createdAt" | "claimedAt" | "startedAt" | "finishedAt">;
+export type LeadRow = { lead: Business; job: SheetJob | null; lastEmail: LastEmail | null; status: LeadStatus };
 
-async function latestJobs(): Promise<Map<string, PreviewJob>> {
+async function latestJobs(): Promise<Map<string, SheetJob>> {
   const rows = await (await db())
-    .selectDistinctOn([previewJobs.businessId])
+    .selectDistinctOn([previewJobs.businessId], {
+      id: previewJobs.id,
+      businessId: previewJobs.businessId,
+      status: previewJobs.status,
+      step: previewJobs.step,
+      runnerName: previewJobs.runnerName,
+      requestedBy: previewJobs.requestedBy,
+      criticVerdict: previewJobs.criticVerdict,
+      createdAt: previewJobs.createdAt,
+      claimedAt: previewJobs.claimedAt,
+      startedAt: previewJobs.startedAt,
+      finishedAt: previewJobs.finishedAt,
+    })
     .from(previewJobs)
     .orderBy(previewJobs.businessId, desc(previewJobs.createdAt));
   return new Map(rows.map((job) => [job.businessId, job]));
