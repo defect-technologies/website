@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
+import type { CriticKind, CriticNote, CriticTarget } from "../../lib/critics";
 import type { SavedDraft } from "../../lib/emailDraft";
 import type { Fixer, FlagNeeds, FlagTopic } from "../../lib/flags";
 import type { InboundKind, InboundSource, InboundStatus } from "../../lib/inbound";
@@ -342,6 +343,8 @@ export const previewJobs = pgTable(
     kind: text("kind").notNull().default("preview"),
     /** A launch's outcome: { projectId, liveUrl, records: [{ host, type, name, value }] }. */
     result: jsonb("result"),
+    /** Every note the critics wrote about this build, as the runner reported them. Null when the runner sent none. */
+    criticNotes: jsonb("critic_notes").$type<CriticNote[]>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -460,6 +463,27 @@ export const previewReviews = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("preview_reviews_business").on(table.businessId, table.reviewedAt), index("preview_reviews_preview_url").on(table.previewUrl)],
+);
+
+/** A founder's answer to one critic proposal. The kind and target are copied from the proposal, so the numbers per kind survive a job being pruned. */
+export const criticAnswers = pgTable(
+  "critic_answers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => previewJobs.id),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    proposalId: text("proposal_id").notNull(),
+    kind: text("kind").$type<CriticKind>().notNull(),
+    target: text("target").$type<CriticTarget>().notNull(),
+    accepted: boolean("accepted").notNull(),
+    answeredBy: text("answered_by").notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("critic_answers_one_per_proposal").on(table.jobId, table.proposalId), index("critic_answers_kind").on(table.kind)],
 );
 
 /** A founder's standing rule of taste. Every preview build, the design critic and the outside review read the active ones. */

@@ -1,6 +1,7 @@
 "use client";
 
-import { AppWindow, Check, CircleNotch, DeviceMobile, Image, Layout, Palette, Quotes, Shapes, SkipForward, TextAa, type Icon } from "@phosphor-icons/react";
+import { AppWindow, ArrowsHorizontal, Check, CircleNotch, DeviceMobile, GlobeHemisphereWest, Image, Layout, Palette, Quotes, Shapes, SkipForward, TextAa, X, type Icon } from "@phosphor-icons/react";
+import type { CriticTarget } from "@/lib/critics";
 import type { AskTopic } from "@/lib/reviewAsks";
 import KnifeStroke from "../KnifeStroke";
 import type { AsksState } from "./useReviewAsks";
@@ -55,13 +56,59 @@ function Finished() {
   );
 }
 
-type Props = { state: AsksState; flow: AskFlow; className?: string };
+const TARGET_MARK: Partial<Record<CriticTarget, { icon: Icon; label: string }>> = {
+  system: { icon: GlobeHemisphereWest, label: "Every section" },
+  seam: { icon: ArrowsHorizontal, label: "Between sections" },
+};
+
+function TargetMark({ target }: { target: CriticTarget }) {
+  const mark = TARGET_MARK[target];
+  if (!mark) return null;
+  return (
+    <span className="text-ink-soft inline-flex items-center gap-1 text-sm">
+      <mark.icon size={14} aria-hidden="true" />
+      {mark.label}
+    </span>
+  );
+}
+
+type Props = { state: AsksState; flow: AskFlow; onProposal: (accepted: boolean) => void; className?: string };
+
+function QuestionChoices({ flow }: { flow: AskFlow }) {
+  return (
+    <>
+      <button type="button" onClick={flow.good} className={`${CHOICE} bg-paper-shade text-ink hover:bg-paper-shade/70`}>
+        <Check size={16} weight="bold" aria-hidden="true" />
+        Good
+      </button>
+      <button type="button" onClick={flow.skip} className={`${CHOICE} text-ink-soft hover:bg-paper-shade`}>
+        <SkipForward size={16} aria-hidden="true" />
+        Skip
+      </button>
+    </>
+  );
+}
+
+function ProposalChoices({ onAnswer }: { onAnswer: (accepted: boolean) => void }) {
+  return (
+    <>
+      <button type="button" onClick={() => onAnswer(true)} className={`${CHOICE} bg-ink text-paper hover:bg-ink/85`}>
+        <Check size={16} weight="bold" aria-hidden="true" />
+        Yes
+      </button>
+      <button type="button" onClick={() => onAnswer(false)} className={`${CHOICE} bg-paper-shade text-ink hover:bg-paper-shade/70`}>
+        <X size={16} weight="bold" aria-hidden="true" />
+        No
+      </button>
+    </>
+  );
+}
 
 /**
  * One specific question about one part of the preview. Good and Skip move on; talking or typing answers it, and the
  * answer becomes a note on the element the question is about.
  */
-export default function AskCard({ state, flow, className = "" }: Props) {
+export default function AskCard({ state, flow, onProposal, className = "" }: Props) {
   if (state.status === "none") return null;
   const ask = flow.current;
   const TopicIcon = ask ? TOPIC_ICON[ask.topic] : AppWindow;
@@ -75,15 +122,9 @@ export default function AskCard({ state, flow, className = "" }: Props) {
             <TopicIcon size={22} aria-hidden="true" className="text-ink-soft shrink-0" />
             <p className="min-w-0 text-lg font-semibold text-pretty">{ask.question}</p>
           </div>
+          {ask.proposal && <TargetMark target={ask.proposal.target} />}
           <div className="flex items-center gap-2">
-            <button type="button" onClick={flow.good} className={`${CHOICE} bg-paper-shade text-ink hover:bg-paper-shade/70`}>
-              <Check size={16} weight="bold" aria-hidden="true" />
-              Good
-            </button>
-            <button type="button" onClick={flow.skip} className={`${CHOICE} text-ink-soft hover:bg-paper-shade`}>
-              <SkipForward size={16} aria-hidden="true" />
-              Skip
-            </button>
+            {ask.proposal ? <ProposalChoices onAnswer={onProposal} /> : <QuestionChoices flow={flow} />}
             <span className="ml-auto">
               <Progress state={state} flow={flow} />
             </span>

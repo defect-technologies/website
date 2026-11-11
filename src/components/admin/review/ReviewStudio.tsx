@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowSquareOut, CaretLeft, CaretRight, Check, CircleNotch, Desktop, DeviceMobile, PaperPlaneTilt, X } from "@phosphor-icons/react";
+import { ArrowSquareOut, CaretLeft, CaretRight, Check, CircleNotch, Desktop, DeviceMobile, DeviceTablet, PaperPlaneTilt, X } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -10,7 +10,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { type BridgeState, useReviewBridge } from "@/hooks/useReviewBridge";
 import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
-import { askAnchor, samePage } from "@/lib/reviewAsks";
+import { askAnchor } from "@/lib/reviewAsks";
 import AskCard from "./AskCard";
 import NoteComposer from "./NoteComposer";
 import NoteList from "./NoteList";
@@ -19,9 +19,10 @@ import PhoneTopBar from "./PhoneTopBar";
 import { Key } from "./NoteParts";
 import PreviewStage from "./PreviewStage";
 import { appendPhrase, type Draft, EMPTY_DRAFT, isTyping, noteFromDraft, readSavedNotes, saveNotes } from "./reviewDraft";
-import { useAskFlow } from "./useAskFlow";
+import { useProposalAnswer } from "./useProposalAnswer";
+import { useShowAsk } from "./useShowAsk";
+import { useStudioAsks } from "./useStudioAsks";
 import { usePhoneReview } from "./usePhoneReview";
-import { useReviewAsks } from "./useReviewAsks";
 
 export type StudioItem = { id: string; businessName: string; website: string; previewUrl: string; held: boolean };
 
@@ -38,6 +39,7 @@ function hostOf(url: string) {
 function DeviceSwitch({ device, onChange }: { device: Device; onChange: (device: Device) => void }) {
   const options: { value: Device; label: string; icon: typeof Desktop }[] = [
     { value: "desktop", label: "Desktop", icon: Desktop },
+    { value: "tablet", label: "Tablet", icon: DeviceTablet },
     { value: "phone", label: "Phone", icon: DeviceMobile },
   ];
   return (
@@ -200,7 +202,6 @@ function Studio({ item, ...queue }: Props) {
   const router = useRouter();
   const frame = useRef<HTMLIFrameElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
-  const [device, setDevice] = useState<Device>(() => (window.matchMedia("(width < 64rem)").matches ? "phone" : "desktop"));
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [pointing, setPointing] = useState(false);
   const [result, setResult] = useState<ReviewResult | null>(null);
@@ -208,6 +209,13 @@ function Studio({ item, ...queue }: Props) {
   const [notesOpen, setNotesOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const { notes, change, remove, add } = useNotes(item);
+  // On a phone the last answer starts the send countdown; on a desktop the founder sends with the button.
+  const { asks, flow, currentAsk, openQuestion, device, setDevice } = useStudioAsks({
+    businessId: item.id,
+    previewUrl: item.previewUrl,
+    nextId: queue.nextId,
+    onLastAnswer: () => window.matchMedia("(width < 64rem)").matches && setArmed(true),
+  });
   const live = useRef({ draft, pointing, device, path: "/" });
 
   const onPicked = useCallback(
@@ -232,29 +240,18 @@ function Studio({ item, ...queue }: Props) {
 
   const dictation = useDictation((phrase) => setDraft((current) => ({ ...current, text: appendPhrase(current.text, phrase) })));
 
-  const asks = useReviewAsks(item.id, item.previewUrl, queue.nextId);
-  // On a phone the last answer starts the send countdown; on a desktop the founder sends with the button.
-  const flow = useAskFlow(asks.asks, () => window.matchMedia("(width < 64rem)").matches && setArmed(true));
-  const currentAsk = flow.current;
-  // Until the founder points somewhere else, a note answers the open question about its element.
-  const target: Draft = draft.anchor || !currentAsk ? draft : { ...draft, anchor: askAnchor(currentAsk) };
-  const { show } = bridge;
-  const shownAsk = useRef<string | null>(null);
-  const onAskPage = Boolean(currentAsk) && samePage(bridge.path, currentAsk?.path ?? "");
-  // A new question takes the preview to its element. Once there, the element is marked again whenever the founder
-  // comes back to that page, but wandering off to another page never pulls them back.
-  useEffect(() => {
-    if (bridgeState !== "connected" || !currentAsk?.selector) return;
-    if (shownAsk.current === currentAsk.id && !onAskPage) return;
-    shownAsk.current = currentAsk.id;
-    show(currentAsk);
-  }, [bridgeState, show, currentAsk, onAskPage]);
+  // Until the founder points somewhere else, a note answers the open question about its element. A critic's proposal
+  // is answered with Yes or No only, so a note the founder writes meanwhile stays his own.
+  const target: Draft = draft.anchor || !openQuestion ? draft : { ...draft, anchor: askAnchor(openQuestion) };
+
+  const answerProposal = useProposalAnswer(currentAsk, flow, add);
+  useShowAsk(bridge, currentAsk);
 
   const addDraft = () => {
     if (!target.text.trim()) return;
     add(noteFromDraft(target, device, bridge.path));
     setDraft({ ...EMPTY_DRAFT });
-    if (currentAsk) flow.noted();
+    if (openQuestion) flow.noted();
   };
 
   const submit = () => {
@@ -277,7 +274,7 @@ function Studio({ item, ...queue }: Props) {
 
   useStudioShortcuts({ point, stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
   const count = notes.length + (draft.text.trim() ? 1 : 0);
-  const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit, ask: { open: Boolean(currentAsk), answered: flow.noted } });
+  const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit, ask: { open: Boolean(openQuestion), answered: flow.noted } });
 
   return (
     <div className="bg-paper fixed inset-0 z-20 flex flex-col gap-3 lg:p-4">
@@ -294,7 +291,7 @@ function Studio({ item, ...queue }: Props) {
           aria-label="Notes"
           className={`bg-surface shadow-card flex min-h-0 flex-col overflow-hidden rounded-2xl ${notesOpen ? "max-lg:fixed max-lg:inset-x-3 max-lg:top-[calc(env(safe-area-inset-top)+4.5rem)] max-lg:bottom-3 max-lg:z-40 max-lg:shadow-lifted" : "max-lg:hidden"}`}
         >
-          <AskCard state={asks} flow={flow} className="border-ink/8 hidden border-b p-4 lg:flex" />
+          <AskCard state={asks} flow={flow} onProposal={answerProposal} className="border-ink/8 hidden border-b p-4 lg:flex" />
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {notes.length ? <NoteList notes={notes} onChange={change} onRemove={remove} /> : <NoNotesYet />}
           </div>
@@ -321,7 +318,7 @@ function Studio({ item, ...queue }: Props) {
         pending={pending}
         armed={armed}
         onSubmit={phone.tapSend}
-        ask={<AskCard state={asks} flow={flow} className={CARD} />}
+        ask={<AskCard state={asks} flow={flow} onProposal={answerProposal} className={CARD} />}
       />
     </div>
   );

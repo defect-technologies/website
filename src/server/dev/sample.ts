@@ -2,7 +2,8 @@ import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { SENT_FROM_GMAIL } from "@/lib/senders";
-import { activity, businesses, inboundRequests, messages, previewJobs, spotChecks, type Business } from "../db/schema";
+import type { CriticKind, CriticNote } from "@/lib/critics";
+import { activity, businesses, criticAnswers, inboundRequests, messages, previewJobs, previewReviews, spotChecks, type Business } from "../db/schema";
 import { upsertProspects, type ProspectInput } from "../prospects";
 import { newLinkCode } from "../leads/import";
 
@@ -59,6 +60,44 @@ async function sampleBuilds(bySlug: Map<string, Business>) {
     const business = bySlug.get(slug);
     if (business) await (await db()).insert(previewJobs).values({ businessId: business.id, ...job }).onConflictDoNothing();
   }
+}
+
+const criticNote = (id: string, fields: Partial<CriticNote>): CriticNote => ({
+  id, target: "section", kind: "text", path: "/", device: "phone", selector: "main > section:nth-of-type(2)", quote: "", text: "", source: "critic:cold-read", model: "claude", status: "proposed", ...fields,
+});
+
+/** Arroyo Plumbing's build reported critic notes, so the Review page asks about them. All made up. */
+const ARROYO_CRITIC_NOTES: CriticNote[] = [
+  criticNote("home-s02-text-1", { quote: "Family owned since 1987", text: "Cut this section to two sentences. The history repeats the About page.", source: "verify:density", model: "measured" }),
+  criticNote("home-s00-cohesion-1", { target: "system", kind: "cohesion", selector: "", text: "Put every section heading in the same place. Use one background family so the page reads as one piece.", source: "critic:zoom-out" }),
+  criticNote("home-s03-spacing-1", { kind: "spacing", selector: "main > section:nth-of-type(3)", device: "tablet", quote: "Call for a free estimate", text: "The call button touches the card edge at tablet width. Give it room.", source: "verify:clearance", model: "measured", status: "open" }),
+  criticNote("home-s04-palette-1", { target: "seam", kind: "palette", selector: "main > section:nth-of-type(4)", device: "desktop", text: "The orange band against the teal footer is hard on the eyes. Calm one of them.", source: "critic:seam" }),
+  criticNote("home-s01-font-1", { kind: "font", selector: "main > section:nth-of-type(1)", text: "Change the heading font to one with more weight.", status: "applied" }),
+];
+
+/** [kind, accepted, rejected, written by the founder that no critic proposed]. Text has earned trust; the rest have not. */
+const CRITIC_HISTORY: [CriticKind, number, number, number][] = [
+  ["text", 14, 1, 2],
+  ["spacing", 7, 4, 3],
+  ["font", 1, 5, 1],
+  ["palette", 3, 0, 0],
+  ["cohesion", 2, 2, 4],
+  ["sense", 0, 0, 1],
+];
+
+async function sampleCritics(bySlug: Map<string, Business>) {
+  const database = await db();
+  const arroyo = bySlug.get("arroyo-plumbing");
+  const cedar = bySlug.get("cedar-barbers");
+  if (!arroyo || !cedar) return;
+  await database.insert(previewJobs).values({ businessId: arroyo.id, status: "done", requestedBy: "bot:outreach", previewUrl: "https://example.com/", finishedAt: minutesAgo(50), criticNotes: ARROYO_CRITIC_NOTES });
+  const answeredNotes = CRITIC_HISTORY.flatMap(([kind, accepted, rejected]) =>
+    Array.from({ length: accepted + rejected }, (_, index) => ({ note: criticNote(`${kind}-${index}`, { kind }), accepted: index < accepted })),
+  );
+  const [history] = await database.insert(previewJobs).values({ businessId: cedar.id, status: "done", requestedBy: "bot:outreach", previewUrl: "https://example.com/?old", finishedAt: daysAgo(20), criticNotes: answeredNotes.map((entry) => entry.note) }).returning();
+  await database.insert(criticAnswers).values(answeredNotes.map(({ note, accepted }) => ({ jobId: history.id, businessId: cedar.id, proposalId: note.id, kind: note.kind, target: note.target, accepted, answeredBy: "sample@dev.localhost" })));
+  const written = CRITIC_HISTORY.flatMap(([kind, , , missed]) => Array.from({ length: missed }, (_, index) => ({ id: `${kind}-mine-${index}`, text: "Made up.", scope: "site" as const, device: "phone" as const, path: "/", anchor: null, kind })));
+  await database.insert(previewReviews).values({ businessId: cedar.id, previewUrl: "https://example.com/?old", verdict: "changes", notes: written, reviewedBy: "sample@dev.localhost", reviewedAt: daysAgo(19) });
 }
 
 /** What the bots did lately, as the activity log would record it. */
@@ -177,6 +216,7 @@ export async function loadSamples() {
   await sampleInbound();
   if (!(await hasBuilds(everySample))) {
     await sampleBuilds(allBySlug);
+    await sampleCritics(allBySlug);
     await sampleActivity(allBySlug);
   }
   return inserted.length;

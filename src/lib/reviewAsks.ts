@@ -1,3 +1,4 @@
+import { type CriticDevice, type CriticKind, type CriticNote, type CriticTarget, proposalWords } from "./critics";
 import type { NoteAnchor } from "./review";
 
 /** What one question is about, so its icon tells the founder before they read it. */
@@ -14,7 +15,31 @@ export type ReviewAsk = {
   selector: string;
   /** Words from the element, so the founder and the builder can find it without the selector. */
   quote: string;
+  /** Set when the question is a critic's proposal: yes makes it one of the founder's notes, no is kept as a rejection. */
+  proposal?: AskProposal;
 };
+
+/** The critic note behind a question, with the job that reported it so the founder's answer can be kept. */
+export type AskProposal = { jobId: string; id: string; kind: CriticKind; target: CriticTarget; device: CriticDevice; text: string };
+
+/** The most proposals one preview asks about, so a long list of critic notes never becomes a long chore. */
+export const MAX_PROPOSALS = 8;
+
+const KIND_TOPIC: Record<CriticKind, AskTopic> = {
+  sense: "layout",
+  text: "copy",
+  form: "imagery",
+  spacing: "layout",
+  font: "type",
+  palette: "color",
+  cohesion: "layout",
+  other: "layout",
+};
+
+export function askFromProposal(jobId: string, note: CriticNote): ReviewAsk {
+  const { id, kind, target, device, text } = note;
+  return { id: `proposal:${id}`, topic: KIND_TOPIC[kind], question: proposalWords(text), path: note.path, selector: note.selector, quote: note.quote, proposal: { jobId, id, kind, target, device, text } };
+}
 
 export const MIN_ASKS = 3;
 export const MAX_ASKS = 5;
