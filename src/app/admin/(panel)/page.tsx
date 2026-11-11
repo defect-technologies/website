@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { CaretRight, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -187,6 +188,7 @@ function nothingWaiting(data: Today) {
 }
 
 export default async function TodayPage() {
+  await requireFounder();
   const [data, agents, runner, builds] = await Promise.all([today(), agentStates(), runnerDay(), runnerStatus()]);
 
   return (

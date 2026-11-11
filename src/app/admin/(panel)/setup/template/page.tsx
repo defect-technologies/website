@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import TemplateEditor from "@/components/admin/TemplateEditor";
@@ -22,6 +23,7 @@ const MADE_UP: TemplateValues = {
 };
 
 export default async function TemplatePage() {
+  await requireFounder();
   const settings = await outreachSettings();
   const [next] = await (await db()).select().from(businesses).where(eq(businesses.stage, "preview_built")).orderBy(asc(businesses.previewBuiltAt)).limit(1);
   const sample = next ? templateValues(next, settings) : MADE_UP;

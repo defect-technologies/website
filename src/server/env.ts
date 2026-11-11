@@ -10,6 +10,16 @@ function required(name: string): string {
   return value;
 }
 
+/** Fails where the address is used, never while modules load, so "next build" and tests need no SITE_URL. */
+function siteUrl(): string {
+  const configured = optional("SITE_URL");
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "development") return "http://localhost:3217";
+  const previewHost = optional("VERCEL_ENV") === "preview" ? optional("VERCEL_URL") : "";
+  if (previewHost) return `https://${previewHost}`;
+  throw new Error("SITE_URL is not set. See .env.example.");
+}
+
 export const isDevelopment = process.env.NODE_ENV === "development";
 
 /** A shortcut past Google sign-in and Gmail, for running locally. Never on in a production build. */
@@ -18,7 +28,7 @@ export const devShortcutsEnabled = isDevelopment && optional("ADMIN_DEV_SIGN_IN"
 export const env = {
   databaseUrl: () => optional("DATABASE_URL"),
   authSecret: () => required("AUTH_SECRET"),
-  siteUrl: () => optional("SITE_URL") || "http://localhost:3217",
+  siteUrl,
   founderEmails: () =>
     optional("ADMIN_EMAILS")
       .split(",")

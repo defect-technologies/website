@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { CaretRight, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Form from "next/form";
@@ -39,6 +40,7 @@ function Search({ query, status }: { query: string; status: LeadStatus | null })
 }
 
 export default async function SitesPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
+  await requireFounder();
   const params = await searchParams;
   const query = (params.q ?? "").trim().slice(0, 100);
   const status = parseStatus(params.status);

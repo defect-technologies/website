@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import type { Icon } from "@phosphor-icons/react";
 import { CheckCircle, Clock, EnvelopeSimple, PauseCircle, Plus, Sparkle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
@@ -84,6 +85,7 @@ function Checks({ checks }: { checks: HealthCheck[] }) {
 }
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ mailbox?: string }> }) {
+  await requireFounder();
   const { mailbox } = await searchParams;
   const [inboxes, checks] = await Promise.all([connectedMailboxes(), healthChecks()]);
   const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;

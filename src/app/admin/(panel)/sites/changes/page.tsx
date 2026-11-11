@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { ButtonLink } from "@/components/Button";
@@ -41,6 +42,7 @@ async function siteDirectory(sites: ClientSiteRow[]): Promise<Map<string, SiteIn
 }
 
 export default async function SiteChangesPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireFounder();
   const search = await searchParams;
   const filters: ChangeFilters = { q: one(search.q), who: one(search.who, CHANGE_AUTHORS), days: one(search.days, BUILT_WITHIN) };
   const [sites, changes] = await Promise.all([allClientSites(), recentSiteChanges(Number(filters.days) || null)]);
