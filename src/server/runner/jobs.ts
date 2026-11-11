@@ -5,11 +5,9 @@ import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
 import { businessById, updateBusiness } from "../leads/businesses";
+import { PACIFIC_MIDNIGHT as LA_MIDNIGHT } from "../outreach/pacificDay";
 
 export type RequestResult = { job: PreviewJob; created: boolean };
-
-/** Midnight in Los Angeles, as a timestamp, so the daily cap follows the founders' day. */
-const LA_MIDNIGHT = sql`(date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')`;
 
 export async function activeJobFor(businessId: string): Promise<PreviewJob | null> {
   const [job] = await (await db())
