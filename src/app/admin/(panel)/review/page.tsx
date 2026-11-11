@@ -13,8 +13,8 @@ export const metadata: Metadata = { title: "Review" };
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   await requireFounder();
   const { id } = await searchParams;
-  await queuePointingUpdates();
-  const queue = await reviewQueue();
+  const firstLook = await reviewQueue();
+  const queue = (await queuePointingUpdates(firstLook)) ? await reviewQueue() : firstLook;
   if (!queue.length) {
     const updating = await pointingUpdatesUnderway();
     if (updating) {
