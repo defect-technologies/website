@@ -7,6 +7,11 @@ import { SUPABASE_CA } from "./supabaseCa";
 
 export type Db = NeonHttpDatabase<typeof schema>;
 
+/** The cron syncs run small upserts; their minutes go to Gmail and Stripe, so a minute is generous for any one query. */
+const CONNECT_TIMEOUT_MS = 10_000;
+const IDLE_TIMEOUT_MS = 30_000;
+const STATEMENT_TIMEOUT_MS = 60_000;
+
 /** Neon's own driver for a Neon address; any other Postgres (Supabase) over postgres.js. */
 export function isNeon(url: string): boolean {
   try {
@@ -35,7 +40,15 @@ async function connect(): Promise<Db> {
     const { Pool } = await import("pg");
     const { drizzle } = await import("drizzle-orm/node-postgres");
     // A serverless function holds one connection; the pooler shares them out.
-    const pool = new Pool({ connectionString: url, max: 1, ssl: isSupabase(url) ? { ca: SUPABASE_CA } : undefined });
+    const pool = new Pool({
+      connectionString: url,
+      max: 1,
+      ssl: isSupabase(url) ? { ca: SUPABASE_CA } : undefined,
+      connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+      idleTimeoutMillis: IDLE_TIMEOUT_MS,
+      statement_timeout: STATEMENT_TIMEOUT_MS,
+      query_timeout: STATEMENT_TIMEOUT_MS + 5_000,
+    });
     // The pooler can drop an idle connection; without a listener that error would crash the function.
     pool.on("error", (error) => console.error("[db] Idle connection failed", error.message));
     return drizzle(pool, { schema }) as unknown as Db;
