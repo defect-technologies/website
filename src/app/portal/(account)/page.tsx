@@ -51,10 +51,10 @@ export default async function PortalDashboard({ searchParams }: { searchParams: 
   const context = await portalContext(query.site);
   const { site } = context;
   const name = siteName(site.businessName, site.url);
-  const going = site.businessId ? await goingLiveFor(site) : null;
-  if (!isLive(site)) return <BeforeLaunch context={context} going={going} name={name} />;
+  const lookUpGoingLive = async () => (site.businessId ? goingLiveFor(site) : null);
+  if (!isLive(site)) return <BeforeLaunch context={context} going={await lookUpGoingLive()} name={name} />;
   const days = parseRange(query.days);
-  const analytics = await siteAnalytics(analyticsProject(site), days);
+  const [going, analytics] = await Promise.all([lookUpGoingLive(), siteAnalytics(analyticsProject(site), days)]);
   if (analytics.state !== "ok") console.error(`[portal] Analytics for ${site.slug} unavailable`, analytics);
   const several = context.sites.length > 1;
 
