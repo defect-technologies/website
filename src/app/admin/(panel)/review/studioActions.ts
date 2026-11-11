@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { compileReviewNote, DEVICES, MAX_NOTE_TEXT, MAX_NOTES, NOTE_SCOPES } from "@/lib/review";
+import { compileReviewNote, DEVICES, MAX_NOTE_TEXT, MAX_NOTES, NOTE_SCOPES, POINTING_NOTE } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { closeFlagsOn } from "@/server/bots/flags";
@@ -98,10 +98,6 @@ export async function reviewAsksAction(businessId: string): Promise<{ previewUrl
   if (!lead?.previewUrl) return { previewUrl: "", asks: [] };
   return { previewUrl: lead.previewUrl, asks: await writeReviewAsks(lead.businessName, lead.previewUrl) };
 }
-
-/** The rebuild a preview gets so the review page can point at its elements; it only moves the site to the newest kit. */
-const POINTING_NOTE =
-  "Rebuild only to take the newest site-kit, so the founders' review page can point at elements in this preview. Keep the design, content, pages and wording exactly as they are.";
 
 /** Queues the kit-only rebuild for a preview built before pointing worked. */
 export async function addPointingAction(businessId: string): Promise<ReviewResult> {
