@@ -3,11 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireFounder } from "@/server/auth/session";
-import { record } from "@/server/activity";
 import type { EmailDraft } from "@/lib/emailDraft";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import type { EmailKind } from "@/server/outreach/compose";
-import { sendOutreach, skipLead, type SendResult } from "@/server/outreach/send";
+import { sendOutreach, skipLead, unskipLead, type SendResult } from "@/server/outreach/send";
 
 const MAX_RECIPIENTS = 20;
 const ADDRESS = z.email();
@@ -68,7 +67,7 @@ export async function skipFromQueue(id: string): Promise<{ ok: boolean }> {
 
 export async function undoSkip(id: string) {
   const founder = await requireFounder();
-  await updateBusiness(id, { stage: "preview_built" });
-  await record(founder.email, "put back in the queue", { businessId: id });
+  const business = await businessById(id);
+  if (business) await unskipLead(business, founder);
   revalidatePath("/admin", "layout");
 }
