@@ -199,9 +199,9 @@ async function holdForOwner(lead: Business, previewUrl: string) {
   await record(ACTOR, "held a new preview until a founder looks", { businessId: lead.id, detail: previewUrl });
 }
 
+/** The job is marked done last: a failure before that leaves it running, so the runner can report again and finish the lead. */
 async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (!body.previewUrl) throw new BotError(400, "A finished build needs previewUrl, the deployed preview's https address.");
-  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
   const ownerHasOne = OWNER_HAS_SEEN.includes(lead.stage) && Boolean(lead.previewUrl) && lead.previewUrl !== body.previewUrl;
   const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
@@ -211,6 +211,7 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (ownerHasOne) await holdForOwner(lead, body.previewUrl);
   else if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   else await maybePickForSpotCheck(lead, body.previewUrl, job.id, ACTOR);
+  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   // A launched site's rebuilt design waits for the owner's OK; the Client care bot publishes it by launching again.
   await record(ACTOR, lead.vercelProjectId ? "built changes for the owner to review" : "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
@@ -224,11 +225,11 @@ function liveAddress(lead: Business, liveUrl: string) {
 
 async function finishLaunched(job: PreviewJob, lead: Business, body: Done) {
   if (!body.launch) throw new BotError(400, "A finished launch needs launch: { projectId, liveUrl, records }.");
-  await updateJob(job.id, { status: "done", step: "Live", result: body.launch, ...results(body) });
   const siteUrl = liveAddress(lead, body.launch.liveUrl);
   await updateBusiness(lead.id, { vercelProjectId: body.launch.projectId, siteUrl, launchedAt: lead.launchedAt ?? new Date() });
   await closeFlagsOn(lead.id, ["launch"], "Closed itself: the site launched.", ACTOR);
   await saveLaunchedSite({ slug: lead.slug, ownerEmail: lead.ownerEmail || lead.email, url: siteUrl, businessId: lead.id, createdBy: ACTOR });
+  await updateJob(job.id, { status: "done", step: "Live", result: body.launch, ...results(body) });
   const records = body.launch.records.map((entry) => `${entry.type} ${entry.name} → ${entry.value}`).join(", ");
   await record(ACTOR, "launched the site", { businessId: lead.id, detail: `${body.launch.liveUrl}; ${records}` });
 }
@@ -241,7 +242,8 @@ function lastLines(text: string, count: number) {
   return text.trim().split("\n").slice(-count).join("\n");
 }
 
-const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.";
+/** The engine strips this exact text to tell an automatic retry from a founder's note: change it there in the same release. */
+export const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.";
 
 /** A failed build tries once more by itself with a note pointing at what failed. After that, only a paying client's failure reaches a founder. */
 async function retryOrGiveUp(job: PreviewJob, lead: Business, body: Done) {
