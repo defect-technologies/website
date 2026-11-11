@@ -1,9 +1,8 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { and, count, eq, gt } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
 import { jwtVerify } from "jose";
 import { z } from "zod";
-import { record } from "../activity";
 import { db } from "../db/client";
 import { activity } from "../db/schema";
 import { env } from "../env";
@@ -14,6 +13,7 @@ const TOKEN_TYPE = "photo-writer";
 const MODEL = "claude-opus-5-5";
 const DAILY_LIMIT = 100;
 const WROTE = "wrote from a photo";
+const CLAUDE_TIMEOUT_MS = 30_000;
 
 export const PhotoRequest = z.object({
   subject: z.enum(["product", "project", "photo"]),
@@ -46,13 +46,27 @@ export async function photoWriterSession(authorization: string | null): Promise<
 
 const actorOf = (slug: string) => `site:${slug}`;
 
-async function writtenToday(slug: string): Promise<number> {
+/** The day's slots up to and including this one, in the order they were taken. Parallel requests get different counts. */
+async function slotsThrough(slug: string, slotId: string): Promise<number> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const takenBefore = sql`(${activity.at}, ${activity.id}) <= (select a.at, a.id from activity a where a.id = ${slotId})`;
   const [row] = await (await db())
     .select({ total: count() })
     .from(activity)
-    .where(and(eq(activity.actor, actorOf(slug)), eq(activity.action, WROTE), gt(activity.at, since)));
+    .where(and(eq(activity.actor, actorOf(slug)), eq(activity.action, WROTE), gt(activity.at, since), takenBefore));
   return row?.total ?? 0;
+}
+
+async function releaseSlot(slotId: string): Promise<void> {
+  await (await db()).delete(activity).where(eq(activity.id, slotId));
+}
+
+/** Takes one of the day's slots before Claude is asked, so parallel requests are counted too. Null when none is left. */
+async function reserveSlot(site: { slug: string; businessId: string | null }, detail: string): Promise<string | null> {
+  const [slot] = await (await db()).insert(activity).values({ actor: actorOf(site.slug), action: WROTE, businessId: site.businessId, detail }).returning({ id: activity.id });
+  if ((await slotsThrough(site.slug, slot.id)) <= DAILY_LIMIT) return slot.id;
+  await releaseSlot(slot.id);
+  return null;
 }
 
 const SUBJECT_TEXT: Record<Request["subject"], string> = {
@@ -86,10 +100,10 @@ const OUTPUT_SCHEMA = {
 const Output = z.object({ text: z.string(), alt: z.string() });
 
 async function askClaude(request: Request, apiKey: string): Promise<Written | null> {
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, timeout: CLAUDE_TIMEOUT_MS, maxRetries: 0 });
   const response = await client.beta.messages.create({
     model: MODEL,
-    max_tokens: 8000,
+    max_tokens: 1000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
@@ -118,12 +132,15 @@ export async function describePhoto(session: { site: string; email: string }, re
   if (!apiKey) return refuse(503, "Writing from photos isn't switched on yet. Write it yourself for now.");
   const site = await clientSite(session.site);
   if (!site) return refuse(403, "This site isn't one of ours, so it can't write from photos.");
-  if ((await writtenToday(site.slug)) >= DAILY_LIMIT) return refuse(429, `This site has written from ${DAILY_LIMIT} photos today. Try again tomorrow, or write it yourself.`);
+  const slotId = await reserveSlot(site, `${request.subject} for ${session.email}`);
+  if (!slotId) return refuse(429, `This site has written from ${DAILY_LIMIT} photos today. Try again tomorrow, or write it yourself.`);
   const written = await askClaude(request, apiKey).catch((error: unknown) => {
     console.error(`[photo-writer] ${site.slug} failed`, error);
     return null;
   });
-  if (!written) return refuse(502, "We couldn't write about this photo. Try a clearer photo, or write it yourself.");
-  await record(actorOf(site.slug), WROTE, { businessId: site.businessId, detail: `${request.subject} for ${session.email}` });
+  if (!written) {
+    await releaseSlot(slotId);
+    return refuse(502, "We couldn't write about this photo. Try a clearer photo, or write it yourself.");
+  }
   return { status: 200, body: { ok: true, text: request.textLimit ? clip(written.text, request.textLimit) : "", alt: clip(written.alt, request.altLimit) } };
 }
