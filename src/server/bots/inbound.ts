@@ -1,12 +1,12 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ABOUT_LIMIT, INBOUND_KINDS, INBOUND_STATUSES, SORTED_KINDS, type InboundKind } from "@/lib/inbound";
 import { unwrapLinks, withoutSubjectLine } from "@/lib/emailLinks";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { inboundRequests, type BotKey, type InboundRequest } from "../db/schema";
-import { inboundById, openOfKinds, pastRequests, replyToRequest, requestLink, tellFoundersAbout } from "../inbound/requests";
+import { claimOpenRequest, inboundById, InboundError, openOfKinds, pastOfKinds, replyToRequest, withClaim, requestLink, tellFoundersAbout } from "../inbound/requests";
 import { BOT_READ_FRESH_MS, syncMailIfStale } from "../mail/sync";
 import { FlagBody, raiseFlag } from "./flags";
 import { actorOf, BotError } from "./http";
@@ -61,7 +61,7 @@ export async function listInbound(key: BotKey, query: z.infer<typeof InboundQuer
   mustBe(key, ["client_care", "overseer"]);
   await syncMailIfStale(BOT_READ_FRESH_MS);
   const kinds: InboundKind[] = query.kind ? [query.kind] : [...INBOUND_KINDS];
-  const rows = query.status === "open" ? await openOfKinds(kinds) : (await pastRequests()).filter((row) => row.status === query.status && kinds.includes(row.kind));
+  const rows = query.status === "open" ? await openOfKinds(kinds) : await pastOfKinds(query.status, kinds);
   const edited = await sitesEditedBy(rows.map((row) => row.email));
   return { inbound: rows.map((row) => inboundView(row, edited)) };
 }
@@ -98,22 +98,39 @@ async function flagFor(request: InboundRequest, body: z.infer<typeof SortBody>):
   return flag.id;
 }
 
+/** Takes the email in one statement, so two sorts of the same email cannot both go on to raise a flag. */
+async function claimForSort(request: InboundRequest, key: BotKey, body: z.infer<typeof SortBody>): Promise<InboundRequest> {
+  const details = { name: body.name, businessName: body.businessName, website: body.website, about: body.about };
+  const [sorted] = await (await db())
+    .update(inboundRequests)
+    .set({ ...details, kind: body.kind, status: STATUS_AFTER_SORT[body.kind], reason: body.reason, sortedBy: actorOf(key), sortedAt: new Date() })
+    .where(and(eq(inboundRequests.id, request.id), eq(inboundRequests.kind, "unsorted")))
+    .returning();
+  if (!sorted) throw new BotError(409, "This email was sorted a moment ago. A founder can move it from Today in the admin.");
+  return sorted;
+}
+
 /** POST /inbound/:id/sort: the bot says what an email is. Requests go to the founders; a founder email becomes a flag. */
 export async function sortInbound(key: BotKey, id: string, body: z.infer<typeof SortBody>) {
   mustBe(key, ["client_care"]);
   const request = await inboundById(id);
   if (!request) throw new BotError(404, "Nothing in the inbound list has that ID.");
   if (request.kind !== "unsorted") throw new BotError(409, `This email was already sorted as ${request.kind}. A founder can move it from Today in the admin.`);
-  const flagId = await flagFor(request, body);
-  const details = { name: body.name, businessName: body.businessName, website: body.website, about: body.about };
-  const [sorted] = await (await db())
-    .update(inboundRequests)
-    .set({ ...details, kind: body.kind, status: STATUS_AFTER_SORT[body.kind], reason: body.reason, sortedBy: actorOf(key), sortedAt: new Date(), flagId })
-    .where(eq(inboundRequests.id, id))
-    .returning();
+  const sorted = await claimForSort(request, key, body);
+  const flagId = await withClaim(request, () => flagFor(request, body));
+  if (flagId) await (await db()).update(inboundRequests).set({ flagId }).where(eq(inboundRequests.id, id));
   await record(actorOf(key), `sorted an email to hello@ as ${body.kind}`, { detail: `${request.email}: ${body.reason}` });
   if (body.kind === "request") await tellFoundersAbout(sorted);
   return { ok: true, kind: sorted.kind, status: sorted.status, flagId };
+}
+
+async function claimForReply(id: string, by: string) {
+  try {
+    await claimOpenRequest(id, { status: "answered", decidedBy: by }, { kind: "bot" });
+  } catch (error) {
+    if (error instanceof InboundError) throw new BotError(409, "Someone already answered this email.");
+    throw error;
+  }
 }
 
 /** POST /inbound/:id/reply: answers an email the bot sorted as one it can answer, from hello@defect.tech in its thread. */
@@ -124,7 +141,7 @@ export async function replyToInbound(key: BotKey, id: string, input: z.infer<typ
   if (request.kind !== "bot" || request.status !== "open") throw new BotError(409, "Only open emails you sorted as bot can be answered here. Requests and founder emails wait for a founder.");
   const { text: body } = unwrapLinks(withoutSubjectLine(input.body));
   checkBody(body);
-  await replyToRequest(request, body, actorOf(key));
-  await (await db()).update(inboundRequests).set({ status: "answered", decidedAt: new Date(), decidedBy: actorOf(key) }).where(eq(inboundRequests.id, id));
+  await claimForReply(id, actorOf(key));
+  await withClaim(request, () => replyToRequest(request, body, actorOf(key)));
   return { ok: true, to: request.email };
 }

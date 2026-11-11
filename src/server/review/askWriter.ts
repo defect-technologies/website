@@ -90,8 +90,10 @@ function usableAsks(asks: z.infer<typeof Output>["asks"], source: PreviewSource)
     .map((ask, index) => ({ ...ask, id: `ask-${index + 1}`, quote: ask.quote.slice(0, 80) }));
 }
 
+const ASK_TIMEOUT_MS = 3 * 60 * 1000;
+
 async function askClaude(text: string, apiKey: string) {
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, timeout: ASK_TIMEOUT_MS });
   const response = await client.beta.messages.create({
     model: MODEL,
     max_tokens: 8000,
