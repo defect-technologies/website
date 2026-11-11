@@ -11,6 +11,7 @@ import { saveLaunchedSite } from "../sites/clientSites";
 import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
+import { asClause } from "@/lib/emailTemplate";
 import { CriticNotesField } from "../review/criticNotes";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
@@ -131,6 +132,8 @@ export const DoneBody = z.object({
   criticVerdict: z.string().trim().max(200).optional(),
   /** Every note the critics wrote about this build; see lib/critics.ts. A runner without critics leaves it out. */
   criticNotes: CriticNotesField,
+  /** The sentence about the prospect's present site that the cold email uses. A runner that reports it here leaves the deploy step's own report out. */
+  problem: z.string().trim().max(400).optional(),
   tokens: z.number().int().min(0).optional(),
   minutes: z.number().min(0).optional(),
   apiEquivalentUsd: z.number().min(0).optional(),
@@ -161,6 +164,8 @@ function results(body: Done) {
     logTail: (body.logTail ?? "").slice(-LOG_TAIL_LIMIT),
   };
 }
+
+const emailProblemOf = (body: Done) => (body.problem ? { emailProblem: asClause(body.problem) } : {});
 
 /** The design critic's last word was "revise": the preview goes up, but a founder looks before the owner does. */
 const criticWantsRevision = (verdict: string | undefined) => /\brevise\b/i.test(verdict ?? "");
@@ -205,7 +210,7 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   const ownerHasOne = OWNER_HAS_SEEN.includes(lead.stage) && Boolean(lead.previewUrl) && lead.previewUrl !== body.previewUrl;
   const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
-  await updateBusiness(lead.id, { ...(ownerHasOne ? {} : { previewUrl: body.previewUrl }), previewBuiltAt: new Date(), ...ready });
+  await updateBusiness(lead.id, { ...(ownerHasOne ? {} : { previewUrl: body.previewUrl }), previewBuiltAt: new Date(), ...emailProblemOf(body), ...ready });
   await closeFlagsOn(lead.id, ["build", "preview-review"], "Closed itself: a new preview was built.", ACTOR);
   // A held preview already waits for a founder, so only the others are sampled for a spot check.
   if (ownerHasOne) await holdForOwner(lead, body.previewUrl);

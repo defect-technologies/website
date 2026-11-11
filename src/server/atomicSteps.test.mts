@@ -175,6 +175,52 @@ test("a launch whose records fail to save stays open, so the runner's retry can 
   assert.equal(after.vercelProjectId, "prj_1");
 });
 
+const insertPreviewJob = async (stage: string) => {
+  const { db } = await import("./db/client");
+  const { businesses, previewJobs } = await import("./db/schema");
+  const database = await db();
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const [lead] = await database.insert(businesses).values({ businessName: "Hold test", slug: `hold-${stamp}`, linkCode: `hold-${stamp}`, stage } as never).returning();
+  const [job] = await database.insert(previewJobs).values({ businessId: lead.id, kind: "preview", status: "running", requestedBy: "test" }).returning();
+  return { lead, job, database, businesses };
+};
+
+test("a revised preview reported through done is held for review and keeps its problem line", async () => {
+  const { reportDone } = await import("./runner/api");
+  const { flags } = await import("./db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { lead, job, database, businesses } = await insertPreviewJob("new");
+  await reportDone(job.id, { status: "done", previewUrl: "https://held.example.com", criticVerdict: "Revise: held for review: cosmetic findings left", problem: "Your site loads slowly." });
+  const [after] = await database.select().from(businesses).where(eq(businesses.id, lead.id));
+  assert.equal(after.stage, "new");
+  assert.equal(after.emailProblem, "your site loads slowly");
+  const raised = await database.select().from(flags).where(eq(flags.businessId, lead.id));
+  assert.ok(raised.some((flag) => flag.topic === "preview-review"));
+});
+
+test("a normal preview reported through done moves the lead on, and a done without a problem line works as before", async () => {
+  const { reportDone } = await import("./runner/api");
+  const { eq } = await import("drizzle-orm");
+  const { lead, job, database, businesses } = await insertPreviewJob("new");
+  await reportDone(job.id, { status: "done", previewUrl: "https://ready.example.com", criticVerdict: "Verdict: pass" });
+  const [after] = await database.select().from(businesses).where(eq(businesses.id, lead.id));
+  assert.equal(after.stage, "preview_built");
+  assert.equal(after.previewUrl, "https://ready.example.com");
+  assert.ok(!after.emailProblem);
+});
+
+test("a repeated done for a revised preview stays held and raises no second flag", async () => {
+  const { reportDone } = await import("./runner/api");
+  const { flags } = await import("./db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { lead, job, database } = await insertPreviewJob("new");
+  const report = { status: "done" as const, previewUrl: "https://twice.example.com", criticVerdict: "Revise: held for review: x", problem: "Your site is dated." };
+  await reportDone(job.id, report);
+  await assert.rejects(reportDone(job.id, report), /not claimed/);
+  const raised = await database.select().from(flags).where(eq(flags.businessId, lead.id));
+  assert.equal(raised.filter((flag) => flag.topic === "preview-review").length, 1);
+});
+
 test("the retry note after a failed build is the exact text the engine strips", async () => {
   const { RETRY_NOTE } = await import("./runner/api");
   assert.equal(RETRY_NOTE, "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.");
