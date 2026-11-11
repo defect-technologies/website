@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowSquareOut, CaretRight, EnvelopeSimple, InstagramLogo, Phone } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -217,6 +218,7 @@ function Pages({ filters, total }: { filters: ProspectFilters; total: number }) 
 }
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireFounder();
   const filters = readFilters(await searchParams);
   const [{ rows, total }, facets] = await Promise.all([searchProspects(filters), prospectFacets()]);
   const first = (filters.page - 1) * PROSPECTS_PER_PAGE + 1;

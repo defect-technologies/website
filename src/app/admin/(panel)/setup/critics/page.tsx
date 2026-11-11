@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { Check, FloppyDisk, Question, ShieldCheck, X } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { TextField } from "@/components/admin/fields";
@@ -69,6 +70,7 @@ function ColumnHeads() {
 
 /** What the founders have taught the pipeline: which kinds of critic note they agree with, and which the builder may apply alone. */
 export default async function CriticsPage() {
+  await requireFounder();
   const [settings, tallies] = await Promise.all([criticSettings(), kindTallies()]);
   return (
     <>

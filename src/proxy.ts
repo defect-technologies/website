@@ -6,9 +6,10 @@ type Area = { prefix: string; cookie: string; publicPaths: string[]; signIn: str
 const AREAS: Area[] = [{ prefix: "/admin", cookie: "defect_admin", publicPaths: ["/admin/sign-in"], signIn: "/admin/sign-in" }];
 
 /**
- * An early, cheap check: no session cookie, no page. The real check (a
- * verified token for an allowed founder) runs in requireFounder on every
- * page, action, and route.
+ * An early, cheap check: no session cookie, no page. It does not verify the
+ * cookie. The real check (a verified token for an allowed founder) is
+ * requireFounder, which each admin page, action, and route calls itself,
+ * because a layout does not run again on client navigation.
  */
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;

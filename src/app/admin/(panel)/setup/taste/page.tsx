@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { Archive, ArrowCounterClockwise, CaretRight, FloppyDisk, Plus } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { addTasteLessonAction, restoreTasteLessonAction, retireTasteLessonAction, updateTasteLessonAction } from "@/app/admin/(panel)/review/studioActions";
@@ -74,6 +75,7 @@ function Retired({ lessons }: { lessons: TasteLesson[] }) {
 
 /** The founders' standing rules of taste. Every preview build, and the outside reviewer, must follow each one. */
 export default async function TasteLessonsPage() {
+  await requireFounder();
   const [lessons, retired] = await Promise.all([activeTasteLessons(), retiredTasteLessons()]);
   return (
     <>

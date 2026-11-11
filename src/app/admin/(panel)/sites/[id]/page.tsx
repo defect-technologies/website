@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowLeft, ArrowSquareOut, ChatsCircle, Globe, Eye, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -207,6 +208,7 @@ async function slugRedirect(id: string) {
 }
 
 export default async function SitePage({ params, searchParams }: Params) {
+  await requireFounder();
   const { id } = await params;
   if (!isUuid(id)) await slugRedirect(id);
   const business = await businessById(id);

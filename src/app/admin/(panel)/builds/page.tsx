@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowCounterClockwise, HourglassMedium, Moon, Play, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import BuildHistory, { SiteLink } from "@/components/admin/BuildHistory";
@@ -123,6 +124,7 @@ function Paused({ until, now }: { until: Date; now: number }) {
 }
 
 export default async function BuildsPage({ searchParams }: { searchParams: Promise<{ page?: string; hide?: string }> }) {
+  await requireFounder();
   const { page, hide } = await searchParams;
   const [status, day, history] = await Promise.all([runnerStatus(), runnerDay(), buildHistory(pageFrom(page), hiddenOutcomes(hide))]);
 

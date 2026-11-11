@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import type { Metadata } from "next";
 import FilterBar from "@/components/admin/FilterBar";
 import IntegrationPanel from "@/components/admin/IntegrationPanel";
@@ -18,6 +19,7 @@ const one = (value: string | undefined, allowed?: [string, string][]) => {
 };
 
 export default async function PreviewsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireFounder();
   const search = await searchParams;
   const filters: PreviewFilters = { q: one(search.q), status: one(search.status, PREVIEW_STATUSES), days: one(search.days, BUILT_WITHIN) };
   const [previews, leads] = await Promise.all([

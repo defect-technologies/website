@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Conversation from "@/components/admin/Conversation";
@@ -53,6 +54,7 @@ async function openThread(threads: ThreadSummary[], asked?: string) {
 }
 
 export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ b?: string }> }) {
+  await requireFounder();
   const { b } = await searchParams;
   const threads = await threadSummaries();
   const { business, thread } = await openThread(threads, b);

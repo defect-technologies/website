@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { ButtonLink } from "@/components/Button";
@@ -10,6 +11,7 @@ export const metadata: Metadata = { title: "Review" };
 
 /** One preview at a time: point at what's wrong, say it, and send it all back to the builder in one go. */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
+  await requireFounder();
   const { id } = await searchParams;
   await queuePointingUpdates();
   const queue = await reviewQueue();

@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowsClockwise, CheckCircle, Clock, Prohibit, Warning } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -69,6 +70,7 @@ function BotCard({ bot, keys, instructions, children }: { bot: Bot; keys: BotKey
 }
 
 export default async function BotsPage() {
+  await requireFounder();
   const [allKeys, builder, statuses] = await Promise.all([listBotKeys(), runnerSettings(), Promise.all(SPEC_BOTS.map(instructionsStatus))]);
   const instructions = new Map<Bot, InstructionsStatus>(SPEC_BOTS.map((bot, index) => [bot, statuses[index]]));
   const keys = allKeys.filter((botKey) => !botKey.revokedAt);

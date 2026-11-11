@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowLeft, ArrowSquareOut, EnvelopeSimple, UserSwitch, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -70,6 +71,7 @@ function notices(site: ClientSiteRow, query: Query) {
 }
 
 export default async function SitePage({ params, searchParams }: Props) {
+  await requireFounder();
   const site = await clientSite((await params).slug);
   if (!site) notFound();
   const query = await searchParams;

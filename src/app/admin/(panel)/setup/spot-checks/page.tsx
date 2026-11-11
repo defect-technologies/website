@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import EmptyState from "@/components/admin/EmptyState";
@@ -80,6 +81,7 @@ function SettingsForm({ share }: { share: number }) {
 }
 
 export default async function SpotChecksPage() {
+  await requireFounder();
   const [reviewed, averages, settings] = await Promise.all([reviewedSpotChecks(), spotCheckAverages(), spotCheckSettings()]);
 
   return (
