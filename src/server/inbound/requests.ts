@@ -1,7 +1,7 @@
 import "server-only";
 import { createHmac } from "node:crypto";
 import { and, desc, eq, gte, inArray, ne, sql } from "drizzle-orm";
-import { INBOUND_PRICE_ARM, type InboundKind } from "@/lib/inbound";
+import { INBOUND_PRICE_ARM, type InboundKind, type InboundStatus } from "@/lib/inbound";
 import { replySubject } from "@/lib/emailLinks";
 import { record } from "../activity";
 import { db } from "../db/client";
@@ -111,6 +111,16 @@ export async function openOfKinds(kinds: InboundKind[]): Promise<InboundRequest[
     .limit(200);
 }
 
+/** Requests with this status, in these kinds, newest first; the filter runs in the database so old rows are not cut off. */
+export async function pastOfKinds(status: InboundStatus, kinds: InboundKind[], limit = 200): Promise<InboundRequest[]> {
+  return (await db())
+    .select()
+    .from(inboundRequests)
+    .where(and(eq(inboundRequests.status, status), inArray(inboundRequests.kind, kinds)))
+    .orderBy(desc(inboundRequests.at))
+    .limit(limit);
+}
+
 export async function pastRequests(limit = 200): Promise<InboundRequest[]> {
   return (await db()).select().from(inboundRequests).where(ne(inboundRequests.status, "open")).orderBy(desc(inboundRequests.at)).limit(limit);
 }
@@ -173,22 +183,57 @@ async function openRequest(id: string): Promise<InboundRequest> {
   return request;
 }
 
-async function finish(request: InboundRequest, fields: Partial<InboundRequest>) {
-  await (await db())
+type ClaimFields = Partial<InboundRequest> & { status: InboundStatus; decidedBy: string };
+
+/**
+ * Takes an open request in one statement: only the caller whose update finds it still open gets the row back,
+ * so two clicks or two bot calls can never both go on to send or create anything.
+ */
+export async function claimOpenRequest(id: string, fields: ClaimFields, only: Partial<Pick<InboundRequest, "kind">> = {}): Promise<InboundRequest> {
+  const [claimed] = await (await db())
     .update(inboundRequests)
     .set({ ...fields, decidedAt: new Date() })
-    .where(eq(inboundRequests.id, request.id));
-  if (request.flagId) await resolveFlag(request.flagId, "closed", "Dealt with in the admin.", fields.decidedBy ?? "");
+    .where(and(eq(inboundRequests.id, id), eq(inboundRequests.status, "open"), only.kind ? eq(inboundRequests.kind, only.kind) : undefined))
+    .returning();
+  if (!claimed) throw new InboundError("Someone already dealt with this one.");
+  return claimed;
+}
+
+/** Puts a claimed request back as it was, so a failed send or build can be tried again. */
+export async function releaseClaim(before: InboundRequest) {
+  const { status, decidedBy, decidedAt, kind, name, businessName, website, about, reason, sortedBy, sortedAt } = before;
+  await (await db()).update(inboundRequests).set({ status, decidedBy, decidedAt, kind, name, businessName, website, about, reason, sortedBy, sortedAt }).where(eq(inboundRequests.id, before.id));
+}
+
+/** Runs the work a claim guards; if it throws, the request goes back to open and the error carries on. */
+export async function withClaim<T>(before: InboundRequest, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    await releaseClaim(before).catch((releaseError) => console.error("[inbound] release claim", releaseError));
+    throw error;
+  }
+}
+
+async function resolveClaimedFlag(request: InboundRequest, by: string) {
+  if (request.flagId) await resolveFlag(request.flagId, "closed", "Dealt with in the admin.", by);
+}
+
+async function makeLeadWithPreview(request: InboundRequest, fields: AcceptFields, by: string) {
+  const found = (await leadMatcher())(fields);
+  const lead = found ? await adoptLead(found, fields) : await createLead(fields, request);
+  if (!lead.previewUrl) await requestPreview(lead, by);
+  return { found, lead };
 }
 
 /** Makes the business a lead (or finds the one we have) and queues its preview. */
 export async function acceptRequest(id: string, fields: AcceptFields, by: string): Promise<Business> {
   const request = await openRequest(id);
   if (!fields.website && !fields.about.trim()) throw new InboundError("Add their website, or what they told us about the business, so the builder has something to work from.");
-  const found = (await leadMatcher())(fields);
-  const lead = found ? await adoptLead(found, fields) : await createLead(fields, request);
-  if (!lead.previewUrl) await requestPreview(lead, by);
-  await finish(request, { ...fields, kind: "request", status: "accepted", businessId: lead.id, decidedBy: by });
+  await claimOpenRequest(id, { ...fields, kind: "request", status: "accepted", decidedBy: by });
+  const { found, lead } = await withClaim(request, () => makeLeadWithPreview(request, fields, by));
+  await (await db()).update(inboundRequests).set({ businessId: lead.id }).where(eq(inboundRequests.id, id));
+  await resolveClaimedFlag(request, by);
   await record(by, "accepted a website request", { businessId: lead.id, detail: found ? "matched a lead we already had" : "" });
   return lead;
 }
@@ -220,16 +265,18 @@ export async function replyToRequest(request: InboundRequest, body: string, by: 
 
 export async function declineRequest(id: string, reply: string, by: string) {
   const request = await openRequest(id);
-  if (reply) await replyToRequest(request, reply, by);
-  await finish(request, { status: "declined", decidedBy: by });
+  await claimOpenRequest(id, { status: "declined", decidedBy: by });
+  if (reply) await withClaim(request, () => replyToRequest(request, reply, by));
+  await resolveClaimedFlag(request, by);
   await record(by, "turned down a website request", { detail: request.businessName || request.email });
 }
 
 /** A founder answered an email that needed them, or decided it needs no answer. */
 export async function closeRequest(id: string, reply: string, by: string) {
   const request = await openRequest(id);
-  if (reply) await replyToRequest(request, reply, by);
-  await finish(request, { status: reply ? "answered" : "closed", decidedBy: by });
+  await claimOpenRequest(id, { status: reply ? "answered" : "closed", decidedBy: by });
+  if (reply) await withClaim(request, () => replyToRequest(request, reply, by));
+  await resolveClaimedFlag(request, by);
 }
 
 /** A founder sorts an email by hand, or moves one the bot sorted wrongly. Only requests reopen. */
