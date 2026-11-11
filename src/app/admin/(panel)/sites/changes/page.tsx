@@ -24,14 +24,20 @@ const one = (value: string | undefined, allowed?: [string, string][]) => {
 };
 
 /** Client sites by slug, with the business name and every address their owner or editors might sign in as. */
-async function siteDirectory(sites: ClientSiteRow[]): Promise<Map<string, SiteInfo>> {
-  const leads = await (await db())
+async function allLeads() {
+  return (await db())
     .select({ id: businesses.id, slug: businesses.slug, name: businesses.businessName, url: businesses.siteUrl, ownerEmail: businesses.ownerEmail, email: businesses.email })
     .from(businesses);
-  const editors = await editorEmailsBySite();
+}
+
+type Lead = Awaited<ReturnType<typeof allLeads>>[number];
+
+function siteDirectory(sites: ClientSiteRow[], leads: Lead[], editors: Map<string, string[]>): Map<string, SiteInfo> {
+  const leadById = new Map(leads.map((lead) => [lead.id, lead]));
+  const leadBySlug = new Map(leads.map((lead) => [lead.slug, lead]));
   const directory = new Map<string, SiteInfo>();
   for (const site of sites) {
-    const lead = leads.find((candidate) => candidate.id === site.businessId) ?? leads.find((candidate) => candidate.slug === site.slug);
+    const lead = (site.businessId ? leadById.get(site.businessId) : undefined) ?? leadBySlug.get(site.slug);
     const clientEmails = [site.ownerEmail, lead?.ownerEmail ?? "", lead?.email ?? "", ...(editors.get(site.id) ?? [])];
     directory.set(site.slug, { name: lead?.name ?? site.slug, url: site.url, ownerEmails: clientEmails.map((email) => email.toLowerCase()).filter(Boolean) });
   }
@@ -45,8 +51,8 @@ export default async function SiteChangesPage({ searchParams }: { searchParams: 
   await requireFounder();
   const search = await searchParams;
   const filters: ChangeFilters = { q: one(search.q), who: one(search.who, CHANGE_AUTHORS), days: one(search.days, BUILT_WITHIN) };
-  const [sites, changes] = await Promise.all([allClientSites(), recentSiteChanges(Number(filters.days) || null)]);
-  const directory = await siteDirectory(sites);
+  const [sites, changes, leads, editors] = await Promise.all([allClientSites(), recentSiteChanges(Number(filters.days) || null), allLeads(), editorEmailsBySite()]);
+  const directory = siteDirectory(sites, leads, editors);
   const filtered = Boolean(filters.q || filters.who || filters.days);
 
   return (
