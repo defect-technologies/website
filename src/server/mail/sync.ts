@@ -95,7 +95,8 @@ async function storeUnmatched(mailbox: Mailbox, email: IncomingEmail, everyone: 
 async function syncInbox(mailbox: Mailbox, { replying, everyone }: InboxIndexes): Promise<number> {
   const since = mailbox.lastSyncedAt ?? new Date(Date.now() - FIRST_SYNC_WINDOW);
   const startedAt = new Date();
-  const incoming = (await mailSince(mailbox, "inbox", since)).filter((email) => email.from !== mailbox.email);
+  const batch = await mailSince(mailbox, "inbox", since);
+  const incoming = batch.emails.filter((email) => email.from !== mailbox.email);
   let stored = 0;
   for (const email of incoming) {
     const business = matchBusiness(email.threadId, email.from, replying);
@@ -104,7 +105,7 @@ async function syncInbox(mailbox: Mailbox, { replying, everyone }: InboxIndexes)
     await noteReply(business, email);
     stored += 1;
   }
-  await (await db()).update(mailboxes).set({ lastSyncedAt: startedAt, lastError: "" }).where(eq(mailboxes.id, mailbox.id));
+  await (await db()).update(mailboxes).set({ lastSyncedAt: batch.resumeFrom ?? startedAt, lastError: "" }).where(eq(mailboxes.id, mailbox.id));
   return stored;
 }
 
@@ -118,13 +119,14 @@ async function syncSent(mailbox: Mailbox, index: Index): Promise<number> {
   const since = mailbox.lastSentSyncedAt ?? new Date(Date.now() - FIRST_SYNC_WINDOW);
   const startedAt = new Date();
   let stored = 0;
-  for (const email of await mailSince(mailbox, "sent", since)) {
+  const batch = await mailSince(mailbox, "sent", since);
+  for (const email of batch.emails) {
     const business = matchBusiness(email.threadId, email.to, index);
     if (!business || !(await store(mailbox, email, business, "out"))) continue;
     await noteSent(business, email);
     stored += 1;
   }
-  await (await db()).update(mailboxes).set({ lastSentSyncedAt: startedAt }).where(eq(mailboxes.id, mailbox.id));
+  await (await db()).update(mailboxes).set({ lastSentSyncedAt: batch.resumeFrom ?? startedAt }).where(eq(mailboxes.id, mailbox.id));
   return stored;
 }
 
@@ -178,7 +180,16 @@ export const BOT_READ_FRESH_MS = 2 * 60 * 1000;
  * The bots run more often than the half-hourly sync, so a bot read first pulls in new mail when any
  * inbox was last read more than freshForMs ago. An interested prospect hears back on the next run.
  */
+let syncBeforeBotRead: Promise<void> | null = null;
+
 export async function syncMailIfStale(freshForMs: number) {
   const stale = (await connectedMailboxes()).some((mailbox) => !mailbox.lastSyncedAt || Date.now() - mailbox.lastSyncedAt.getTime() >= freshForMs);
-  if (stale) await syncMail().catch((error) => console.error("[mail] sync before a bot read", error));
+  if (!stale) return;
+  syncBeforeBotRead ??= syncMail()
+    .then(() => undefined)
+    .catch((error) => console.error("[mail] sync before a bot read", error))
+    .finally(() => {
+      syncBeforeBotRead = null;
+    });
+  await syncBeforeBotRead;
 }

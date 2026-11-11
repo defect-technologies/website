@@ -37,13 +37,43 @@ async function accessToken(mailbox: Mailbox): Promise<string> {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 20_000;
+const READ_RETRY_DELAYS_MS = [500, 1_500];
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+/** Gmail never answered, so a send that was in flight may or may not have gone out. */
+export class GmailUnreachable extends Error {}
+
+/** The send request got no answer. Gmail may have accepted the email, so it must not be sent again. */
+export class SendOutcomeUnknown extends Error {}
+
+const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 async function gmail<T>(mailbox: Mailbox, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${await accessToken(mailbox)}`, "Content-Type": "application/json", ...init.headers },
-  });
-  if (!response.ok) throw new Error(`Gmail ${path.split("?")[0]} answered ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  return (await response.json()) as T;
+  const headers = { Authorization: `Bearer ${await accessToken(mailbox)}`, "Content-Type": "application/json", ...init.headers };
+  const retryDelays = init.method && init.method !== "GET" ? [] : READ_RETRY_DELAYS_MS;
+  for (let attempt = 0; ; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetch(`${API}${path}`, { ...init, headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    } catch (error) {
+      throw new GmailUnreachable(`Gmail ${path.split("?")[0]} did not answer: ${(error as Error).message}`);
+    }
+    if (response.ok) return readBody<T>(response, path);
+    if (attempt < retryDelays.length && RETRYABLE_STATUSES.has(response.status)) {
+      await pause(retryDelays[attempt]);
+      continue;
+    }
+    throw new Error(`Gmail ${path.split("?")[0]} answered ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  }
+}
+
+async function readBody<T>(response: Response, path: string): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch (error) {
+    throw new GmailUnreachable(`Gmail ${path.split("?")[0]} answered but the answer was cut off: ${(error as Error).message}`);
+  }
 }
 
 type Header = { name: string; value: string };
@@ -74,14 +104,31 @@ function textOf(payload: Part): string {
   return html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ");
 }
 
-export async function sendEmail(mailbox: Mailbox, email: OutgoingEmail): Promise<SentEmail> {
+async function headerMessageIdOf(mailbox: Mailbox, gmailId: string): Promise<string> {
+  try {
+    const metadata = await gmail<GmailMessage>(mailbox, `/messages/${gmailId}?format=metadata&metadataHeaders=Message-ID`);
+    return header(metadata.payload, "Message-ID");
+  } catch {
+    return "";
+  }
+}
+
+async function postToGmail(mailbox: Mailbox, email: OutgoingEmail) {
   const raw = buildRawMessage(email);
-  const sent = await gmail<{ id: string; threadId: string }>(mailbox, "/messages/send", {
-    method: "POST",
-    body: JSON.stringify(email.threadId ? { raw, threadId: email.threadId } : { raw }),
-  });
-  const metadata = await gmail<GmailMessage>(mailbox, `/messages/${sent.id}?format=metadata&metadataHeaders=Message-ID`);
-  return { gmailId: sent.id, threadId: sent.threadId, headerMessageId: header(metadata.payload, "Message-ID") };
+  try {
+    return await gmail<{ id: string; threadId: string }>(mailbox, "/messages/send", {
+      method: "POST",
+      body: JSON.stringify(email.threadId ? { raw, threadId: email.threadId } : { raw }),
+    });
+  } catch (error) {
+    if (error instanceof GmailUnreachable) throw new SendOutcomeUnknown(`${error.message} The email may have gone out.`);
+    throw error;
+  }
+}
+
+export async function sendEmail(mailbox: Mailbox, email: OutgoingEmail): Promise<SentEmail> {
+  const sent = await postToGmail(mailbox, email);
+  return { gmailId: sent.id, threadId: sent.threadId, headerMessageId: await headerMessageIdOf(mailbox, sent.id) };
 }
 
 function toIncoming(message: GmailMessage): IncomingEmail {
@@ -99,12 +146,52 @@ function toIncoming(message: GmailMessage): IncomingEmail {
 
 export type Folder = "inbox" | "sent";
 
-/** Mail in one folder dated after `since`, oldest first. */
-export async function mailSince(mailbox: Mailbox, folder: Folder, since: Date): Promise<IncomingEmail[]> {
+const LIST_PAGE_SIZE = 100;
+const MAX_LIST_PAGES = 50;
+const MESSAGES_READ_PER_RUN = 200;
+const READ_CONCURRENCY = 5;
+
+/** Every message ID in the query, newest first, page by page. */
+async function listMessageIds(mailbox: Mailbox, query: string): Promise<string[]> {
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+    const tokenPart = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+    const list = await gmail<{ messages?: { id: string }[]; nextPageToken?: string }>(mailbox, `/messages?q=${query}&maxResults=${LIST_PAGE_SIZE}${tokenPart}`);
+    ids.push(...(list.messages ?? []).map((message) => message.id));
+    pageToken = list.nextPageToken;
+    if (!pageToken) break;
+  }
+  return ids;
+}
+
+async function mapWithLimit<T, R>(items: T[], limit: number, work: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await work(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+export type MailBatch = {
+  emails: IncomingEmail[];
+  /** Set when older mail is still unread: the next run starts here instead of at the time of this run. */
+  resumeFrom: Date | null;
+};
+
+/** Mail in one folder dated after `since`, oldest first, at most one run's worth. */
+export async function mailSince(mailbox: Mailbox, folder: Folder, since: Date): Promise<MailBatch> {
   const query = encodeURIComponent(`in:${folder} after:${Math.floor(since.getTime() / 1000)}`);
-  const list = await gmail<{ messages?: { id: string }[] }>(mailbox, `/messages?q=${query}&maxResults=100`);
-  const full = await Promise.all(
-    (list.messages ?? []).map((m) => gmail<GmailMessage>(mailbox, `/messages/${m.id}?format=full`)),
-  );
-  return full.map(toIncoming).sort((a, b) => a.at.getTime() - b.at.getTime());
+  const oldestFirst = (await listMessageIds(mailbox, query)).reverse();
+  const batch = oldestFirst.slice(0, MESSAGES_READ_PER_RUN);
+  const full = await mapWithLimit(batch, READ_CONCURRENCY, (id) => gmail<GmailMessage>(mailbox, `/messages/${id}?format=full`));
+  const emails = full.map(toIncoming).sort((a, b) => a.at.getTime() - b.at.getTime());
+  const newest = emails[emails.length - 1];
+  const resumeFrom = oldestFirst.length > batch.length && newest ? new Date(newest.at.getTime() - 1000) : null;
+  return { emails, resumeFrom };
 }
