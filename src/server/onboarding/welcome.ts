@@ -1,4 +1,5 @@
 import "server-only";
+import { and, eq } from "drizzle-orm";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { messages, type Business } from "../db/schema";
@@ -37,8 +38,21 @@ function welcomeBody(business: Business) {
   ].join("\n");
 }
 
-/** Sent once, right after Stripe reports the checkout. It always comes from the studio inbox, where the Onboarding bot follows up. */
+async function alreadyWelcomed(business: Business) {
+  const [sent] = await (await db())
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.businessId, business.id), eq(messages.kind, "welcome")))
+    .limit(1);
+  return Boolean(sent);
+}
+
+/**
+ * Sent once, right after Stripe reports the checkout, and never again for a business that has the email on record.
+ * It always comes from the studio inbox, where the Onboarding bot follows up. A failure raises a flag, and the next sync tries again.
+ */
 export async function sendWelcome(business: Business, to: string) {
+  if (await alreadyWelcomed(business)) return;
   const body = welcomeBody(business);
   try {
     const delivery = await deliver(
@@ -61,6 +75,6 @@ export async function sendWelcome(business: Business, to: string) {
     });
     await record("stripe sync", "sent welcome email", { businessId: business.id, detail: to });
   } catch (error) {
-    await record("stripe sync", "welcome email failed", { businessId: business.id, detail: (error as Error).message });
+    await record("stripe sync", "welcome email failed", { businessId: business.id, detail: (error as Error).message, priority: "urgent" });
   }
 }
