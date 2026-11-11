@@ -1,14 +1,15 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { REGULAR_MONTHLY_PRICE } from "@/lib/emailTemplate";
 import { record } from "../activity";
 import { db } from "../db/client";
-import { businesses, settings, type Business } from "../db/schema";
+import { businesses, clientSites, messages, settings, type Business } from "../db/schema";
 import { env } from "../env";
 import { advanceStage, businessById } from "../leads/businesses";
 import { openPortal } from "../sites/clientSites";
 import { sendWelcome } from "../onboarding/welcome";
-import { getJson, integration } from "./result";
+import { stagesBefore } from "@/lib/stages";
+import { getJson, integration, OUTSIDE_CALL_TIMEOUT_MS } from "./result";
 
 const API = "https://api.stripe.com/v1";
 const SYNC_KEY = "sync.stripe";
@@ -62,8 +63,39 @@ async function businessForSession(session: CheckoutSession, all: Business[]): Pr
 }
 
 /**
+ * Stripe lists checkouts by when they were opened, not when they were paid, so a sync looks back this far
+ * past its last run to find a checkout that was opened early and paid later.
+ */
+const CHECKOUT_LOOKBACK_SECONDS = 25 * 60 * 60;
+const CHECKOUT_PAGE_SIZE = 100;
+/** A paid client whose portal, stage or welcome email is missing is only fixed this long after paying, so a client who paid before the welcome email existed is never mailed. */
+const RECOVERY_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+/** A payment being recorded right now is left to the request that is recording it. */
+const RECOVERY_SETTLE_MS = 10 * 60 * 1000;
+
+/**
+ * What follows a payment: the client's portal, the paid stage and the welcome email. Each step can be run again
+ * and does nothing when it already happened. A step that fails is flagged and the others still run.
+ */
+async function finishPaidFollowUps(business: Business, ownerEmail: string) {
+  const steps: [string, () => Promise<unknown>][] = [
+    ["portal", () => openPortal(business, ownerEmail, "stripe sync")],
+    ["stage", () => advanceStage(business.id, "paid")],
+    ["welcome email", () => sendWelcome(business, ownerEmail || business.email)],
+  ];
+  for (const [name, run] of steps) {
+    try {
+      await run();
+    } catch (error) {
+      await record("stripe sync", `paid follow-up failed: ${name}`, { businessId: business.id, detail: (error as Error).message, priority: "urgent" });
+    }
+  }
+}
+
+/**
  * Records the payment once. The welcome page's return and the half-hourly sync can both see the
- * same checkout, so only the one that sets paidAt goes on to send the welcome email.
+ * same checkout, so only the one that sets paidAt records it. The follow-ups that a failure leaves
+ * undone are finished by the next sync.
  */
 async function markPaid(session: CheckoutSession, business: Business) {
   const payerEmail = (session.customer_details?.email ?? "").toLowerCase();
@@ -81,10 +113,38 @@ async function markPaid(session: CheckoutSession, business: Business) {
     .where(and(eq(businesses.id, business.id), isNull(businesses.paidAt)))
     .returning({ id: businesses.id });
   if (claimed.length === 0) return;
-  await openPortal(business, payerEmail || business.ownerEmail, "stripe sync");
-  await advanceStage(business.id, "paid");
   await record("stripe sync", "paid", { businessId: business.id, detail: planFor(session.amount_total) });
-  await sendWelcome(business, payerEmail || business.ownerEmail || business.email);
+  await finishPaidFollowUps(business, payerEmail || business.ownerEmail);
+}
+
+async function recentlyPaidClients(): Promise<Business[]> {
+  return (await db())
+    .select()
+    .from(businesses)
+    .where(and(isNotNull(businesses.paidAt), gte(businesses.paidAt, new Date(Date.now() - RECOVERY_WINDOW_MS)), lt(businesses.updatedAt, new Date(Date.now() - RECOVERY_SETTLE_MS))));
+}
+
+async function idsWith(table: typeof clientSites | typeof messages, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await (await db())
+    .select({ id: table.businessId })
+    .from(table)
+    .where(and(inArray(table.businessId, ids), table === messages ? eq(messages.kind, "welcome") : undefined));
+  return new Set(rows.map((row) => row.id).filter((id): id is string => Boolean(id)));
+}
+
+/** Finishes the follow-ups of clients who paid recently and still lack their portal, the paid stage or the welcome email. */
+async function recoverPaidFollowUps() {
+  const paid = await recentlyPaidClients();
+  const ids = paid.map((business) => business.id);
+  const [withPortal, withWelcome] = await Promise.all([idsWith(clientSites, ids), idsWith(messages, ids)]);
+  const behind = stagesBefore("paid");
+  const unfinished = paid.filter((business) => {
+    const needsPortal = Boolean(business.ownerEmail && business.previewUrl) && !withPortal.has(business.id);
+    return needsPortal || behind.includes(business.stage) || !withWelcome.has(business.id);
+  });
+  for (const business of unfinished) await finishPaidFollowUps(business, business.ownerEmail);
+  return unfinished.length;
 }
 
 async function lastSync(): Promise<number> {
@@ -99,22 +159,47 @@ async function saveSync(seconds: number) {
     .onConflictDoUpdate({ target: settings.key, set: { value: seconds, updatedAt: new Date() } });
 }
 
+async function completedCheckoutsSince(since: number): Promise<CheckoutSession[]> {
+  const sessions: CheckoutSession[] = [];
+  let startingAfter = "";
+  for (;;) {
+    const cursor = startingAfter ? `&starting_after=${startingAfter}` : "";
+    const page = await stripe<{ data: CheckoutSession[]; has_more: boolean }>(
+      `/checkout/sessions?status=complete&limit=${CHECKOUT_PAGE_SIZE}&created[gte]=${since - CHECKOUT_LOOKBACK_SECONDS}${cursor}`,
+    );
+    sessions.push(...page.data);
+    const last = page.data.at(-1);
+    if (!page.has_more || !last) return sessions;
+    startingAfter = last.id;
+  }
+}
+
+/** Records one checkout. A failure is noted and does not stop the checkouts after it. */
+async function recordCheckout(session: CheckoutSession, all: () => Promise<Business[]>): Promise<boolean> {
+  try {
+    const business = await businessForSession(session, await all());
+    if (!business || business.paidAt) return false;
+    await markPaid(session, business);
+    return true;
+  } catch (error) {
+    await record("stripe sync", "checkout not recorded", { detail: `${session.id}: ${(error as Error).message}`, priority: "urgent" });
+    return false;
+  }
+}
+
 /** Completed checkouts since the last run. The preview's checkout link carries the lead's ID as client_reference_id. */
 export function syncPayments() {
   return integration({ STRIPE_API_KEY: env.stripeKey() }, async () => {
     const since = await lastSync();
     const startedAt = Math.floor(Date.now() / 1000);
-    const { data } = await stripe<{ data: CheckoutSession[] }>(`/checkout/sessions?status=complete&limit=100&created[gte]=${since}`);
-    const all = await (await db()).select().from(businesses);
+    const data = await completedCheckoutsSince(since);
+    let everyone: Promise<Business[]> | undefined;
+    const all = async () => (everyone ??= db().then((database) => database.select().from(businesses)));
     let matched = 0;
-    for (const session of data) {
-      const business = await businessForSession(session, all);
-      if (!business || business.paidAt) continue;
-      await markPaid(session, business);
-      matched += 1;
-    }
+    for (const session of data) if (await recordCheckout(session, all)) matched += 1;
     await saveSync(startedAt);
-    return { checkouts: data.length, newClients: matched };
+    const recovered = await recoverPaidFollowUps();
+    return { checkouts: data.length, newClients: matched, recovered };
   });
 }
 
@@ -173,6 +258,7 @@ async function stripePost<T>(path: string, form: Record<string, string>): Promis
     headers: { Authorization: `Bearer ${env.stripeKey()}`, "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(form),
     cache: "no-store",
+    signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS),
   });
   return { ok: response.ok, body: (await response.json()) as T & { error?: { message?: string } } };
 }
