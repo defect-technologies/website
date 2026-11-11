@@ -89,10 +89,12 @@ describe("the notes a build reports", () => {
     assert.deepEqual(Object.keys(newer.success ? (newer.data.criticNotes?.[0] ?? {}) : {}).sort(), Object.keys(criticNote("a")).sort());
   });
 
-  it("allow at most 80", () => {
+  it("keep the first 80 and never fail a report for sending more", () => {
     const eighty = Array.from({ length: 80 }, (_, index) => criticNote(`n${index}`));
-    assert.equal(CriticNotesField.safeParse(eighty).success, true);
-    assert.equal(CriticNotesField.safeParse([...eighty, criticNote("one-more")]).success, false);
+    assert.equal(CriticNotesField.parse(eighty)?.length, 80);
+    const kept = CriticNotesField.parse([...eighty, criticNote("one-more")]);
+    assert.equal(kept?.length, 80);
+    assert.equal(kept?.some((note) => note.id === "one-more"), false);
   });
 
   it("leave out a note that is invalid, too long, or repeats an id, and keep the rest", () => {

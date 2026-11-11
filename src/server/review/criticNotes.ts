@@ -16,13 +16,13 @@ const CriticNoteShape = z.object({
 });
 
 /**
- * A note this version cannot read is left out instead of failing the whole report: a runner that already knows a newer
- * kind must still be able to finish its build. Only the count is a hard limit.
+ * A note this version cannot read, and any note past the limit, is left out instead of failing the whole report: a
+ * finished build must always be able to report, whatever its runner sends.
  */
 function readableNotes(items: unknown[]): CriticNote[] {
   const seen = new Set<string>();
   const notes: CriticNote[] = [];
-  for (const item of items) {
+  for (const item of items.slice(0, MAX_CRITIC_NOTES)) {
     const parsed = CriticNoteShape.safeParse(item);
     if (!parsed.success || seen.has(parsed.data.id)) continue;
     seen.add(parsed.data.id);
@@ -31,5 +31,5 @@ function readableNotes(items: unknown[]): CriticNote[] {
   return notes;
 }
 
-/** The optional criticNotes of a done report: at most MAX_CRITIC_NOTES, each one valid, unknown fields dropped. */
-export const CriticNotesField = z.array(z.unknown()).max(MAX_CRITIC_NOTES).transform(readableNotes).optional();
+/** The optional criticNotes of a done report: the first MAX_CRITIC_NOTES, each one valid, unknown fields dropped. */
+export const CriticNotesField = z.array(z.unknown()).transform(readableNotes).optional();
