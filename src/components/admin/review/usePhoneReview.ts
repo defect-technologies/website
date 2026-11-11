@@ -51,7 +51,7 @@ export function usePhoneReview({ draft, setDraft, dictation, add, device, path, 
     setSplitting(true);
     const notes = await splitSpokenNotesAction(spoken);
     setSplitting(false);
-    for (const note of notes) add(noteFromDraft({ ...draft, text: note.text, scope: draft.scope === "every" ? "every" : note.scope }, device, path));
+    for (const note of notes) add(noteFromDraft({ ...draft, text: note.text, scope: draft.scope === "every" ? "every" : note.scope }, device, path, { kind: note.kind, target: note.target }));
     setDraft({ ...EMPTY_DRAFT });
     if (!notes.length) return;
     if (ask.open) ask.answered();

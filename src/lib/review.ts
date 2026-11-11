@@ -1,3 +1,5 @@
+import { type CriticKind, type CriticTarget, TARGET_SENTENCE } from "./critics";
+
 export const REVIEW_VERDICTS = ["approved", "changes"] as const;
 export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
 
@@ -5,10 +7,10 @@ export const NOTE_SCOPES = ["site", "every"] as const;
 /** "site" changes only this preview; "every" also becomes a taste lesson for every build after it. */
 export type NoteScope = (typeof NOTE_SCOPES)[number];
 
-export const DEVICES = ["desktop", "phone"] as const;
+export const DEVICES = ["desktop", "tablet", "phone"] as const;
 export type Device = (typeof DEVICES)[number];
 
-export const DEVICE_WIDTH: Record<Device, number> = { desktop: 1440, phone: 390 };
+export const DEVICE_WIDTH: Record<Device, number> = { desktop: 1440, tablet: 768, phone: 390 };
 
 /** The element a note points at, as the preview's review bridge reported it. */
 export type NoteAnchor = {
@@ -26,6 +28,11 @@ export type ReviewNote = {
   /** The page the frame was on when the note was written. */
   path: string;
   anchor: NoteAnchor | null;
+  /** What the note is about, and where its repair belongs. Notes saved before critics have neither. */
+  kind?: CriticKind;
+  target?: CriticTarget;
+  /** The critic note this one was accepted from. A note without it is one the founder wrote himself. */
+  proposalId?: string;
 };
 
 export const MAX_NOTE_TEXT = 2000;
@@ -52,7 +59,8 @@ function whereLine(note: ReviewNote): string {
 export function compileReviewNote(notes: ReviewNote[], previewUrl: string): string {
   const lines = notes.map((note, index) => {
     const lesson = note.scope === "every" ? " This is also a standing taste lesson for every site (lead/taste.md)." : "";
-    return `${index + 1}. ${whereLine(note)}: ${note.text.trim()}${lesson}`;
+    const targetSentence = note.target ? ` ${TARGET_SENTENCE[note.target]}` : "";
+    return `${index + 1}. ${whereLine(note)}: ${note.text.trim()}${targetSentence}${lesson}`;
   });
   const head = `A founder reviewed the preview at ${previewUrl} and wants these changes. Make every one of them; where a note names an element, change that element and anything else on the site with the same problem.`;
   return [head, "", ...lines].join("\n").slice(0, MAX_COMPILED_NOTE);

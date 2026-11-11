@@ -19,7 +19,8 @@ function readCached(businessId: string, previewUrl: string): ReviewAsk[] | null 
 }
 
 function cache(businessId: string, previewUrl: string, asks: ReviewAsk[]) {
-  if (!previewUrl || !asks.length) return;
+  // Proposals leave the list as they are answered, so they are read fresh every time.
+  if (!previewUrl || !asks.length || asks.some((ask) => ask.proposal)) return;
   try {
     window.localStorage.setItem(keyOf(businessId, previewUrl), JSON.stringify(asks));
   } catch {

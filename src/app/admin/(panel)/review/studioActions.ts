@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { CRITIC_KINDS, CRITIC_TARGETS } from "@/lib/critics";
 import { compileReviewNote, DEVICES, MAX_NOTE_TEXT, MAX_NOTES, NOTE_SCOPES, POINTING_NOTE } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
@@ -11,7 +12,9 @@ import { isDevelopment } from "@/server/env";
 import { previewReviews, type Business } from "@/server/db/schema";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import type { ReviewAsk } from "@/lib/reviewAsks";
-import { writeReviewAsks } from "@/server/review/askWriter";
+import { reviewQuestionsFor } from "@/server/review/askWriter";
+import { recordProposalAnswer } from "@/server/review/criticProposals";
+import { withClasses } from "@/server/review/noteClassifier";
 import { splitSpokenNotes, type SplitNote } from "@/server/review/noteWriter";
 import { addTasteLessons, restoreTasteLesson, retireTasteLesson, updateTasteLesson } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
@@ -32,6 +35,9 @@ const Note = z.object({
   device: z.enum(DEVICES),
   path: z.string().max(500),
   anchor: Anchor.nullable(),
+  kind: z.enum(CRITIC_KINDS).optional(),
+  target: z.enum(CRITIC_TARGETS).optional(),
+  proposalId: z.string().max(100).optional(),
 });
 
 const Review = z.object({
@@ -58,10 +64,11 @@ export async function sendReviewAction(input: z.input<typeof Review>): Promise<R
   if (checked.error !== null) return { ok: false, message: checked.error };
   const { founder, lead, review } = checked;
   if (!review.notes.length) return { ok: false, message: "Add a note first, or approve the preview." };
-  const { job, created } = await requestPreview(lead, founder.email, compileReviewNote(review.notes, review.previewUrl));
+  const notes = await withClasses(review.notes);
+  const { job, created } = await requestPreview(lead, founder.email, compileReviewNote(notes, review.previewUrl));
   if (!created) return { ok: false, message: "This preview is already rebuilding. Your notes are still here." };
   await addTasteLessons(review.notes.filter((note) => note.scope === "every").map((note) => note.text), founder.email, lead.id);
-  await (await db()).insert(previewReviews).values({ businessId: lead.id, previewUrl: review.previewUrl, verdict: "changes", notes: review.notes, jobId: job.id, reviewedBy: founder.email });
+  await (await db()).insert(previewReviews).values({ businessId: lead.id, previewUrl: review.previewUrl, verdict: "changes", notes, jobId: job.id, reviewedBy: founder.email });
   revalidatePath("/admin", "layout");
   return { ok: true, message: `Sent ${review.notes.length} ${review.notes.length === 1 ? "note" : "notes"} to the builder.` };
 }
@@ -96,7 +103,16 @@ export async function reviewAsksAction(businessId: string): Promise<{ previewUrl
   const id = z.uuid().safeParse(businessId);
   const lead = id.success ? await businessById(id.data) : null;
   if (!lead?.previewUrl) return { previewUrl: "", asks: [] };
-  return { previewUrl: lead.previewUrl, asks: await writeReviewAsks(lead.businessName, lead.previewUrl) };
+  return { previewUrl: lead.previewUrl, asks: await reviewQuestionsFor(lead.id, lead.businessName, lead.previewUrl) };
+}
+
+const ProposalAnswer = z.object({ jobId: z.uuid(), proposalId: z.string().min(1).max(100), accepted: z.boolean() });
+
+/** Keeps the founder's yes or no to one critic proposal. The note itself is added in the browser. */
+export async function answerProposalAction(input: z.input<typeof ProposalAnswer>): Promise<boolean> {
+  const founder = await requireFounder();
+  const parsed = ProposalAnswer.safeParse(input);
+  return parsed.success ? recordProposalAnswer({ ...parsed.data, answeredBy: founder.email }) : false;
 }
 
 /** Queues the kit-only rebuild for a preview built before pointing worked. */

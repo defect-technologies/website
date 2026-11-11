@@ -11,6 +11,7 @@ import { saveLaunchedSite } from "../sites/clientSites";
 import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
+import { CriticNotesField } from "../review/criticNotes";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
@@ -128,6 +129,8 @@ export const DoneBody = z.object({
   verifyPassed: z.boolean().optional(),
   worstCls: z.number().min(0).optional(),
   criticVerdict: z.string().trim().max(200).optional(),
+  /** Every note the critics wrote about this build; see lib/critics.ts. A runner without critics leaves it out. */
+  criticNotes: CriticNotesField,
   tokens: z.number().int().min(0).optional(),
   minutes: z.number().min(0).optional(),
   apiEquivalentUsd: z.number().min(0).optional(),
@@ -151,6 +154,7 @@ function results(body: Done) {
     verifyPassed: body.verifyPassed ?? null,
     worstCls: body.worstCls ?? null,
     criticVerdict: body.criticVerdict ?? "",
+    ...(body.criticNotes ? { criticNotes: body.criticNotes } : {}),
     tokens: body.tokens ?? null,
     minutes: body.minutes ?? null,
     apiEquivalentUsd: body.apiEquivalentUsd ?? null,
