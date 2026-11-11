@@ -34,9 +34,14 @@ function failure(error: unknown) {
   return NextResponse.json({ error: "Something went wrong on our side. Try again on the next run, and flag it if it keeps happening." }, { status: 500 });
 }
 
+/** Auditing never changes the answer: a failed insert after a finished action would make the bot repeat it. */
 async function logCall(request: Request, key: BotKey | null, status: number) {
   const path = new URL(request.url).pathname;
-  await (await db()).insert(botCalls).values({ keyId: key?.id ?? null, bot: key?.bot ?? null, method: request.method, path, status });
+  try {
+    await (await db()).insert(botCalls).values({ keyId: key?.id ?? null, bot: key?.bot ?? null, method: request.method, path, status });
+  } catch (error) {
+    console.error("[bot api] Could not log the call", error);
+  }
 }
 
 async function respond(handler: Handler, context: BotContext): Promise<Response> {
