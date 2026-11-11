@@ -248,7 +248,7 @@ function lastLines(text: string, count: number) {
 }
 
 /** The engine strips this exact text to tell an automatic retry from a founder's note: change it there in the same release. */
-export const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.";
+export const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/review-*.md, and fix every failure they list before anything else.";
 
 /** A failed build tries once more by itself with a note pointing at what failed. After that, only a paying client's failure reaches a founder. */
 async function retryOrGiveUp(job: PreviewJob, lead: Business, body: Done) {
