@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { after, mock, test } from "node:test";
+import { startEmptyTestDatabase } from "../emptyTestDatabase";
 
 mock.module("server-only", { namedExports: {} });
+
+const closeDatabase = await startEmptyTestDatabase();
 
 test("the history reaches every finished build a page at a time, newest first", async () => {
   const { db } = await import("../db/client");
@@ -63,7 +66,5 @@ test("hiding an outcome takes it out of the rows and the page count, and the que
 });
 
 after(async () => {
-  const { db } = await import("../db/client");
-  // The in-process Postgres stays open otherwise, and the test run never ends.
-  await ((await db()) as unknown as { $client?: { close?: () => Promise<void> } }).$client?.close?.();
+  await closeDatabase();
 });
