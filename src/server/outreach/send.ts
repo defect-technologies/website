@@ -6,6 +6,7 @@ import { db } from "../db/client";
 import { businesses, messages, type Business, type Mailbox } from "../db/schema";
 import { advanceStage, blockedContacts, businessById, updateBusiness } from "../leads/businesses";
 import { isBlocked } from "../leads/contactKeys";
+import { SendOutcomeUnknown } from "../mail/gmail";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
 import { htmlFor } from "../bots/reply";
@@ -122,7 +123,7 @@ async function remember(kind: EmailKind, prepared: Prepared, delivery: Awaited<R
     subject: delivery.email.subject,
     body: delivery.email.body,
     sentBy: founder.email,
-  });
+  }).onConflictDoNothing();
   const firstFields = kind !== "follow_up" ? { threadId: delivery.threadId, firstMessageHeaderId: delivery.headerMessageId, mailboxId: delivery.mailbox?.id ?? null } : {};
   const problemField = problem ? { emailProblem: problem } : {};
   await updateBusiness(business.id, { ...firstFields, ...problemField, email: business.email, emailDraft: null, lastContactAt: now });
@@ -134,19 +135,47 @@ const SENT_ACTION: Record<EmailKind, string> = { first: "sent first email", foll
 
 const mailboxFor = async (kind: EmailKind, business: Business) => (isCold(kind) ? business.mailboxId : await studioMailboxId());
 
+type Delivered = Awaited<ReturnType<typeof deliver>>;
+
+/** Opens the claim again only when Gmail certainly did not take the email. After a send with no answer it stays closed. */
+async function deliverOrRelease(kind: EmailKind, prepared: Prepared, senderName: string): Promise<Delivered | SendResult> {
+  try {
+    return await deliver((from) => outgoing(kind, prepared, from, senderName), await mailboxFor(kind, prepared.business));
+  } catch (error) {
+    if (error instanceof SendOutcomeUnknown) return { ok: false, error: `${error.message} Look in Sent in Gmail before sending it again.` };
+    await release(kind, prepared.business.id);
+    return { ok: false, error: `Nothing was sent. ${(error as Error).message}` };
+  }
+}
+
+const RECORD_ATTEMPTS = 2;
+
+/** Gmail has the email by now, so a failed save must never undo the claim. The sync stores the message by its Gmail ID later. */
+async function rememberAfterSend(kind: EmailKind, prepared: Prepared, delivery: Delivered, founder: Founder, problem?: string) {
+  let failure: unknown;
+  for (let attempt = 0; attempt < RECORD_ATTEMPTS; attempt += 1) {
+    try {
+      return await remember(kind, prepared, delivery, founder, problem);
+    } catch (error) {
+      failure = error;
+    }
+  }
+  const id = prepared.business.id;
+  await advanceStage(id, "sent").catch((error) => console.error("[send] stage after a sent email", error));
+  await record(founder.email, "sent an email but could not save it", { businessId: id, detail: `Gmail ID ${delivery.gmailId}: ${(failure as Error).message}` }).catch((error) =>
+    console.error("[send] note after a sent email", error),
+  );
+}
+
 export async function sendOutreach(kind: EmailKind, id: string, founder: Founder, problem?: string, edits?: EmailEdits): Promise<SendResult> {
   const prepared = await prepare(kind, id, problem, edits);
   if (typeof prepared === "string") return { ok: false, error: prepared };
   if (!(await claim(kind, id))) return { ok: false, error: "This one already went out. The queue was out of date." };
   const { senderName } = await outreachSettings();
-  try {
-    const delivery = await deliver((from) => outgoing(kind, prepared, from, senderName), await mailboxFor(kind, prepared.business));
-    await remember(kind, prepared, delivery, founder, problem);
-    return { ok: true, to: prepared.recipients.to.join(", ") };
-  } catch (error) {
-    await release(kind, id);
-    return { ok: false, error: `Nothing was sent. ${(error as Error).message}` };
-  }
+  const delivery = await deliverOrRelease(kind, prepared, senderName);
+  if ("ok" in delivery) return delivery;
+  await rememberAfterSend(kind, prepared, delivery, founder, problem);
+  return { ok: true, to: prepared.recipients.to.join(", ") };
 }
 
 /** Sets a lead aside without emailing it. It stays in the pipeline as lost and can be moved back. */
@@ -154,4 +183,11 @@ export async function skipLead(business: Business, founder: Founder, reason: str
   const id = business.id;
   await updateBusiness(id, { stage: "lost", note: [business.note, reason].filter(Boolean).join("\n") });
   await record(founder.email, "skipped", { businessId: id, detail: reason });
+}
+
+/** A skipped lead goes back to the stage that keeps it in the queue it came from. */
+export async function unskipLead(business: Business, founder: Founder) {
+  const stage = business.firstSentAt ? (business.clickedAt ? "clicked" : "sent") : "preview_built";
+  await updateBusiness(business.id, { stage });
+  await record(founder.email, "put back in the queue", { businessId: business.id });
 }

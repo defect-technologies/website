@@ -6,6 +6,7 @@ import { activity, flags, type Flag } from "../db/schema";
 import { env } from "../env";
 import { deliver } from "../mail/outbox";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
+import { PACIFIC_MIDNIGHT } from "../outreach/pacificDay";
 import type { FlagRow } from "../bots/flags";
 import { spentToday } from "../runner/jobs";
 
@@ -30,8 +31,6 @@ export async function alertFounders(flag: Flag) {
   await emailFounders(`Needs you: ${flag.headline}`, body);
 }
 
-const LA_MIDNIGHT = sql`(date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')`;
-
 const COUNTED: [string, string[], (count: number) => string][] = [
   ["emails answered", ["replied"], (n) => `${n} ${n === 1 ? "email" : "emails"} answered`],
   ["previews built", ["built a preview"], (n) => `${n} ${n === 1 ? "preview" : "previews"} built`],
@@ -43,7 +42,7 @@ async function todaysCounts(): Promise<string> {
   const rows = await (await db())
     .select({ action: activity.action, count: sql<number>`count(*)::int` })
     .from(activity)
-    .where(and(gte(activity.at, LA_MIDNIGHT), inArray(activity.action, COUNTED.flatMap(([, actions]) => actions))))
+    .where(and(gte(activity.at, PACIFIC_MIDNIGHT), inArray(activity.action, COUNTED.flatMap(([, actions]) => actions))))
     .groupBy(activity.action);
   const countOf = (actions: string[]) => rows.filter((row) => actions.includes(row.action)).reduce((sum, row) => sum + row.count, 0);
   const spent = await spentToday();

@@ -6,6 +6,7 @@ import { businesses, messages, type Business } from "../db/schema";
 import { blockedContacts } from "../leads/businesses";
 import { outreachSettings } from "../settings";
 import { requestThreads } from "../inbound/threads";
+import { PACIFIC_MIDNIGHT } from "./pacificDay";
 import { blockers, composeBody, failingChecks, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread } from "./compose";
 
 export type QueueItem = {
@@ -22,17 +23,12 @@ export type QueueItem = {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-function startOfToday() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
 /** First emails and follow-ups both count toward the daily limit. Request emails don't: those businesses asked us. */
 export async function sentToday(): Promise<number> {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
     .from(messages)
-    .where(and(eq(messages.direction, "out"), or(eq(messages.kind, "first"), eq(messages.kind, "follow_up")), gte(messages.at, startOfToday())));
+    .where(and(eq(messages.direction, "out"), or(eq(messages.kind, "first"), eq(messages.kind, "follow_up")), gte(messages.at, PACIFIC_MIDNIGHT)));
   return row?.count ?? 0;
 }
 

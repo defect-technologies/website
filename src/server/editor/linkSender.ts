@@ -18,6 +18,7 @@ const consoleSender: SignInLinkSender = {
 };
 
 const RESEND_EMAILS_URL = "https://api.resend.com/emails";
+const RESEND_TIMEOUT_MS = 10_000;
 
 function signInEmailText({ siteName, editUrl, url, expiresInMinutes }: SignInEmail): string {
   return [
@@ -55,6 +56,7 @@ export async function sendPlainEmail({ to, subject, text }: PlainEmail) {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to: [to], reply_to: "hello@defect.tech", subject, text }),
+    signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`Resend refused the email (${response.status}): ${await response.text()}`);
 }

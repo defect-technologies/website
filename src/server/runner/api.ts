@@ -11,6 +11,7 @@ import { saveLaunchedSite } from "../sites/clientSites";
 import { closeFlagsOn, raiseFlag } from "../bots/flags";
 import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
+import { asClause } from "@/lib/emailTemplate";
 import { CriticNotesField } from "../review/criticNotes";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
@@ -131,6 +132,8 @@ export const DoneBody = z.object({
   criticVerdict: z.string().trim().max(200).optional(),
   /** Every note the critics wrote about this build; see lib/critics.ts. A runner without critics leaves it out. */
   criticNotes: CriticNotesField,
+  /** The sentence about the prospect's present site that the cold email uses. A runner that reports it here leaves the deploy step's own report out. */
+  problem: z.string().trim().max(400).optional(),
   tokens: z.number().int().min(0).optional(),
   minutes: z.number().min(0).optional(),
   apiEquivalentUsd: z.number().min(0).optional(),
@@ -161,6 +164,8 @@ function results(body: Done) {
     logTail: (body.logTail ?? "").slice(-LOG_TAIL_LIMIT),
   };
 }
+
+const emailProblemOf = (body: Done) => (body.problem ? { emailProblem: asClause(body.problem) } : {});
 
 /** The design critic's last word was "revise": the preview goes up, but a founder looks before the owner does. */
 const criticWantsRevision = (verdict: string | undefined) => /\brevise\b/i.test(verdict ?? "");
@@ -199,18 +204,19 @@ async function holdForOwner(lead: Business, previewUrl: string) {
   await record(ACTOR, "held a new preview until a founder looks", { businessId: lead.id, detail: previewUrl });
 }
 
+/** The job is marked done last: a failure before that leaves it running, so the runner can report again and finish the lead. */
 async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (!body.previewUrl) throw new BotError(400, "A finished build needs previewUrl, the deployed preview's https address.");
-  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
   const ownerHasOne = OWNER_HAS_SEEN.includes(lead.stage) && Boolean(lead.previewUrl) && lead.previewUrl !== body.previewUrl;
   const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
-  await updateBusiness(lead.id, { ...(ownerHasOne ? {} : { previewUrl: body.previewUrl }), previewBuiltAt: new Date(), ...ready });
+  await updateBusiness(lead.id, { ...(ownerHasOne ? {} : { previewUrl: body.previewUrl }), previewBuiltAt: new Date(), ...emailProblemOf(body), ...ready });
   await closeFlagsOn(lead.id, ["build", "preview-review"], "Closed itself: a new preview was built.", ACTOR);
   // A held preview already waits for a founder, so only the others are sampled for a spot check.
   if (ownerHasOne) await holdForOwner(lead, body.previewUrl);
   else if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   else await maybePickForSpotCheck(lead, body.previewUrl, job.id, ACTOR);
+  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   // A launched site's rebuilt design waits for the owner's OK; the Client care bot publishes it by launching again.
   await record(ACTOR, lead.vercelProjectId ? "built changes for the owner to review" : "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
@@ -224,11 +230,11 @@ function liveAddress(lead: Business, liveUrl: string) {
 
 async function finishLaunched(job: PreviewJob, lead: Business, body: Done) {
   if (!body.launch) throw new BotError(400, "A finished launch needs launch: { projectId, liveUrl, records }.");
-  await updateJob(job.id, { status: "done", step: "Live", result: body.launch, ...results(body) });
   const siteUrl = liveAddress(lead, body.launch.liveUrl);
   await updateBusiness(lead.id, { vercelProjectId: body.launch.projectId, siteUrl, launchedAt: lead.launchedAt ?? new Date() });
   await closeFlagsOn(lead.id, ["launch"], "Closed itself: the site launched.", ACTOR);
   await saveLaunchedSite({ slug: lead.slug, ownerEmail: lead.ownerEmail || lead.email, url: siteUrl, businessId: lead.id, createdBy: ACTOR });
+  await updateJob(job.id, { status: "done", step: "Live", result: body.launch, ...results(body) });
   const records = body.launch.records.map((entry) => `${entry.type} ${entry.name} → ${entry.value}`).join(", ");
   await record(ACTOR, "launched the site", { businessId: lead.id, detail: `${body.launch.liveUrl}; ${records}` });
 }
@@ -241,7 +247,8 @@ function lastLines(text: string, count: number) {
   return text.trim().split("\n").slice(-count).join("\n");
 }
 
-const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.";
+/** The engine strips this exact text to tell an automatic retry from a founder's note: change it there in the same release. */
+export const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/critique-*.md, and fix every failure they list before anything else.";
 
 /** A failed build tries once more by itself with a note pointing at what failed. After that, only a paying client's failure reaches a founder. */
 async function retryOrGiveUp(job: PreviewJob, lead: Business, body: Done) {

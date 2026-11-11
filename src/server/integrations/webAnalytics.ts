@@ -1,7 +1,7 @@
 import "server-only";
 import { ACTIONS, type Action, type Compared, type Day, type RangeDays, type Ranked, type SiteAnalytics, type WeekGrid } from "@/lib/siteAnalytics";
 import { env } from "../env";
-import { integration, type Integration } from "./result";
+import { integration, OUTSIDE_CALL_TIMEOUT_MS, type Integration } from "./result";
 
 const API = "https://api.vercel.com/v1/query/web-analytics";
 const CACHE_SECONDS = 600;
@@ -32,7 +32,7 @@ class AnalyticsOff extends Error {}
 async function query(projectId: string, { dataset, by, period, limit, filter }: Query): Promise<Row[]> {
   const { token, teamId } = env.vercel();
   const params = new URLSearchParams({ projectId, teamId, by, since: period.since, until: period.until, ...(limit ? { limit: String(limit) } : {}), ...(filter ? { filter } : {}) });
-  const response = await fetch(`${API}/${dataset}/aggregate?${params}`, { headers: { Authorization: `Bearer ${token}` }, next: { revalidate: CACHE_SECONDS } });
+  const response = await fetch(`${API}/${dataset}/aggregate?${params}`, { headers: { Authorization: `Bearer ${token}` }, next: { revalidate: CACHE_SECONDS }, signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS) });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 200);
     if (detail.includes("web_analytics_not_enabled")) throw new AnalyticsOff(projectId);
