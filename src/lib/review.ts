@@ -64,3 +64,7 @@ export function tasteMarkdown(lessons: { text: string }[]): string {
     "These are the founders' standing rules of taste, written while reviewing earlier previews. They outrank DESIGN.md's defaults where the two conflict, and every one must hold on this site.";
   return ["# Founder taste lessons", "", intro, "", ...lessons.map((lesson) => `- ${lesson.text.replace(/\s+/g, " ").trim()}`), ""].join("\n");
 }
+
+/** The rebuild a preview gets so the review page can point at its elements; it only moves the site to the newest kit. */
+export const POINTING_NOTE =
+  "Rebuild only to take the newest site-kit, so the founders' review page can point at elements in this preview. Keep the design, content, pages and wording exactly as they are.";
