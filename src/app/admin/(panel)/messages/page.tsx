@@ -6,7 +6,8 @@ import EmptyState from "@/components/admin/EmptyState";
 import { CheckMailButton } from "@/components/admin/ThreadControls";
 import { PageHeader, When } from "@/components/admin/ui";
 import { businessById } from "@/server/leads/businesses";
-import { markThreadRead, threadFor, threadSummaries, type ThreadSummary } from "@/server/mail/threads";
+import { markThreadRead, threadFor, type ThreadSummary } from "@/server/mail/threads";
+import { threads as threadSummaries } from "@/server/today";
 
 export const metadata: Metadata = { title: "Messages" };
 

@@ -62,6 +62,15 @@ export async function threadSummaries(): Promise<ThreadSummary[]> {
   }));
 }
 
+/** How many received messages nobody has read yet, counted without loading any thread. */
+export async function unreadMessageCount(): Promise<number> {
+  const [row] = await (await db())
+    .select({ total: sql<number>`count(*)::int` })
+    .from(messages)
+    .where(and(eq(messages.direction, "in"), isNull(messages.readAt)));
+  return row?.total ?? 0;
+}
+
 export async function threadFor(businessId: string): Promise<Message[]> {
   return (await db()).select().from(messages).where(eq(messages.businessId, businessId)).orderBy(asc(messages.at));
 }
