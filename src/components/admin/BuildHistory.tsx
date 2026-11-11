@@ -1,4 +1,4 @@
-import { CheckCircle, EyeSlash, HourglassMedium, MinusCircle, RocketLaunch, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircle, EyeSlash, HourglassMedium, MinusCircle, RocketLaunch, SquaresFour, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
@@ -17,6 +17,7 @@ const finishedClock = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_
 const OUTCOME_LOOK: Record<BuildOutcome, { icon: Icon; tone: StatusTone }> = {
   built: { icon: CheckCircle, tone: "good" },
   launched: { icon: RocketLaunch, tone: "good" },
+  boards: { icon: SquaresFour, tone: "quiet" },
   failed: { icon: WarningCircle, tone: "bad" },
   skipped: { icon: MinusCircle, tone: "quiet" },
   paused: { icon: HourglassMedium, tone: "warn" },

@@ -26,14 +26,26 @@ export function isSkipped(job: { status: PreviewJobStatus; step?: string | null 
   return job?.status === "failed" && job.step === SKIPPED_STEP;
 }
 
+/**
+ * A build that stopped after it made the lead's design boards: a founder chooses one, and that choice queues the job
+ * that builds the site. Stored as a done job with this step (no migration needed). It builds nothing, so it isn't
+ * counted against the daily cap or as a success after failures.
+ */
+export const BOARDS_STEP = "Boards sent: a founder chooses the design";
+
+export function isBoards(job: { status: PreviewJobStatus; step?: string | null } | null | undefined): boolean {
+  return job?.status === "done" && job.step === BOARDS_STEP;
+}
+
 /** How a finished build ended, in the order the Builds page lists them. */
-export const BUILD_OUTCOMES = ["built", "launched", "failed", "skipped", "paused"] as const;
+export const BUILD_OUTCOMES = ["built", "launched", "boards", "failed", "skipped", "paused"] as const;
 export type BuildOutcome = (typeof BUILD_OUTCOMES)[number];
 
-export const BUILD_OUTCOME_LABEL: Record<BuildOutcome, string> = { built: "Built", launched: "Launched", failed: "Failed", skipped: "Skipped", paused: "Paused" };
+export const BUILD_OUTCOME_LABEL: Record<BuildOutcome, string> = { built: "Built", launched: "Launched", boards: "Boards sent", failed: "Failed", skipped: "Skipped", paused: "Paused" };
 
 export function buildOutcome(job: { status: PreviewJobStatus; step?: string | null; kind?: string | null }): BuildOutcome {
   if (isSkipped(job)) return "skipped";
+  if (isBoards(job)) return "boards";
   if (job.status === "failed") return "failed";
   if (job.status === "waiting_for_usage") return "paused";
   return job.kind === "launch" ? "launched" : "built";
@@ -59,9 +71,14 @@ export type RunnerSettings = {
   outreachPicksPreviews: boolean;
   /** When the queue is empty, the runner's next poll queues the highest-scoring new lead with an email. */
   autoQueue: boolean;
+  /** A first build stops after it made three design boards, and goes on when a founder has chosen one. */
+  designBoards: boolean;
 };
 
-export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = { dailyCap: 10, pausedUntil: null, outreachPicksPreviews: false, autoQueue: true };
+export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = { dailyCap: 10, pausedUntil: null, outreachPicksPreviews: false, autoQueue: true, designBoards: true };
+
+/** The runner stops queuing new leads by itself while this many boards wait for a founder: a choice is the slow part. */
+export const MOST_BOARDS_WAITING = 5;
 
 /** Env var the runner machine keeps its admin key in. */
 export const RUNNER_KEY_ENV = "DEFECT_RUNNER_KEY";

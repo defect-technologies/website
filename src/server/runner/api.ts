@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { MAX_FAILED_BUILDS, type JobKind, SKIPPED_STEP } from "@/lib/previewJobs";
+import { MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, SKIPPED_STEP } from "@/lib/previewJobs";
 import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
@@ -13,6 +13,7 @@ import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { asClause } from "@/lib/emailTemplate";
 import { CriticNotesField } from "../review/criticNotes";
+import { choiceForJob, countBoardsWaiting, type BoardChoice } from "../boards/store";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
@@ -65,10 +66,16 @@ function launchPayload(job: PreviewJob, lead: Business) {
 /** Stages at which the owner has been sent their preview. */
 const OWNER_HAS_SEEN: Business["stage"][] = ["sent", "clicked", "replied", "paid", "live"];
 
-/** brandFiles are the owner's artwork; the runner downloads them into the lead's folder before the builder starts. */
-function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[]) {
+/**
+ * brandFiles are the owner's artwork; the runner downloads them into the lead's folder before the builder starts.
+ * `boards` tells the runner to stop a first build once it has made the lead's design boards, and `board` is the option
+ * a founder chose from them, which this build is held to.
+ */
+function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[], boards: { on: boolean; choice: BoardChoice | null }) {
   return {
     job: { id: job.id, attempt: job.attempts, note: job.note, kind: job.kind },
+    ...(job.kind === "preview" && boards.on ? { boards: true } : {}),
+    ...(boards.choice ? { board: boards.choice } : {}),
     lead: {
       id: lead.id,
       slug: lead.slug,
@@ -86,7 +93,10 @@ function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand:
 }
 
 async function claimAutoQueued(runnerName: string, kinds: JobKind[]): Promise<PreviewJob | null> {
-  if (!(await runnerSettings()).autoQueue) return null;
+  const current = await runnerSettings();
+  if (!current.autoQueue) return null;
+  // A founder's choice is the slow part: more boards than they can look at would only wait, and each cost a crawl.
+  if (current.designBoards && (await countBoardsWaiting()) >= MOST_BOARDS_WAITING) return null;
   return (await autoQueueNext()) ? claimNextJob(runnerName, kinds) : null;
 }
 
@@ -104,8 +114,9 @@ export async function claimNext(key: BotKey, request: Request) {
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
+  const boards = { on: (await runnerSettings()).designBoards, choice: job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null };
   // A client who has paid already has their plan, so their previews carry no "Make it live" button.
-  return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id));
+  return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id), boards);
 }
 
 async function claimedJob(id: string): Promise<PreviewJob> {

@@ -8,6 +8,7 @@ const DARK = { background: "#101a33", accent: "#f08d3c" };
 function option(letter: BoardLetter, layout: string, extra: Partial<BoardOption> = {}): BoardOption {
   return {
     letter,
+    boldness: letter === "a" ? 1 : letter === "b" ? 2 : 3,
     name: `Direction ${letter}`,
     idea: "An idea.",
     palette: LIGHT,
@@ -17,6 +18,8 @@ function option(letter: BoardLetter, layout: string, extra: Partial<BoardOption>
     motif: { name: "Sunburst", from: "Their logo." },
     headline: "Heating and cooling",
     line: "Family run.",
+    photoTreatment: "plain",
+    texture: "none",
     explores: letter === "c",
     pictures: { board: "https://x/a.jpg", desktop: "https://x/a-desktop.jpg", phone: "https://x/a-phone.jpg" },
     ...extra,
@@ -67,6 +70,7 @@ test("the lessons carry each choice, what was passed over and the founder's own 
   assert.match(markdown, /- Said: No capitals on buttons\./);
   assert.match(markdown, /- First screens, chosen of shown: type-led 1 of 1; split-hero 1 of 2; /);
   assert.match(markdown, /- Pages, chosen of shown: light 2 of 6\./);
+  assert.match(markdown, /- How far the option goes \(1 close to how the business looks today, 3 far from it\), chosen of shown: (1 1 of 2; 2 1 of 2|2 1 of 2; 1 1 of 2); 3 0 of 2\./);
 });
 
 test("agreement counts only boards the system made a pick for", () => {

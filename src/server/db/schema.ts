@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, date, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, index, uuid } from "drizzle-orm/pg-core";
+import type { BoardOption, BoardPick } from "../../lib/boards";
 import { BOTS, FLAG_STATUSES } from "../../lib/bots";
 import type { CriticKind, CriticNote, CriticTarget } from "../../lib/critics";
 import type { SavedDraft } from "../../lib/emailDraft";
@@ -502,6 +503,35 @@ export const tasteLessons = pgTable(
 );
 
 /**
+ * The three design options the runner pictured for a lead before building it, and the one a founder chose. The
+ * build that follows is held to the chosen option, and every decided row teaches the next draw (src/lib/boards.ts).
+ */
+export const designBoards = pgTable(
+  "design_boards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    /** The job that made the boards. */
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => previewJobs.id),
+    options: jsonb("options").$type<BoardOption[]>().notNull(),
+    /** Which option the system expected the founders to choose, written before they saw the boards. */
+    pick: jsonb("pick").$type<BoardPick>(),
+    chosenLetter: text("chosen_letter"),
+    feedback: text("feedback").notNull().default(""),
+    chosenBy: text("chosen_by"),
+    chosenAt: timestamp("chosen_at", { withTimezone: true }),
+    /** The job that builds the site from the choice, once the runner has claimed it. */
+    builtJobId: uuid("built_job_id").references(() => previewJobs.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("design_boards_business").on(table.businessId, table.createdAt), index("design_boards_waiting").on(table.chosenAt, table.createdAt), uniqueIndex("design_boards_job").on(table.jobId)],
+);
+
+/**
  * Every business the lead finder audited, whether or not it became a lead, so a
  * new niche or area can start from what's already been collected. Only the
  * Google place ID comes from Google; everything else is from the business's own
@@ -627,3 +657,4 @@ export type PortalAccount = typeof portalAccounts.$inferSelect;
 export type BrandFile = typeof brandFiles.$inferSelect;
 export type PreviewReview = typeof previewReviews.$inferSelect;
 export type TasteLesson = typeof tasteLessons.$inferSelect;
+export type DesignBoard = typeof designBoards.$inferSelect;

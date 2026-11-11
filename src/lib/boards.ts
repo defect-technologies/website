@@ -19,6 +19,8 @@ export interface BoardControls {
 /** One option as the runner sends it: the choices a build is held to, and where its pictures are. */
 export interface BoardOption {
   letter: BoardLetter;
+  /** How far the option goes from how the business looks today: 1 stays close, 3 goes furthest. */
+  boldness: number;
   name: string;
   idea: string;
   palette: Record<string, string>;
@@ -28,6 +30,8 @@ export interface BoardOption {
   motif: { name: string; from: string };
   headline: string;
   line: string;
+  photoTreatment: string;
+  texture: string;
   /** Drawn without the founders' preferences, so the options never narrow to what was chosen before. */
   explores: boolean;
   pictures: Record<BoardView, string>;
@@ -136,7 +140,13 @@ export function boardLessonsMarkdown(decisions: BoardDecision[]): string {
   const recent = decisions.slice(0, LESSON_SITES);
   const intro =
     "What the founders chose on earlier sites, newest first, and what they said. Learn their taste from it: lean toward what they choose and away from what they pass over, and never repeat something they said they don't want. Each business is different, so take the taste, not the design.";
-  const counts = [tallyLine("Pages", tally(decisions, pageTone)), tallyLine("First screens", tally(decisions, (option) => option.layout)), tallyLine("Buttons", tally(decisions, (option) => buttons(option.controls)))];
+  const counts = [
+    tallyLine("How far the option goes (1 close to how the business looks today, 3 far from it)", tally(decisions, (option) => String(option.boldness))),
+    tallyLine("Pages", tally(decisions, pageTone)),
+    tallyLine("First screens", tally(decisions, (option) => option.layout)),
+    tallyLine("Buttons", tally(decisions, (option) => buttons(option.controls))),
+    tallyLine("Photos", tally(decisions, (option) => option.photoTreatment)),
+  ];
   return ["# What the founders chose before", "", intro, "", ...recent.flatMap(decisionLines), "## Counts over every choice", "", ...counts, ""].join("\n");
 }
 
