@@ -18,6 +18,8 @@ export const metadata: Metadata = { title: "Sign in" };
 
 const ERRORS: Record<string, string> = {
   google: "Google sign-in didn't work. Try again, or use your email.",
+  limited: "We can't send another sign-in link right now. Wait a few minutes and try again.",
+  "not-ready": "Email sign-in isn't switched on yet. Email hello@defect.tech and we'll help you in.",
   "no-site": "That Google account can't edit a site with us. Sign in with the email address we have for you.",
 };
 
@@ -52,12 +54,13 @@ export default async function PortalSignInPage({ searchParams }: { searchParams:
   const next = site ? `/portal/edit/${site.slug}` : safeNext(rawNext);
   if (await currentPortalUser()) redirect(next);
   const sent = site && result === "sent";
+  const problem = ERRORS[error ?? result ?? ""];
   return (
     <main className="grid min-h-svh place-items-center px-4 py-12">
       <div className="flex w-full max-w-sm flex-col items-center gap-8 text-center">
         <EditorBrand />
         <h1 className="text-2xl font-semibold text-balance">{site ? `Sign in to edit ${siteName(site.businessName, site.url)}` : "Sign in to your portal"}</h1>
-        {error && ERRORS[error] && <Notice tone="bad">{ERRORS[error]}</Notice>}
+        {problem && <Notice tone="bad">{problem}</Notice>}
         {sent ? (
           <LinkSentNotice>We sent a sign-in link to {maskEmail(site.ownerEmail)}. It works once, within 15 minutes.</LinkSentNotice>
         ) : (

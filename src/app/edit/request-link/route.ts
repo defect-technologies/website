@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { env } from "@/server/env";
 import { emailPortalLink } from "@/server/portal/accounts";
+import { currentCallerKey } from "@/server/portal/callerKey";
 import { clientSite } from "@/server/sites/clientSites";
 
 /**
@@ -11,6 +12,6 @@ export async function POST(request: Request) {
   const slug = String((await request.formData()).get("site") ?? "").slice(0, 100);
   const site = await clientSite(slug);
   if (!site) return NextResponse.redirect(new URL("/portal/sign-in", env.siteUrl()), 303);
-  await emailPortalLink(site.ownerEmail, `/portal/edit/${site.slug}`);
-  return NextResponse.redirect(new URL(`/portal/sign-in?site=${encodeURIComponent(site.slug)}&result=sent`, env.siteUrl()), 303);
+  const result = await emailPortalLink(site.ownerEmail, `/portal/edit/${site.slug}`, await currentCallerKey());
+  return NextResponse.redirect(new URL(`/portal/sign-in?site=${encodeURIComponent(site.slug)}&result=${result}`, env.siteUrl()), 303);
 }

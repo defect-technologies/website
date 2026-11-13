@@ -11,6 +11,7 @@ import LinkSentNotice from "@/components/editor/LinkSentNotice";
 const PROBLEMS: Partial<Record<SignInState["status"], string>> = {
   wrong: "That email and password don't match. Try again, or email yourself a link.",
   locked: "Too many tries. Wait 15 minutes, or email yourself a link.",
+  limited: "Too many sign-in link requests. Wait a few minutes and try again.",
   invalid: "That email address doesn't look right. Check it and try again.",
   "not-ready": "Email sign-in isn't switched on yet. Email hello@defect.tech and we'll help you in.",
 };

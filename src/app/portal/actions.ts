@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { emailPortalLink, safeNext, setPassword, signInWithLink, signInWithPassword, type PasswordChange } from "@/server/portal/accounts";
+import { currentCallerKey } from "@/server/portal/callerKey";
 import { isOwnerOf, portalSite } from "@/server/portal/context";
 import { endPortalSession, requirePortalUser } from "@/server/portal/session";
 import { record } from "@/server/activity";
@@ -13,7 +14,7 @@ import { launchBlocker, requestPreview } from "@/server/runner/jobs";
 import { clientSite } from "@/server/sites/clientSites";
 import { addEditorAndRecord, removeEditorAndRecord } from "@/server/sites/siteEditors";
 
-export type SignInState = { status: "idle" | "sent" | "wrong" | "locked" | "invalid" | "not-ready"; email: string };
+export type SignInState = { status: "idle" | "sent" | "wrong" | "locked" | "limited" | "invalid" | "not-ready"; email: string };
 
 const SignIn = z.object({ intent: z.enum(["password", "link"]), email: z.email().max(200), password: z.string().max(200), next: z.string().max(200) });
 
@@ -23,8 +24,8 @@ export async function signInAction(_previous: SignInState, form: FormData): Prom
   const parsed = SignIn.safeParse({ intent: form.get("intent"), email, password: form.get("password") ?? "", next: form.get("next") ?? "" });
   if (!parsed.success) return { status: "invalid", email };
   const next = safeNext(parsed.data.next);
-  if (parsed.data.intent === "link") return { status: await emailPortalLink(email, next), email };
-  const result = await signInWithPassword(email, parsed.data.password);
+  if (parsed.data.intent === "link") return { status: await emailPortalLink(email, next, await currentCallerKey()), email };
+  const result = await signInWithPassword(email, parsed.data.password, await currentCallerKey());
   if (result === "signed-in") redirect(next);
   return { status: result, email };
 }
@@ -53,8 +54,8 @@ export async function emailOwnerLinkAction(form: FormData) {
   const slug = String(form.get("site") ?? "").slice(0, 100);
   const site = await clientSite(slug);
   if (!site) redirect("/portal/sign-in");
-  await emailPortalLink(site.ownerEmail, `/portal/edit/${site.slug}`);
-  redirect(`/portal/sign-in?site=${encodeURIComponent(site.slug)}&result=sent`);
+  const result = await emailPortalLink(site.ownerEmail, `/portal/edit/${site.slug}`, await currentCallerKey());
+  redirect(`/portal/sign-in?site=${encodeURIComponent(site.slug)}&result=${result}`);
 }
 
 /** "Looks good, make it live" on the portal's checklist: the owner approves their preview and the launch starts. */
