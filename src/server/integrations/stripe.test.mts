@@ -44,7 +44,7 @@ mock.module("../mail/outbox", {
   },
 });
 
-const { syncPayments } = await import("./stripe");
+const { syncPayments, billingPortalLink } = await import("./stripe");
 
 const HOUR = 60 * 60;
 const nowSeconds = () => Math.floor(Date.now() / 1000);
@@ -250,5 +250,42 @@ describe("recovering half-finished payments", () => {
 
     assert.equal(welcomesSent, 0);
     assert.equal((await portalsOf(justPaid.id)).length, 0);
+  });
+});
+
+describe("Stripe POST requests", () => {
+  const portalStandIn = (posts: Headers[]) => (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input));
+    if (init?.method === "POST") {
+      posts.push(new Headers(init.headers));
+      return Promise.resolve(new Response(JSON.stringify({ url: "https://billing.example.com/session" }), { status: 200 }));
+    }
+    const body = url.pathname.endsWith("/billing_portal/configurations") ? { data: [{ id: "bpc_1", is_default: true }] } : { data: [] };
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+  };
+
+  async function postedKeys(calls: [string, string][]) {
+    const posts: Headers[] = [];
+    globalThis.fetch = portalStandIn(posts) as typeof fetch;
+    mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 10, 12, 12, 0, 5) });
+    try {
+      for (const [customer, returnUrl] of calls) await billingPortalLink(customer, returnUrl);
+    } finally {
+      mock.timers.reset();
+      globalThis.fetch = stripeStandIn as typeof fetch;
+    }
+    return posts.map((headers) => headers.get("Idempotency-Key"));
+  }
+
+  it("carries an idempotency key, the same for the same request repeated", async () => {
+    const [first, second] = await postedKeys([["cus_1", "https://defect.tech/a"], ["cus_1", "https://defect.tech/a"]]);
+    assert.ok(first);
+    assert.equal(first, second);
+  });
+
+  it("carries a different key for a different request", async () => {
+    const [first, second, third] = await postedKeys([["cus_1", "https://defect.tech/a"], ["cus_2", "https://defect.tech/a"], ["cus_1", "https://defect.tech/b"]]);
+    assert.notEqual(first, second);
+    assert.notEqual(first, third);
   });
 });

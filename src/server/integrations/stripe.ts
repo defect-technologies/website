@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { and, eq, gte, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { REGULAR_MONTHLY_PRICE } from "@/lib/emailTemplate";
 import { record } from "../activity";
@@ -252,10 +253,22 @@ export async function finishWelcomeCheckout(sessionId: string, business: Busines
   return session.status;
 }
 
+const IDEMPOTENCY_WINDOW_MS = 60_000;
+
+/**
+ * The same request repeated within a minute (a double click) gets the same key, so Stripe answers it once.
+ * A different request, or the same one a minute later, gets a new key and is a new action.
+ */
+function idempotencyKey(path: string, form: Record<string, string>): string {
+  const fields = Object.entries(form).sort(([a], [b]) => a.localeCompare(b));
+  const digest = createHash("sha256").update(JSON.stringify([path, fields])).digest("hex");
+  return `${digest}-${Math.floor(Date.now() / IDEMPOTENCY_WINDOW_MS)}`;
+}
+
 async function stripePost<T>(path: string, form: Record<string, string>): Promise<{ ok: boolean; body: T & { error?: { message?: string } } }> {
   const response = await fetch(`${API}${path}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.stripeKey()}`, "content-type": "application/x-www-form-urlencoded" },
+    headers: { Authorization: `Bearer ${env.stripeKey()}`, "content-type": "application/x-www-form-urlencoded", "Idempotency-Key": idempotencyKey(path, form) },
     body: new URLSearchParams(form),
     cache: "no-store",
     signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS),
