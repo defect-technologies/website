@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { changesBuiltPreview, founderNote, MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, RETRY_NOTE, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
+import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { type BuildKind, previewWaitsEmail, type PreviewWait } from "@/lib/turnEmails";
 import { isNeon } from "../db/client";
+import type { RepairNotes } from "@/lib/repairs";
 import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
@@ -24,10 +25,11 @@ import { updateBusiness } from "../leads/businesses";
 import { maybePickForSpotCheck } from "../spotChecks";
 import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
+import { repairChecks, repairNotesFor, RepairsField } from "./repairs";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
 import { tellFounders } from "./tellFounders";
 
-const ACTOR = "bot:runner";
+const ACTOR = RUNNER_ACTOR;
 const PAUSE_WITHOUT_RESUME_MS = 60 * 60 * 1000;
 const LOG_TAIL_LIMIT = 8000;
 
@@ -81,13 +83,17 @@ const OWNER_HAS_SEEN: Business["stage"][] = ["sent", "clicked", "replied", "paid
 /**
  * brandFiles are the owner's artwork; the runner downloads them into the lead's folder before the builder starts.
  * `boards` tells the runner to stop a first build once it has made the lead's design boards, and `board` is the option
- * a founder chose from them, which this build is held to.
+ * a founder chose from them, which this build is held to. `repair` tells it to make the note's changes on the built
+ * site as it is, and `repairNotes` are the founder's notes it pictures before and after. A founder's choice is always
+ * built, so its job is never a repair.
  */
-function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[], boards: { on: boolean; choice: BoardChoice | null }) {
+function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[], boards: { on: boolean; choice: BoardChoice | null }, repair: { on: boolean; notes: RepairNotes | null }) {
   return {
     job: { id: job.id, attempt: job.attempts, note: job.note, kind: job.kind },
     ...(job.kind === "preview" && boards.on ? { boards: true } : {}),
     ...(boards.choice ? { board: boards.choice } : {}),
+    ...(repair.on ? { repair: true } : {}),
+    ...(repair.on && repair.notes ? { repairNotes: repair.notes } : {}),
     lead: {
       id: lead.id,
       slug: lead.slug,
@@ -112,6 +118,17 @@ async function claimAutoQueued(runnerName: string, kinds: JobKind[]): Promise<Pr
   return (await autoQueueNext()) ? claimNextJob(runnerName, kinds) : null;
 }
 
+/**
+ * How a claimed job treats the lead's design. A founder's choice is always built. Without one, a note about the
+ * preview the lead has keeps that preview's design: no boards, and the note is repaired on the site as it is.
+ */
+async function designAndRepairFor(job: PreviewJob, lead: Business) {
+  const choice = job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null;
+  const boards = { on: (await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl)), choice };
+  const repairing = !choice && isRepair(job, lead.previewUrl);
+  return { boards, repair: { on: repairing, notes: repairing ? await repairNotesFor(lead.id, lead.previewUrl) : null } };
+}
+
 /** GET /api/runner/next: claims one queued build, or 204 with why there's nothing to do. */
 export async function claimNext(key: BotKey, request: Request) {
   const search = new URL(request.url).searchParams;
@@ -126,11 +143,9 @@ export async function claimNext(key: BotKey, request: Request) {
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
-  const choice = job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null;
-  // A founder's choice is always built. Without one, a note about the preview the lead has keeps that preview's design.
-  const boards = { on: (await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl)), choice };
+  const { boards, repair } = await designAndRepairFor(job, lead);
   // A client who has paid already has their plan, so their previews carry no "Make it live" button.
-  return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id), boards);
+  return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id), boards, repair);
 }
 
 async function claimedJob(id: string): Promise<PreviewJob> {
@@ -163,6 +178,8 @@ export const DoneBody = z.object({
   minutes: z.number().min(0).optional(),
   apiEquivalentUsd: z.number().min(0).optional(),
   logTail: z.string().max(LOG_TAIL_LIMIT * 4).optional(),
+  /** A repair's before and after pictures, by note id. Each was stored with PUT /api/runner/:job/repairs/:picture. */
+  repairs: RepairsField,
   /** With status "failed": the runner skipped this lead before building, because its current site is already good. */
   skipped: z.boolean().optional(),
   resumeAt: z.iso.datetime({ offset: true }).optional(),
@@ -229,6 +246,13 @@ async function holdForOwner(lead: Business, previewUrl: string) {
   await record(ACTOR, "held a new preview until a founder looks", { businessId: lead.id, detail: previewUrl });
 }
 
+/** A repair's checks as the job keeps them (preview_jobs.result), or nothing when the runner sent no pictures. */
+async function repairResult(lead: Business, body: Done): Promise<{ result?: { repairs: ReturnType<typeof repairChecks> } }> {
+  if (!body.repairs?.length) return {};
+  const repairs = repairChecks(lead.id, await repairNotesFor(lead.id, lead.previewUrl), body.repairs);
+  return repairs.length ? { result: { repairs } } : {};
+}
+
 function buildKindOf(note: string): BuildKind {
   const written = founderNote(note);
   if (!written) return "built";
@@ -243,6 +267,8 @@ async function tellFoundersPreviewWaits(job: PreviewJob, lead: Business, wait: P
 /** The job is marked done last: a failure before that leaves it running, so the runner can report again and finish the lead. */
 async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (!body.previewUrl) throw new BotError(400, "A finished build needs previewUrl, the deployed preview's https address.");
+  // Read before the lead's preview changes below: the notes are the ones written about the preview it has now.
+  const repaired = await repairResult(lead, body);
   const ownerHasOne = OWNER_HAS_SEEN.includes(lead.stage) && Boolean(lead.previewUrl) && lead.previewUrl !== body.previewUrl;
   const held = lead.stage === "new" && criticWantsRevision(body.criticVerdict);
   const ready = lead.stage === "new" && !held ? { stage: "preview_built" as const } : {};
@@ -252,7 +278,7 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (ownerHasOne) await holdForOwner(lead, body.previewUrl);
   else if (held) await holdForReview(lead, body.previewUrl, body.criticVerdict ?? "");
   else await maybePickForSpotCheck(lead, body.previewUrl, job.id, ACTOR);
-  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body) });
+  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed", ...results(body), ...repaired });
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   // A launched site's rebuilt design waits for the owner's OK; the Client care bot publishes it by launching again.
   await record(ACTOR, lead.vercelProjectId ? "built changes for the owner to review" : "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });

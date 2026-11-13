@@ -2,10 +2,11 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { ASK_TOPICS, askFromProposal, MAX_ASK_TEXT, MAX_ASK_WORDS, MAX_ASKS, MAX_PROPOSALS, type ReviewAsk } from "@/lib/reviewAsks";
+import { ASK_TOPICS, askFromProposal, askFromRepair, MAX_ASK_TEXT, MAX_ASK_WORDS, MAX_ASKS, MAX_PROPOSALS, type ReviewAsk } from "@/lib/reviewAsks";
 import { db } from "../db/client";
 import { previewJobs } from "../db/schema";
 import { env } from "../env";
+import { repairChecksForPreview } from "../runner/repairs";
 import { proposalsForPreview } from "./criticProposals";
 import { readPreview, type PreviewSource } from "./previewPages";
 import { activeTasteLessons } from "./taste";
@@ -123,10 +124,13 @@ export async function writeReviewAsks(businessName: string, previewUrl: string):
 }
 
 /**
- * What the founder is asked about a preview. When the newest build reported critic notes that are still open or only
+ * What the founder is asked about a preview. A preview that a repair made asks about each note that was repaired, with
+ * its spot before and after. Otherwise, when the newest build reported critic notes that are still open or only
  * proposed, those are the questions, minus the ones he answered; otherwise Claude writes questions from the markup.
  */
 export async function reviewQuestionsFor(businessId: string, businessName: string, previewUrl: string): Promise<ReviewAsk[]> {
+  const repairs = await repairChecksForPreview(businessId, previewUrl);
+  if (repairs.length) return repairs.map(askFromRepair);
   const proposals = await proposalsForPreview(businessId, previewUrl);
   if (proposals) return proposals.notes.slice(0, MAX_PROPOSALS).map((note) => askFromProposal(proposals.jobId, note));
   return writeReviewAsks(businessName, previewUrl);

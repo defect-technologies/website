@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import type { BridgeState } from "@/hooks/useReviewBridge";
 import { type ReviewAsk, samePage } from "@/lib/reviewAsks";
 
+const REPAIRED_MARK = "Your note is about this";
+
 type Bridge = { state: BridgeState; path: string; show: (target: { path: string; selector: string; question: string }) => void };
 
 /**
@@ -18,6 +20,7 @@ export function useShowAsk(bridge: Bridge, ask: ReviewAsk | null) {
     if (state !== "connected" || !ask?.selector) return;
     if (shownAsk.current === ask.id && !onAskPage) return;
     shownAsk.current = ask.id;
-    show(ask);
+    // A repaired note is the founder's own words, too long for the mark on the page: the card already says them.
+    show(ask.repair ? { ...ask, question: REPAIRED_MARK } : ask);
   }, [state, show, ask, onAskPage]);
 }

@@ -1,5 +1,6 @@
 import { type CriticDevice, type CriticKind, type CriticNote, type CriticTarget, proposalWords } from "./critics";
-import type { NoteAnchor } from "./review";
+import type { RepairCheck } from "./repairs";
+import type { Device, NoteAnchor } from "./review";
 
 /** What one question is about, so its icon tells the founder before they read it. */
 export const ASK_TOPICS = ["first-screen", "type", "color", "layout", "copy", "imagery", "motif", "phone"] as const;
@@ -17,7 +18,35 @@ export type ReviewAsk = {
   quote: string;
   /** Set when the question is a critic's proposal: yes makes it one of the founder's notes, no is kept as a rejection. */
   proposal?: AskProposal;
+  /** Set when the question is one of the founder's own notes after its repair: is it fixed? */
+  repair?: AskRepair;
 };
+
+/** A repaired note's spot on the preview the founder looked at (empty when it could not be pictured) and on the new one. */
+export type AskRepair = { before: string; after: string; device: Device; tag: string; focus?: number };
+
+/** What the stage shows for a repaired note: one of its two pictures, or the live preview to try the page. */
+export const REPAIR_VIEWS = ["before", "after", "live"] as const;
+export type RepairView = (typeof REPAIR_VIEWS)[number];
+
+/** The question is the founder's own note, in their words. */
+export function askFromRepair(check: RepairCheck): ReviewAsk {
+  const anchor = check.anchor;
+  return {
+    id: `repair:${check.id}`,
+    topic: "layout",
+    question: check.text,
+    path: anchor?.path ?? check.path,
+    selector: anchor?.selector ?? "",
+    quote: anchor?.text ?? "",
+    repair: { before: check.before, after: check.after, device: check.device, tag: anchor?.tag ?? "", ...(check.focus === undefined ? {} : { focus: check.focus }) },
+  };
+}
+
+/** The note a founder gets back when a repair did not fix what they asked for. */
+export function stillWrongText(original: string): string {
+  return `Still wrong after the repair: ${original}`;
+}
 
 /** The critic note behind a question, with the job that reported it so the founder's answer can be kept. */
 export type AskProposal = { jobId: string; id: string; kind: CriticKind; target: CriticTarget; device: CriticDevice; text: string };

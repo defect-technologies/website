@@ -12,6 +12,9 @@ import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
 import { askAnchor } from "@/lib/reviewAsks";
 import AskCard from "./AskCard";
+import Segmented, { type Segment } from "./Segmented";
+import { useRepairAnswer } from "./useRepairAnswer";
+import { useRepairView } from "./useRepairView";
 import NoteComposer from "./NoteComposer";
 import NoteList from "./NoteList";
 import PhoneDock, { CARD } from "./PhoneDock";
@@ -36,28 +39,14 @@ function hostOf(url: string) {
   }
 }
 
+const DEVICE_OPTIONS: Segment<Device>[] = [
+  { value: "desktop", label: "Desktop", icon: Desktop },
+  { value: "tablet", label: "Tablet", icon: DeviceTablet },
+  { value: "phone", label: "Phone", icon: DeviceMobile },
+];
+
 function DeviceSwitch({ device, onChange }: { device: Device; onChange: (device: Device) => void }) {
-  const options: { value: Device; label: string; icon: typeof Desktop }[] = [
-    { value: "desktop", label: "Desktop", icon: Desktop },
-    { value: "tablet", label: "Tablet", icon: DeviceTablet },
-    { value: "phone", label: "Phone", icon: DeviceMobile },
-  ];
-  return (
-    <div role="group" aria-label="Preview width" className="bg-paper-shade flex rounded-full p-1">
-      {options.map(({ value, label, icon: OptionIcon }) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={device === value}
-          onClick={() => onChange(value)}
-          className={`focus-visible:outline-ink inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-2 ${device === value ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:text-ink"}`}
-        >
-          <OptionIcon size={18} weight={device === value ? "fill" : "regular"} aria-hidden="true" />
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented label="Preview width" options={DEVICE_OPTIONS} value={device} onChange={onChange} />;
 }
 
 function QueueSteps({ position, total, previousId, nextId }: Omit<Props, "item">) {
@@ -245,7 +234,10 @@ function Studio({ item, ...queue }: Props) {
   const target: Draft = draft.anchor || !openQuestion ? draft : { ...draft, anchor: askAnchor(openQuestion) };
 
   const answerProposal = useProposalAnswer(currentAsk, flow, add);
+  const answerRepair = useRepairAnswer(currentAsk, flow, add);
+  const repair = useRepairView(currentAsk);
   useShowAsk(bridge, currentAsk);
+  const askCard = (className: string) => <AskCard state={asks} flow={flow} onProposal={answerProposal} repair={{ view: repair.view, onView: repair.setView, onAnswer: answerRepair }} className={className} />;
 
   const addDraft = () => {
     if (!target.text.trim()) return;
@@ -285,13 +277,13 @@ function Studio({ item, ...queue }: Props) {
           <div className="max-lg:hidden">
             <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} />
           </div>
-          <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} />
+          <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} picture={repair.picture} />
         </section>
         <aside
           aria-label="Notes"
           className={`bg-surface shadow-card flex min-h-0 flex-col overflow-hidden rounded-2xl ${notesOpen ? "max-lg:fixed max-lg:inset-x-3 max-lg:top-[calc(env(safe-area-inset-top)+4.5rem)] max-lg:bottom-3 max-lg:z-40 max-lg:shadow-lifted" : "max-lg:hidden"}`}
         >
-          <AskCard state={asks} flow={flow} onProposal={answerProposal} className="border-ink/8 hidden border-b p-4 lg:flex" />
+          {askCard("border-ink/8 hidden border-b p-4 lg:flex")}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {notes.length ? <NoteList notes={notes} onChange={change} onRemove={remove} /> : <NoNotesYet />}
           </div>
@@ -318,7 +310,7 @@ function Studio({ item, ...queue }: Props) {
         pending={pending}
         armed={armed}
         onSubmit={phone.tapSend}
-        ask={<AskCard state={asks} flow={flow} onProposal={answerProposal} className={CARD} />}
+        ask={askCard(CARD)}
       />
     </div>
   );
