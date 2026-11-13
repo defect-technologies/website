@@ -29,15 +29,15 @@ export async function revokeBotKeyAction(form: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean(), autoQueue: z.boolean(), designBoards: z.boolean() });
+const RunnerForm = z.object({ dailyCap: z.coerce.number().int().min(0).max(100), outreachPicksPreviews: z.boolean(), autoQueue: z.boolean(), designBoards: z.boolean(), tellFounders: z.boolean() });
 
-/** The daily build cap, whether new leads are built automatically, whether a first build stops for a founder to choose its design, and whether the Outreach bot may queue previews. */
+/** The daily build cap, whether new leads are built automatically, whether a first build stops for a founder to choose its design, whether the founders are emailed when something waits for them, and whether the Outreach bot may queue previews. */
 export async function saveRunnerSettingsAction(form: FormData) {
   const founder = await requireFounder();
-  const parsed = RunnerForm.safeParse({ dailyCap: form.get("dailyCap"), outreachPicksPreviews: form.get("outreachPicksPreviews") === "on", autoQueue: form.get("autoQueue") === "on", designBoards: form.get("designBoards") === "on" });
+  const parsed = RunnerForm.safeParse({ dailyCap: form.get("dailyCap"), outreachPicksPreviews: form.get("outreachPicksPreviews") === "on", autoQueue: form.get("autoQueue") === "on", designBoards: form.get("designBoards") === "on", tellFounders: form.get("tellFounders") === "on" });
   if (!parsed.success) return;
   await updateRunnerSettings(parsed.data, founder.email);
-  await record(founder.email, "changed preview runner settings", { detail: `${parsed.data.dailyCap} builds a day; Outreach ${parsed.data.outreachPicksPreviews ? "can" : "can't"} request previews; new leads ${parsed.data.autoQueue ? "are" : "aren't"} built automatically; design boards ${parsed.data.designBoards ? "on" : "off"}` });
+  await record(founder.email, "changed preview runner settings", { detail: `${parsed.data.dailyCap} builds a day; Outreach ${parsed.data.outreachPicksPreviews ? "can" : "can't"} request previews; new leads ${parsed.data.autoQueue ? "are" : "aren't"} built automatically; design boards ${parsed.data.designBoards ? "on" : "off"}; emails when something waits ${parsed.data.tellFounders ? "on" : "off"}` });
   revalidatePath("/admin", "layout");
 }
 

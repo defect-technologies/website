@@ -2,12 +2,14 @@ import "server-only";
 import { z } from "zod";
 import { BOARD_LETTERS, boardLessonsMarkdown, boardPreferences, pickAgreement } from "@/lib/boards";
 import { BOARDS_STEP } from "@/lib/previewJobs";
+import { designsWaitEmail } from "@/lib/turnEmails";
 import { record } from "../activity";
 import { BotError } from "../bots/http";
 import { isBoardPicture, MAX_PICTURE_BYTES, pictureName, storeBoardPicture } from "../boards/pictures";
 import { decisions, saveBoards } from "../boards/store";
 import type { PreviewJob } from "../db/schema";
 import { isActive, jobById, leadForJob, updateJob } from "./jobs";
+import { tellFounders } from "./tellFounders";
 
 const ACTOR = "bot:runner";
 const short = (most: number) => z.string().trim().max(most);
@@ -65,6 +67,7 @@ export async function reportBoards(id: string, body: z.infer<typeof BoardsBody>)
   const board = await saveBoards({ businessId: lead.id, jobId: job.id, options: body.options, pick: body.pick });
   await updateJob(job.id, { status: "done", step: BOARDS_STEP, finishedAt: new Date() });
   await record(ACTOR, "sent three design boards", { businessId: lead.id, detail: body.options.map((option) => `${option.letter.toUpperCase()}: ${option.name}`).join("; ") });
+  await tellFounders((adminUrl) => designsWaitEmail(lead.businessName, body.options, `${adminUrl}/designs/${board.id}`));
   return { ok: true, board: board.id };
 }
 
