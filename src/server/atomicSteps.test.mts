@@ -222,7 +222,7 @@ test("a repeated done for a revised preview stays held and raises no second flag
 });
 
 test("the retry note after a failed build is the exact text the engine strips", async () => {
-  const { RETRY_NOTE } = await import("./runner/api");
+  const { RETRY_NOTE } = await import("@/lib/previewJobs");
   assert.equal(RETRY_NOTE, "The last build of this site failed. Read verify/report.md and the latest design/review-*.md, and fix every failure they list before anything else.");
 });
 

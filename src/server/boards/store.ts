@@ -2,8 +2,9 @@ import "server-only";
 import { and, asc, count, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
+import { founderNote } from "@/lib/previewJobs";
 import { db } from "../db/client";
-import { businesses, designBoards, type DesignBoard } from "../db/schema";
+import { businesses, designBoards, previewJobs, type DesignBoard } from "../db/schema";
 
 /** How many decided boards the next draw and the next option writer learn from. */
 const DECISIONS_KEPT = 200;
@@ -79,6 +80,15 @@ export async function chooseBoard(id: string, letter: BoardLetter, feedback: str
     .where(and(eq(designBoards.id, id), isNull(designBoards.chosenAt)))
     .returning();
   return chosen ?? null;
+}
+
+/**
+ * What a founder wrote in the note of the job that made these boards. The job that builds their choice carries it, so
+ * the words are not lost when the build stops for the boards.
+ */
+export async function noteBehindBoards(board: Pick<DesignBoard, "jobId">): Promise<string> {
+  const [job] = await (await db()).select({ note: previewJobs.note }).from(previewJobs).where(eq(previewJobs.id, board.jobId));
+  return founderNote(job?.note ?? "");
 }
 
 export type BoardChoice = { letter: BoardLetter; feedback: string; by: string };
