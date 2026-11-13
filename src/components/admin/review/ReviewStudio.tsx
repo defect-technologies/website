@@ -10,10 +10,14 @@ import { useHydrated } from "@/hooks/useHydrated";
 import { type BridgeState, useReviewBridge } from "@/hooks/useReviewBridge";
 import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
-import { askAnchor } from "@/lib/reviewAsks";
+import type { CriticKind } from "@/lib/critics";
+import { askAnchor, type ReviewAsk } from "@/lib/reviewAsks";
+import { quickNote, quickNoteOn, sectionAnchor } from "@/lib/reviewSections";
 import { TURN_PATH } from "@/lib/turn";
 import AskCard from "./AskCard";
 import Segmented, { type Segment } from "../Segmented";
+import SectionCard from "./SectionCard";
+import { useSectionSteps } from "./useSectionSteps";
 import { useRepairAnswer } from "./useRepairAnswer";
 import { useRepairView } from "./useRepairView";
 import NoteComposer from "./NoteComposer";
@@ -188,6 +192,13 @@ function pointHandler({ bridgeState, businessId, hasNotes, setPointing, setResul
   };
 }
 
+/** What a new note points at: the element the founder picked, else the section they stepped to, else the open question's. */
+function draftTarget(draft: Draft, section: NoteAnchor | null, openQuestion: ReviewAsk | null): Draft {
+  if (draft.anchor) return draft;
+  if (section) return { ...draft, anchor: section };
+  return openQuestion ? { ...draft, anchor: askAnchor(openQuestion) } : draft;
+}
+
 function Studio({ item, ...queue }: Props) {
   const router = useRouter();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -230,15 +241,29 @@ function Studio({ item, ...queue }: Props) {
 
   const dictation = useDictation((phrase) => setDraft((current) => ({ ...current, text: appendPhrase(current.text, phrase) })));
 
-  // Until the founder points somewhere else, a note answers the open question about its element. A critic's proposal
-  // is answered with Yes or No only, so a note the founder writes meanwhile stays his own.
-  const target: Draft = draft.anchor || !openQuestion ? draft : { ...draft, anchor: askAnchor(openQuestion) };
+  const steps = useSectionSteps(bridge, pointing);
+  // Until the founder points somewhere else, a note is about the section they stepped to, or answers the open question
+  // about its element. A critic's proposal is answered with Yes or No only, so a note written meanwhile stays his own.
+  const target = draftTarget(draft, steps.current ? sectionAnchor(steps.current, bridge.path) : null, openQuestion);
+  const toggleQuickNote = (kind: CriticKind) => {
+    if (!steps.current) return;
+    const on = quickNoteOn(notes, steps.current, kind);
+    if (on) return remove(on.id);
+    const note = quickNote(steps.current, kind, device, bridge.path, crypto.randomUUID());
+    if (note) add(note);
+  };
 
   const answerProposal = useProposalAnswer(currentAsk, flow, add);
   const answerRepair = useRepairAnswer(currentAsk, flow, add);
   const repair = useRepairView(currentAsk);
   useShowAsk(bridge, currentAsk);
-  const askCard = (className: string) => <AskCard state={asks} flow={flow} onProposal={answerProposal} repair={{ view: repair.view, onView: repair.setView, onAnswer: answerRepair }} className={className} />;
+  // While pointing at a preview that reports its sections, the card steps through them; otherwise it asks its questions.
+  const askCard = (className: string) =>
+    steps.current ? (
+      <SectionCard steps={steps} notes={notes} onQuickNote={toggleQuickNote} className={className} />
+    ) : (
+      <AskCard state={asks} flow={flow} onProposal={answerProposal} repair={{ view: repair.view, onView: repair.setView, onAnswer: answerRepair }} className={className} />
+    );
 
   const addDraft = () => {
     if (!target.text.trim()) return;
