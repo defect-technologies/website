@@ -65,6 +65,7 @@ export async function navCounts() {
   const sendable = [...sendQueue.requested, ...sendQueue.followUps, ...sendQueue.firstEmails].filter((item) => item.blockers.length === 0).length;
   const [builds, review, designs] = await Promise.all([runnerStatus(), reviewQueueCount(), countBoardsWaiting()]);
   return {
+    turn: review + designs,
     review,
     designs,
     building: builds.current.length > 0,
