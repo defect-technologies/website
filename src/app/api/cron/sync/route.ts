@@ -9,5 +9,6 @@ import { syncMail } from "@/server/mail/sync";
 export async function GET(request: Request) {
   if (!hasBearer(request, env.cronSecret())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const [mail, payments] = await Promise.all([syncMail(), syncPayments()]);
-  return NextResponse.json({ mail, payments });
+  const failed = payments.state === "error" || mail.errors.length > 0;
+  return NextResponse.json({ mail, payments }, { status: failed ? 500 : 200 });
 }

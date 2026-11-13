@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { mock, test } from "node:test";
+import { startEmptyTestDatabase } from "./emptyTestDatabase";
 
 mock.module("server-only", { namedExports: {} });
 
 test("a corrected name reaches the prospect and its lead while the lead is new, and never a contacted lead", async () => {
+  const closeDatabase = await startEmptyTestDatabase();
   const { db } = await import("./db/client");
   const { businesses, prospects } = await import("./db/schema");
   const { ProspectInput, upsertProspects, renameProspects } = await import("./prospects");
@@ -25,6 +27,5 @@ test("a corrected name reaches the prospect and its lead while the lead is new, 
   assert.equal(leads[0].name, "Styling Studio");
   const sent = await database.select({ name: businesses.businessName }).from(businesses).where(eq(businesses.slug, `rename-${stamp}-sent`));
   assert.equal(sent[0].name, "Los Angeles, CA");
-  // The in-process Postgres stays open otherwise, and the test run never ends.
-  await (database as unknown as { $client?: { close?: () => Promise<void> } }).$client?.close?.();
+  await closeDatabase();
 });

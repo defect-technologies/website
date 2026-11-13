@@ -18,8 +18,11 @@ export async function integration<T>(settings: Record<string, string>, load: () 
   }
 }
 
+/** How long an outside service gets to answer before the call is given up. */
+export const OUTSIDE_CALL_TIMEOUT_MS = 15_000;
+
 export async function getJson<T>(url: string, headers: Record<string, string>): Promise<T> {
-  const response = await fetch(url, { headers, cache: "no-store" });
+  const response = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`${new URL(url).host} answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
   return (await response.json()) as T;
 }

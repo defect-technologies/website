@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { approvePreviewAction, requestPreviewAction } from "@/app/admin/(panel)/sites/actions";
 import { handToClaudeAction, resolveFlagAction } from "@/app/admin/(panel)/review/actions";
 import { buttonClasses } from "@/components/Button";
+import { claimStartedAt, isStaleClaim } from "@/lib/claudeClaim";
 import { FIXER_LABEL, type Fixer } from "@/lib/flags";
 import type { Flag } from "@/server/db/schema";
 import type { FlagRow } from "@/server/bots/flags";
@@ -113,8 +114,9 @@ function ClaudeStatus({ flag }: { flag: Flag }) {
       </form>
     );
   }
-  const started = flag.reviewer === "claude" ? /\d{4}-\d{2}-\d{2}T[\d:.]+Z/.exec(flag.note)?.[0] : undefined;
+  const started = flag.reviewer === "claude" ? claimStartedAt(flag.note) : undefined;
   if (!started) return <StatusMark icon={Clock} label="Queued for Claude" detail="Claude picks this up within a few minutes." />;
+  if (isStaleClaim(flag.note)) return <StatusMark icon={Clock} label="Claude stalled" detail="Claude's session never reported back. It picks this up again within a few minutes." />;
   return <StatusMark icon={Robot} tone="ink" label={<>Claude since <When date={new Date(started)} /></>} />;
 }
 

@@ -17,7 +17,7 @@ import { recordProposalAnswer } from "@/server/review/criticProposals";
 import { withClasses } from "@/server/review/noteClassifier";
 import { splitSpokenNotes, type SplitNote } from "@/server/review/noteWriter";
 import { addTasteLessons, restoreTasteLesson, retireTasteLesson, updateTasteLesson } from "@/server/review/taste";
-import { requestPreview } from "@/server/runner/jobs";
+import { activeJobFor, requestPreview } from "@/server/runner/jobs";
 
 export type ReviewResult = { ok: boolean; message: string };
 
@@ -58,15 +58,18 @@ async function reviewedLead(input: z.input<typeof Review>): Promise<Checked> {
   return { error: null, founder, lead, review: parsed.data };
 }
 
+const REBUILDING_MESSAGE = "This preview is already rebuilding. Your notes are still here.";
+
 /** Sends the notes to the builder as one rebuild, and keeps every "every site" note as a taste lesson. */
 export async function sendReviewAction(input: z.input<typeof Review>): Promise<ReviewResult> {
   const checked = await reviewedLead(input);
   if (checked.error !== null) return { ok: false, message: checked.error };
   const { founder, lead, review } = checked;
   if (!review.notes.length) return { ok: false, message: "Add a note first, or approve the preview." };
+  if (await activeJobFor(lead.id)) return { ok: false, message: REBUILDING_MESSAGE };
   const notes = await withClasses(review.notes);
   const { job, created } = await requestPreview(lead, founder.email, compileReviewNote(notes, review.previewUrl));
-  if (!created) return { ok: false, message: "This preview is already rebuilding. Your notes are still here." };
+  if (!created) return { ok: false, message: REBUILDING_MESSAGE };
   await addTasteLessons(review.notes.filter((note) => note.scope === "every").map((note) => note.text), founder.email, lead.id);
   await (await db()).insert(previewReviews).values({ businessId: lead.id, previewUrl: review.previewUrl, verdict: "changes", notes, jobId: job.id, reviewedBy: founder.email });
   revalidatePath("/admin", "layout");

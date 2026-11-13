@@ -1,5 +1,6 @@
 import "server-only";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, or } from "drizzle-orm";
+import { isStaleClaim } from "@/lib/claudeClaim";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, flags, type Flag } from "../db/schema";
@@ -23,15 +24,16 @@ export interface ClaudeFlag {
   prompt: string;
 }
 
-/** Open flags assigned to Claude that no session has claimed yet, oldest first. */
+/** Open flags assigned to Claude that no session has claimed yet, or whose claim is too old for a session to still be running, oldest first. */
 export async function waitingClaudeFlags(): Promise<ClaudeFlag[]> {
   const rows = await (await db())
     .select({ flag: flags, lead: businesses })
     .from(flags)
     .leftJoin(businesses, eq(flags.businessId, businesses.id))
-    .where(and(eq(flags.status, "open"), eq(flags.fixer, CLAUDE), ne(flags.reviewer, CLAUDE)))
+    .where(and(eq(flags.status, "open"), eq(flags.fixer, CLAUDE)))
     .orderBy(flags.at);
-  return rows.map(({ flag, lead }) => ({
+  const waiting = rows.filter(({ flag }) => flag.reviewer !== CLAUDE || isStaleClaim(flag.note));
+  return waiting.map(({ flag, lead }) => ({
     id: flag.id,
     headline: flag.headline || flag.whatHappened,
     ask: flag.ask,
@@ -43,12 +45,16 @@ export async function waitingClaudeFlags(): Promise<ClaudeFlag[]> {
   }));
 }
 
-/** Marks a flag as Claude's. False when it's gone, resolved or already claimed. */
+/** Marks a flag as Claude's. False when it's gone, resolved or claimed by a session that may still be running. */
 export async function claimClaudeFlag(id: string): Promise<boolean> {
-  const [claimed] = await (await db())
+  const database = await db();
+  const [current] = await database.select({ reviewer: flags.reviewer, note: flags.note }).from(flags).where(eq(flags.id, id));
+  const staleClaimNote = current?.reviewer === CLAUDE && isStaleClaim(current.note) ? current.note : null;
+  const notClaimed = staleClaimNote === null ? ne(flags.reviewer, CLAUDE) : or(ne(flags.reviewer, CLAUDE), eq(flags.note, staleClaimNote));
+  const [claimed] = await database
     .update(flags)
     .set({ reviewer: CLAUDE, note: `Claude started on this ${new Date().toISOString()}.`, updatedAt: new Date() })
-    .where(and(eq(flags.id, id), eq(flags.status, "open"), ne(flags.reviewer, CLAUDE)))
+    .where(and(eq(flags.id, id), eq(flags.status, "open"), notClaimed))
     .returning({ id: flags.id, businessId: flags.businessId });
   if (!claimed) return false;
   await record(CLAUDE, "started on a flag", { businessId: claimed.businessId, detail: id });

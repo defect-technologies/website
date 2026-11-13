@@ -78,7 +78,7 @@ export function useDictation(onPhrase: (text: string) => void) {
       stop();
     };
     session.onend = () => {
-      if (wanted.current) session.start();
+      if (wanted.current && recognition.current === session) session.start();
     };
     recognition.current = session;
     wanted.current = true;

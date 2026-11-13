@@ -15,6 +15,10 @@ export function RunnerSettingsForm({ settings }: { settings: RunnerSettings }) {
         Build previews for new leads automatically
       </label>
       <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input type="checkbox" name="designBoards" defaultChecked={settings.designBoards} className="accent-ink size-4" />
+        Stop each first build for a founder to choose its design
+      </label>
+      <label className="flex min-h-11 items-center gap-2 text-sm">
         <input type="checkbox" name="outreachPicksPreviews" defaultChecked={settings.outreachPicksPreviews} className="accent-ink size-4" />
         Let the Outreach bot request previews
       </label>

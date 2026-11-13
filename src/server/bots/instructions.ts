@@ -21,6 +21,7 @@ const SPEC_PATH: Record<SpecBot, string> = {
 };
 
 const CACHE_MS = 60_000;
+const GITHUB_TIMEOUT_MS = 10_000;
 const LOADED = "loaded new instructions";
 
 export type BotInstructions = { bot: SpecBot; version: string; instructions: string; source: string };
@@ -44,6 +45,9 @@ async function fetchSpec(path: string): Promise<string> {
   const response = await fetch(`https://api.github.com/repos/${SPEC_REPO}/contents/${path}?ref=main`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" },
     cache: "no-store",
+    signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
+  }).catch(() => {
+    throw new BotError(502, "GitHub didn't answer in time for your instructions. Keep using your saved copy.");
   });
   if (!response.ok) throw new BotError(502, `GitHub answered ${response.status} for your instructions. Keep using your saved copy.`);
   return response.text();

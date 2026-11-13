@@ -1,7 +1,9 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowLeft, ArrowSquareOut, ChatsCircle, Globe, Eye, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 import { buttonClasses } from "@/components/Button";
 import BrandFiles from "@/components/admin/BrandFiles";
 import BuildProgress, { clockTime } from "@/components/admin/BuildProgress";
@@ -35,9 +37,12 @@ type Params = { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: s
 
 const isUuid = (value: string) => /^[0-9a-f-]{36}$/i.test(value);
 
+/** The metadata and the page both need this row; one request reads it once. */
+const leadById = cache(businessById);
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
-  const business = isUuid(id) ? await businessById(id) : null;
+  const business = isUuid(id) ? await leadById(id) : null;
   return { title: business?.businessName ?? "Site" };
 }
 
@@ -207,9 +212,10 @@ async function slugRedirect(id: string) {
 }
 
 export default async function SitePage({ params, searchParams }: Params) {
+  await requireFounder();
   const { id } = await params;
   if (!isUuid(id)) await slugRedirect(id);
-  const business = await businessById(id);
+  const business = await leadById(id);
   if (!business) notFound();
   const requested = (await searchParams).tab as Tab;
   const tab = TABS.includes(requested) ? requested : "overview";

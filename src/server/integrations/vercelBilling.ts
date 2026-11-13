@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "../env";
+import { OUTSIDE_CALL_TIMEOUT_MS } from "./result";
 
 type Charge = { BilledCost: number | string; ChargeCategory: string; ServiceName: string };
 
@@ -22,7 +23,7 @@ export type CycleCharges = {
 async function charges(from: Date, to: Date): Promise<Charge[]> {
   const { token, teamId } = env.vercel();
   const params = new URLSearchParams({ teamId, from: from.toISOString(), to: to.toISOString() });
-  const response = await fetch(`https://api.vercel.com/v1/billing/charges?${params}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  const response = await fetch(`https://api.vercel.com/v1/billing/charges?${params}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`Vercel billing answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
   return (await response.text())
     .split("\n")

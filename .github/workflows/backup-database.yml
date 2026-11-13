@@ -6,6 +6,9 @@ on:
     - cron: "17 9 * * 0"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx tsx scripts/backup-database.mts
         env:
           FROM_DATABASE_URL: ${{ secrets.BACKUP_FROM_DATABASE_URL }}

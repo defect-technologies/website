@@ -7,21 +7,27 @@ import { db } from "../db/client";
 import { previewJobs } from "../db/schema";
 import { businessById } from "../leads/businesses";
 import { requestPreview } from "../runner/jobs";
-import { reviewQueue } from "./queue";
+import type { ReviewItem } from "./queue";
 
 /** site-kit #34 (kit 0.11.8, the review bridge with its question label) merged; the runner builds from site-kit main. */
 const BRIDGE_KIT_MERGED_AT = new Date("2026-11-10T17:05:56Z");
 const ACTOR = "admin";
 
-/** The build that made this preview, or null when the runner didn't make it (a preview deployed by hand). */
-async function buildOf(businessId: string, previewUrl: string) {
-  const [job] = await (await db())
-    .select({ startedAt: previewJobs.startedAt })
+/** When the runner started the build behind each preview, by business. A preview the runner didn't make has no entry. */
+async function buildStartTimes(items: ReviewItem[]): Promise<Map<string, Date | null>> {
+  if (!items.length) return new Map();
+  const rows = await (await db())
+    .select({ businessId: previewJobs.businessId, previewUrl: previewJobs.previewUrl, startedAt: previewJobs.startedAt })
     .from(previewJobs)
-    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.previewUrl, previewUrl), eq(previewJobs.status, "done")))
-    .orderBy(desc(previewJobs.finishedAt))
-    .limit(1);
-  return job ?? null;
+    .where(and(inArray(previewJobs.businessId, items.map((item) => item.id)), eq(previewJobs.status, "done")))
+    .orderBy(desc(previewJobs.finishedAt));
+  const previewUrlOf = new Map(items.map((item) => [item.id, item.previewUrl]));
+  const startTimes = new Map<string, Date | null>();
+  for (const row of rows) {
+    if (row.previewUrl !== previewUrlOf.get(row.businessId) || startTimes.has(row.businessId)) continue;
+    startTimes.set(row.businessId, row.startedAt);
+  }
+  return startTimes;
 }
 
 /**
@@ -29,11 +35,12 @@ async function buildOf(businessId: string, previewUrl: string) {
  * review page can take the founder to each question's element. A preview with a build already queued leaves the queue,
  * so this runs once per preview.
  */
-export async function queuePointingUpdates(): Promise<number> {
+export async function queuePointingUpdates(queue: ReviewItem[]): Promise<number> {
   let queued = 0;
-  for (const item of await reviewQueue()) {
-    const build = await buildOf(item.id, item.previewUrl);
-    if (!build?.startedAt || build.startedAt >= BRIDGE_KIT_MERGED_AT) continue;
+  const startTimes = await buildStartTimes(queue);
+  for (const item of queue) {
+    const startedAt = startTimes.get(item.id);
+    if (!startedAt || startedAt >= BRIDGE_KIT_MERGED_AT) continue;
     const lead = await businessById(item.id);
     if (lead && (await requestPreview(lead, ACTOR, POINTING_NOTE)).created) queued++;
   }

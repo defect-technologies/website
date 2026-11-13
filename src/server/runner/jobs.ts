@@ -1,15 +1,13 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
-import { ACTIVE_JOB_STATUSES, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
+import { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray, sql } from "drizzle-orm";
+import { ACTIVE_JOB_STATUSES, BOARDS_STEP, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
 import { businessById, updateBusiness } from "../leads/businesses";
+import { PACIFIC_MIDNIGHT as LA_MIDNIGHT } from "../outreach/pacificDay";
 
 export type RequestResult = { job: PreviewJob; created: boolean };
-
-/** Midnight in Los Angeles, as a timestamp, so the daily cap follows the founders' day. */
-const LA_MIDNIGHT = sql`(date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')`;
 
 export async function activeJobFor(businessId: string): Promise<PreviewJob | null> {
   const [job] = await (await db())
@@ -62,8 +60,8 @@ export async function failuresInARow(businessId: string): Promise<number> {
   const jobs = await (await db())
     .select({ status: previewJobs.status })
     .from(previewJobs)
-    // A skipped build isn't a failure: the runner chose not to build.
-    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.kind, "preview"), inArray(previewJobs.status, ["done", "failed"]), ne(previewJobs.step, SKIPPED_STEP)))
+    // A skipped build isn't a failure: the runner chose not to build. A job that only made boards isn't a success either.
+    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.kind, "preview"), inArray(previewJobs.status, ["done", "failed"]), notInArray(previewJobs.step, [SKIPPED_STEP, BOARDS_STEP])))
     .orderBy(desc(previewJobs.createdAt))
     .limit(10);
   const firstSuccess = jobs.findIndex((job) => job.status === "done");
@@ -104,8 +102,8 @@ export async function buildsToday(): Promise<number> {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
     .from(previewJobs)
-    // A skip takes a minute and builds nothing, so it doesn't use up a build.
-    .where(and(eq(previewJobs.kind, "preview"), ne(previewJobs.step, SKIPPED_STEP), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
+    // A skip takes a minute and builds nothing, so it doesn't use up a build. Neither does a job that only made boards.
+    .where(and(eq(previewJobs.kind, "preview"), notInArray(previewJobs.step, [SKIPPED_STEP, BOARDS_STEP]), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
   return row?.count ?? 0;
 }
 

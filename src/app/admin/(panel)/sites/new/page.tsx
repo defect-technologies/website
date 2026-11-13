@@ -1,3 +1,4 @@
+import { requireFounder } from "@/server/auth/session";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -8,6 +9,7 @@ import { listBusinesses } from "@/server/leads/businesses";
 export const metadata: Metadata = { title: "Add a site" };
 
 export default async function AddSitePage() {
+  await requireFounder();
   const paid = await listBusinesses({ stage: "paid" });
   const clients = paid.map((business) => ({ id: business.id, name: business.businessName }));
 

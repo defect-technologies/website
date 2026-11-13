@@ -11,7 +11,7 @@ import { FOUNDERS, founderName } from "@/lib/founders";
 import { formatCents, monthName, monthOf, todayInPacific, type MonthBalance } from "@/lib/settleUp";
 import { requireFounder } from "@/server/auth/session";
 import type { Expense, ExpenseFrequency, RecurringExpense } from "@/server/db/schema";
-import { balances } from "@/server/expenses/expenses";
+import { expenseBalances as balances } from "@/server/today";
 import { stripeSummary } from "@/server/integrations/stripe";
 
 export const metadata: Metadata = { title: "Money" };

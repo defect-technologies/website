@@ -6,9 +6,11 @@
  */
 import assert from "node:assert/strict";
 import { after, mock, test } from "node:test";
+import { startEmptyTestDatabase } from "../emptyTestDatabase";
 
 mock.module("server-only", { namedExports: {} });
 
+const closeDatabase = await startEmptyTestDatabase();
 const realFetch = globalThis.fetch;
 const realToken = process.env.GITHUB_READ_TOKEN;
 process.env.GITHUB_READ_TOKEN = "test-token";
@@ -21,9 +23,7 @@ after(async () => {
   globalThis.fetch = realFetch;
   if (realToken === undefined) delete process.env.GITHUB_READ_TOKEN;
   else process.env.GITHUB_READ_TOKEN = realToken;
-  const { db } = await import("../db/client");
-  // The in-process Postgres stays open otherwise, and the test run never ends.
-  await ((await db()) as unknown as { $client?: { close?: () => Promise<void> } }).$client?.close?.();
+  await closeDatabase();
 });
 
 const call = (GET: (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>, key?: string) =>

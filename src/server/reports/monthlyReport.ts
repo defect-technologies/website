@@ -64,12 +64,15 @@ async function reportOne(site: SiteWithProject, month: ReturnType<typeof lastTwo
   const subject = `Your website in ${month.label}: ${plural(totalActions(analytics.data).now, "person", "people")} reached you`;
   try {
     await deliver((from) => ({ from: { name: STUDIO_NAME, email: from?.email ?? "outbox@dev.localhost" }, to: site.ownerEmail, subject, body, html: withTeamSignatureHtml(body) }), await studioMailboxId());
-    await record("monthly report", "sent the monthly report", { businessId: site.businessId, detail: `${month.label} to ${site.ownerEmail}` });
-    return "sent";
   } catch (error) {
     await record("monthly report", "monthly report failed", { businessId: site.businessId, detail: (error as Error).message });
     return "failed";
   }
+  return "sent";
+}
+
+async function noteSent(site: SiteWithProject, month: ReturnType<typeof lastTwoMonths>) {
+  await record("monthly report", "sent the monthly report", { businessId: site.businessId, detail: `${month.label} to ${site.ownerEmail}` }).catch((error) => console.error("[monthly report] log", error));
 }
 
 /**
@@ -84,8 +87,10 @@ export async function sendMonthlyReports(now = new Date()): Promise<Record<strin
   for (const site of await sitesWithProjects()) {
     if (sent.has(site.slug)) continue;
     outcomes[site.slug] = await reportOne(site, month);
-    if (outcomes[site.slug] === "sent") sent.add(site.slug);
+    if (outcomes[site.slug] !== "sent") continue;
+    sent.add(site.slug);
+    await saveSent(month.key, sent);
+    await noteSent(site, month);
   }
-  await saveSent(month.key, sent);
   return outcomes;
 }

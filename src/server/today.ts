@@ -1,10 +1,11 @@
 import "server-only";
 import { cache } from "react";
 import { monthOf, todayInPacific, type MonthBalance } from "@/lib/settleUp";
+import { countBoardsWaiting } from "./boards/store";
 import { openFlags, resolvedFlags } from "./bots/flags";
 import { balances } from "./expenses/expenses";
 import { leadMatcher, openOfKinds, pastRequests } from "./inbound/requests";
-import { threadSummaries } from "./mail/threads";
+import { threadSummaries, unreadMessageCount } from "./mail/threads";
 import { outreachQueue } from "./outreach/queue";
 import { reviewQueueCount } from "./review/queue";
 import { runnerStatus } from "./runner/status";
@@ -12,11 +13,14 @@ import { openSpotChecks } from "./spotChecks";
 
 /** The layout's badges and the Today page both read these in one request; React's cache runs each once. */
 const queue = cache(outreachQueue);
-const months = cache(async () => (await balances()).months);
+const expenseBalances = cache(balances);
+const months = cache(async () => (await expenseBalances()).months);
 const flagsOpen = cache(openFlags);
 const spotChecksOpen = cache(openSpotChecks);
 const founderMail = cache(() => openOfKinds(["request", "founder", "unsorted"]));
 const threads = cache(threadSummaries);
+
+export { expenseBalances, threads };
 
 /** A finished month where one founder still owes the other. */
 function settleDue(all: MonthBalance[]): MonthBalance[] {
@@ -57,13 +61,14 @@ export async function today() {
 
 /** The nav's badges. Today counts what a founder has to do; Messages counts what they haven't read. */
 export async function navCounts() {
-  const [flags, inbound, sendQueue, spotChecks, monthRows, threadRows] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), threads()]);
+  const [flags, inbound, sendQueue, spotChecks, monthRows, unreadMessages] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), unreadMessageCount()]);
   const sendable = [...sendQueue.requested, ...sendQueue.followUps, ...sendQueue.firstEmails].filter((item) => item.blockers.length === 0).length;
-  const [builds, review] = await Promise.all([runnerStatus(), reviewQueueCount()]);
+  const [builds, review, designs] = await Promise.all([runnerStatus(), reviewQueueCount(), countBoardsWaiting()]);
   return {
     review,
+    designs,
     building: builds.current.length > 0,
     today: flags.length + inbound.length + sendable + spotChecks.length + settleDue(monthRows).length,
-    messages: threadRows.reduce((total, thread) => total + thread.unread, 0),
+    messages: unreadMessages,
   };
 }

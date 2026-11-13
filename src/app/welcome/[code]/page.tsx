@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { buttonClasses, ButtonLink } from "@/components/Button";
 import PaintedHeadline from "@/components/PaintedHeadline";
@@ -21,12 +22,15 @@ import { launchDomainOf } from "@/server/integrations/domain";
 import { monthlyPriceOf } from "@/server/integrations/stripe";
 import { businessByLinkCode } from "@/server/leads/businesses";
 
+/** The metadata and the page both need this row; one request reads it once. */
+const leadForCode = cache(businessByLinkCode);
+
 type Props = { params: Promise<{ code: string }> };
 
 const SECTION = "mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-[10vh] sm:px-8";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const business = await businessByLinkCode((await params).code);
+  const business = await leadForCode((await params).code);
   return {
     title: business ? `${business.businessName}'s new website` : "defect.tech",
     robots: { index: false, follow: false },
@@ -90,7 +94,7 @@ function CheckoutArea({ business, code }: { business: Business; code: string }) 
 
 export default async function WelcomePage({ params }: Props) {
   const { code } = await params;
-  const business = await businessByLinkCode(code);
+  const business = await leadForCode(code);
   if (!business?.previewUrl) notFound();
   const price = monthlyPriceOf(business);
   return (
