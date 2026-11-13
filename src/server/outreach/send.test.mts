@@ -121,6 +121,29 @@ describe("sendOutreach after a failure", () => {
   });
 });
 
+describe("the daily limit at the moment of sending", () => {
+  it("lets only one of two founders send when one email is left under the limit", async () => {
+    await saveOutreachSettings({ ...DEFAULT_SETTINGS, mailingAddress: "1 Main St, Los Angeles, CA", senderName: "Boris", dailyLimit: 1 }, "test");
+    const [{ id: otherId }] = await database
+      .insert(businesses)
+      .values({ slug: "other", linkCode: "def456", businessName: "Other", email: "owner@other.example", previewUrl: "https://other.preview.example", priceArm: 59, problemSummary: "the site is slow", stage: "preview_built" })
+      .returning({ id: businesses.id });
+    let sends = 0;
+    deliverImpl = async () => {
+      sends += 1;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return delivered(`race-${sends}`);
+    };
+    try {
+      const results = await Promise.all([sendOutreach("first", businessId, founder), sendOutreach("first", otherId, founder)]);
+      assert.equal(results.filter((result) => result.ok).length, 1);
+      assert.equal(sends, 1);
+    } finally {
+      await saveOutreachSettings({ ...DEFAULT_SETTINGS, mailingAddress: "1 Main St, Los Angeles, CA", senderName: "Boris", dailyLimit: 50 }, "test");
+    }
+  });
+});
+
 describe("unskipLead", () => {
   const skipThenUndo = async () => {
     await skipLead(await savedBusiness(), founder, "Skipped from the outreach queue.");
