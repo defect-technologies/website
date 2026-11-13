@@ -34,6 +34,13 @@ function splitResults(event: RecognitionEvent): { final: string; interim: string
   return { final, interim };
 }
 
+/** Dictated phrases join what is already written as sentences. */
+export function appendPhrase(text: string, phrase: string): string {
+  const spoken = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+  const ended = /[.!?]$/.test(spoken) ? spoken : `${spoken}.`;
+  return text.trim() ? `${text.trimEnd()} ${ended}` : ended;
+}
+
 /** Errors that mean the microphone can't be used at all, so listening stops instead of restarting. */
 const FATAL_ERRORS = new Set(["not-allowed", "service-not-allowed", "audio-capture"]);
 

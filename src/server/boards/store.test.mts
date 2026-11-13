@@ -67,6 +67,7 @@ test("a picture counts only when it is in our store, in the lead's boards folder
   assert.ok(!isBoardPicture(`${STORE}/brand/lead-1/logo.png`, "lead-1"), "not a board");
   assert.ok(!isBoardPicture("https://evil.example/boards/lead-1/a-board.jpg", "lead-1"), "another host");
   assert.deepEqual(pictureName("b-desktop"), { letter: "b", view: "desktop" });
+  assert.deepEqual(pictureName("c-narrow"), { letter: "c", view: "narrow" }, "the board for a phone, from a newer kit");
   assert.equal(pictureName("d-board"), null);
   assert.equal(pictureName("a-poster"), null);
 });
@@ -124,7 +125,7 @@ test("decided boards teach the next build", async () => {
   assert.match(memory.markdown, /- Said: Quieter orange\./);
 });
 
-type Claim = { job: { id: string; note: string }; lead: { id: string }; boards?: boolean; board?: unknown; repair?: boolean };
+type Claim = { job: { id: string; note: string }; lead: { id: string }; boards?: boolean; board?: unknown; boardsAgain?: unknown; repair?: boolean };
 
 /**
  * What the runner is handed for the lead's next job, as GET /api/runner/next answers it. It asks under its own name:
@@ -199,3 +200,64 @@ async function boardFromNotedPreview(lead: { id: string }) {
   await reportBoards(job.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
   return (await store.waitingBoardFor(lead.id))!;
 }
+
+test("a founder who wants none of the three gets three new designs, with their words, and nothing is built or learned from the ones turned down", async () => {
+  made += 1;
+  const [lead] = await database.insert(businesses).values({ businessName: "Redrawn Bakery", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example`, previewUrl: "https://redrawn-1.vercel.app" } as never).returning();
+  await requestPreview(lead, "brendan@g.studio", "Start a new design.");
+  const boardsJob = (await claimNextJob("runner-1"))!;
+  await reportBoards(boardsJob.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  const board = (await store.waitingBoardFor(lead.id))!;
+  assert.equal(await store.redrawFor(lead.id), null, "the boards still wait for a decision");
+  const decidedBefore = (await store.boardsDecided()).length;
+
+  const turnedDown = await store.redrawBoards(board.id, "  All three are too loud.  ", "brendan@g.studio");
+  assert.equal(turnedDown?.chosenLetter, "redrawn");
+  assert.equal(await store.redrawBoards(board.id, "", "boris.nezlobin@gmail.com"), null, "the first decision stands");
+  assert.equal(await store.chooseBoard(board.id, "a", "", "boris.nezlobin@gmail.com"), null, "and it can't be chosen from any more");
+  assert.equal(await store.waitingBoardFor(lead.id), null);
+  assert.equal((await store.boardsDecided()).length, decidedBefore, "a board turned down is not a choice: it is not listed and teaches nothing");
+  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "All three are too loud.", by: "Brendan" });
+
+  const redraw = await claimed(lead, await store.noteBehindBoards(board));
+  assert.equal(redraw.job.note, "Start a new design.", "the note behind the first boards goes on");
+  assert.equal(redraw.boards, true);
+  assert.deepEqual(redraw.boardsAgain, { feedback: "All three are too loud.", by: "Brendan" });
+  assert.equal(redraw.board, undefined);
+  assert.equal(redraw.repair, undefined);
+
+  await reportBoards(redraw.job.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  assert.equal(await store.redrawFor(lead.id), null, "the new boards are the newest now, so nothing is drawn again");
+  assert.ok(await store.waitingBoardFor(lead.id), "and they wait for a founder");
+});
+
+test("boards are drawn again when a founder asks, also for a lead whose note would otherwise be a repair or with boards switched off", async () => {
+  made += 1;
+  const [lead] = await database.insert(businesses).values({ businessName: "Switched Florist", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example`, previewUrl: "https://switched-1.vercel.app" } as never).returning();
+  await requestPreview(lead, "brendan@g.studio", "On / at phone width, the <h1>: too large.");
+  const boardsJob = (await claimNextJob("runner-1"))!;
+  await reportBoards(boardsJob.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  const board = (await store.waitingBoardFor(lead.id))!;
+  await store.redrawBoards(board.id, "", "brendan@g.studio");
+  const { updateRunnerSettings } = await import("../runner/settings");
+  await updateRunnerSettings({ designBoards: false }, "brendan@g.studio");
+  const redraw = await claimed(lead, await store.noteBehindBoards(board));
+  await updateRunnerSettings({ designBoards: true }, "brendan@g.studio");
+  assert.equal(redraw.boards, true);
+  assert.deepEqual(redraw.boardsAgain, { feedback: "", by: "Brendan" });
+  assert.equal(redraw.repair, undefined, "a founder asked for designs, not for a change to the preview");
+  await finish(redraw.job.id);
+});
+
+test("an option may carry its board for a phone, and one from somewhere else is refused like any picture", async () => {
+  const { lead, job } = await leadWithRunningJob("Narrow Heating");
+  const options = threeOptions(lead.id).map((entry) => ({ ...entry, pictures: { ...entry.pictures, narrow: `${STORE}/boards/${lead.id}/job/${entry.letter}-narrow-x1.jpg` } }));
+  const stranger = structuredClone(options);
+  stranger[2].pictures.narrow = "https://evil.example/c-narrow.jpg";
+  await assert.rejects(() => reportBoards(job.id, BoardsBody.parse({ options: stranger })), /one this job uploaded/);
+  await reportBoards(job.id, BoardsBody.parse({ options }));
+  const board = (await store.waitingBoardFor(lead.id))!;
+  assert.equal(board.options[1].pictures.narrow, `${STORE}/boards/${lead.id}/job/b-narrow-x1.jpg`);
+  assert.equal(BoardsBody.parse({ options: threeOptions(lead.id) }).options[0].pictures.narrow, undefined, "an older runner sends none");
+  await store.chooseBoard(board.id, "a", "", "brendan@g.studio");
+});

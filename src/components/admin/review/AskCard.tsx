@@ -4,7 +4,7 @@ import { AppWindow, ArrowsHorizontal, Check, CircleNotch, DeviceMobile, GlobeHem
 import type { CriticTarget } from "@/lib/critics";
 import type { AskRepair, AskTopic, RepairView } from "@/lib/reviewAsks";
 import KnifeStroke from "../KnifeStroke";
-import Segmented, { type Segment } from "./Segmented";
+import Segmented, { type Segment } from "../Segmented";
 import type { AsksState } from "./useReviewAsks";
 import type { AskAnswer, AskFlow } from "./useAskFlow";
 

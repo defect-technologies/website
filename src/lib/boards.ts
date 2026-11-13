@@ -5,8 +5,27 @@
 export const BOARD_LETTERS = ["a", "b", "c"] as const;
 export type BoardLetter = (typeof BOARD_LETTERS)[number];
 
-export const BOARD_VIEWS = ["board", "desktop", "phone"] as const;
+/**
+ * A founder wanted none of a board's three options and asked for three new ones. The board is decided with this in
+ * place of a letter (design_boards.chosen_letter, so no migration): nothing is built from it, and the runner draws again.
+ */
+export const REDRAWN = "redrawn";
+
+/** What the runner is handed to draw a lead's boards again: the founder's words about the three it turned down. */
+export interface BoardRedraw {
+  feedback: string;
+  by: string;
+}
+
+/**
+ * The pictures of one option: its whole board, its first screen on a desktop and on a phone, and (from site-kit 0.15.0)
+ * the board in one column at a phone's width, for a founder who chooses on a phone.
+ */
+export const BOARD_VIEWS = ["board", "desktop", "phone", "narrow"] as const;
 export type BoardView = (typeof BOARD_VIEWS)[number];
+
+/** Where an option's pictures are. Boards made before the narrow board have none. */
+export type BoardPictures = { board: string; desktop: string; phone: string; narrow?: string };
 
 export interface BoardControls {
   shape: string | null;
@@ -34,7 +53,7 @@ export interface BoardOption {
   texture: string;
   /** Drawn without the founders' preferences, so the options never narrow to what was chosen before. */
   explores: boolean;
-  pictures: Record<BoardView, string>;
+  pictures: BoardPictures;
 }
 
 /** Which option the system expected the founders to choose, written before they saw the boards. */

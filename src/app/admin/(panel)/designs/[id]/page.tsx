@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ButtonLink } from "@/components/Button";
 import BoardChooser from "@/components/admin/designs/BoardChooser";
+import PhoneChooser from "@/components/admin/designs/PhoneChooser";
 import { BoardPicture, Letter, OptionFacts, Reach } from "@/components/admin/designs/parts";
 import { Card, Notice, PageHeader, When } from "@/components/admin/ui";
-import type { BoardOption } from "@/lib/boards";
+import { type BoardOption, REDRAWN } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
 import { boardById, type BoardWithLead } from "@/server/boards/store";
@@ -13,13 +14,28 @@ import { businessById } from "@/server/leads/businesses";
 
 export const metadata: Metadata = { title: "Choose a design" };
 
-function Decided({ board }: { board: BoardWithLead }) {
+/** What was decided about the board, in a sentence: an option chosen, or all three turned down. */
+function Decision({ board }: { board: BoardWithLead }) {
+  const founder = founderName(board.chosenBy ?? "") ?? "A founder";
+  if (board.chosenLetter === REDRAWN) {
+    return (
+      <Notice tone="good">
+        {founder} asked for three new designs <When date={board.chosenAt} />. They come to Designs when they are drawn.
+      </Notice>
+    );
+  }
   const chosen = board.options.find((option) => option.letter === board.chosenLetter);
   return (
+    <Notice tone="good">
+      {founder} chose {chosen ? `${chosen.letter.toUpperCase()}, ${chosen.name}` : "a design"} <When date={board.chosenAt} />. The site is built from it.
+    </Notice>
+  );
+}
+
+function Decided({ board }: { board: BoardWithLead }) {
+  return (
     <div className="flex flex-col gap-6">
-      <Notice tone="good">
-        {founderName(board.chosenBy ?? "") ?? "A founder"} chose {chosen ? `${chosen.letter.toUpperCase()}, ${chosen.name}` : "a design"} <When date={board.chosenAt} />. The site is built from it.
-      </Notice>
+      <Decision board={board} />
       {board.feedback && (
         <Card className="flex flex-col gap-2 p-5">
           <h2 className="text-lg font-semibold">What they asked to change</h2>
@@ -55,16 +71,31 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
   const board = await boardById((await params).id);
   if (!board) notFound();
   const lead = await businessById(board.businessId);
+  const header = (
+    <PageHeader title={board.businessName}>
+      {lead?.website && (
+        <ButtonLink href={lead.website} target="_blank" rel="noreferrer" variant="soft" icon={<ArrowSquareOut size={18} aria-hidden="true" />}>
+          Their site today
+        </ButtonLink>
+      )}
+    </PageHeader>
+  );
+  if (board.chosenAt) {
+    return (
+      <>
+        {header}
+        <Decided board={board} />
+      </>
+    );
+  }
+  // A phone gets the chooser made for a thumb; a wide screen gets the three options side by side.
   return (
     <>
-      <PageHeader title={board.businessName}>
-        {lead?.website && (
-          <ButtonLink href={lead.website} target="_blank" rel="noreferrer" variant="soft" icon={<ArrowSquareOut size={18} aria-hidden="true" />}>
-            Their site today
-          </ButtonLink>
-        )}
-      </PageHeader>
-      {board.chosenAt ? <Decided board={board} /> : <BoardChooser boardId={board.id} options={board.options} />}
+      <PhoneChooser boardId={board.id} businessName={board.businessName} website={lead?.website ?? ""} options={board.options} />
+      <div className="flex flex-col gap-8 max-lg:hidden">
+        {header}
+        <BoardChooser boardId={board.id} options={board.options} />
+      </div>
     </>
   );
 }

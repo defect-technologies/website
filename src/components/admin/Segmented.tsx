@@ -6,7 +6,7 @@ export type Segment<Value extends string> = { value: Value; label: string; icon?
 
 type Props<Value extends string> = { label: string; options: Segment<Value>[]; value: Value; onChange: (value: Value) => void };
 
-/** A row of choices where exactly one is on: the width of the preview, or which picture of a repair the stage shows. */
+/** A row of choices where exactly one is on: the width of a preview, which picture of a repair the stage shows, or which design is in view. */
 export default function Segmented<Value extends string>({ label, options, value, onChange }: Props<Value>) {
   return (
     <div role="group" aria-label={label} className="bg-paper-shade flex w-fit rounded-full p-1">

@@ -7,6 +7,7 @@ import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, MOST_BOA
 import { POINTING_NOTE } from "@/lib/review";
 import { type BuildKind, previewWaitsEmail, type PreviewWait } from "@/lib/turnEmails";
 import { isNeon } from "../db/client";
+import type { BoardRedraw } from "@/lib/boards";
 import type { RepairNotes } from "@/lib/repairs";
 import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
@@ -17,7 +18,7 @@ import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { asClause } from "@/lib/emailTemplate";
 import { CriticNotesField } from "../review/criticNotes";
-import { choiceForJob, countBoardsWaiting, type BoardChoice } from "../boards/store";
+import { choiceForJob, countBoardsWaiting, redrawFor, type BoardChoice } from "../boards/store";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
@@ -83,15 +84,17 @@ const OWNER_HAS_SEEN: Business["stage"][] = ["sent", "clicked", "replied", "paid
 /**
  * brandFiles are the owner's artwork; the runner downloads them into the lead's folder before the builder starts.
  * `boards` tells the runner to stop a first build once it has made the lead's design boards, and `board` is the option
- * a founder chose from them, which this build is held to. `repair` tells it to make the note's changes on the built
+ * a founder chose from them, which this build is held to. `boardsAgain` tells it to draw three new options, with what
+ * the founder said about the three they turned down. `repair` tells it to make the note's changes on the built
  * site as it is, and `repairNotes` are the founder's notes it pictures before and after. A founder's choice is always
  * built, so its job is never a repair.
  */
-function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[], boards: { on: boolean; choice: BoardChoice | null }, repair: { on: boolean; notes: RepairNotes | null }) {
+function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand: BrandFile[], boards: { on: boolean; choice: BoardChoice | null; redraw: BoardRedraw | null }, repair: { on: boolean; notes: RepairNotes | null }) {
   return {
     job: { id: job.id, attempt: job.attempts, note: job.note, kind: job.kind },
     ...(job.kind === "preview" && boards.on ? { boards: true } : {}),
     ...(boards.choice ? { board: boards.choice } : {}),
+    ...(boards.redraw ? { boardsAgain: boards.redraw } : {}),
     ...(repair.on ? { repair: true } : {}),
     ...(repair.on && repair.notes ? { repairNotes: repair.notes } : {}),
     lead: {
@@ -119,13 +122,15 @@ async function claimAutoQueued(runnerName: string, kinds: JobKind[]): Promise<Pr
 }
 
 /**
- * How a claimed job treats the lead's design. A founder's choice is always built. Without one, a note about the
- * preview the lead has keeps that preview's design: no boards, and the note is repaired on the site as it is.
+ * How a claimed job treats the lead's design. A founder's choice is always built, and boards a founder turned down
+ * are always drawn again. Otherwise a note about the preview the lead has keeps that preview's design: no boards, and
+ * the note is repaired on the site as it is.
  */
 async function designAndRepairFor(job: PreviewJob, lead: Business) {
   const choice = job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null;
-  const boards = { on: (await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl)), choice };
-  const repairing = !choice && isRepair(job, lead.previewUrl);
+  const redraw = job.kind === "preview" && !choice ? await redrawFor(lead.id) : null;
+  const boards = { on: Boolean(redraw) || ((await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl))), choice, redraw };
+  const repairing = !choice && !redraw && isRepair(job, lead.previewUrl);
   return { boards, repair: { on: repairing, notes: repairing ? await repairNotesFor(lead.id, lead.previewUrl) : null } };
 }
 

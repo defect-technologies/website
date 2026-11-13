@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, count, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
-import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick } from "@/lib/boards";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, REDRAWN } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { founderNote } from "@/lib/previewJobs";
 import { db } from "../db/client";
@@ -44,13 +44,13 @@ export async function countBoardsWaiting(): Promise<number> {
   return row?.total ?? 0;
 }
 
-/** Boards a founder has chosen from, the newest choice first. */
+/** Boards a founder has chosen an option from, the newest choice first. A board they turned down is not one. */
 export async function boardsDecided(limit = DECISIONS_KEPT): Promise<BoardWithLead[]> {
   const rows = await (await db())
     .select(WITH_LEAD)
     .from(designBoards)
     .innerJoin(businesses, eq(businesses.id, designBoards.businessId))
-    .where(isNotNull(designBoards.chosenAt))
+    .where(and(isNotNull(designBoards.chosenAt), inArray(designBoards.chosenLetter, [...BOARD_LETTERS])))
     .orderBy(desc(designBoards.chosenAt))
     .limit(limit);
   return rows.map(withLead);
@@ -89,6 +89,30 @@ export async function chooseBoard(id: string, letter: BoardLetter, feedback: str
 export async function noteBehindBoards(board: Pick<DesignBoard, "jobId">): Promise<string> {
   const [job] = await (await db()).select({ note: previewJobs.note }).from(previewJobs).where(eq(previewJobs.id, board.jobId));
   return founderNote(job?.note ?? "");
+}
+
+/**
+ * Records that a founder wanted none of a board's options and asked for three new ones, with what they said. Null when
+ * the board is gone or was already decided: the first decision stands.
+ */
+export async function redrawBoards(id: string, feedback: string, by: string): Promise<DesignBoard | null> {
+  if (!(await boardById(id))) return null;
+  const [turnedDown] = await (await db())
+    .update(designBoards)
+    .set({ chosenLetter: REDRAWN, feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
+    .where(and(eq(designBoards.id, id), isNull(designBoards.chosenAt)))
+    .returning();
+  return turnedDown ?? null;
+}
+
+/**
+ * What the runner draws a lead's boards again from: set while the lead's newest board is one a founder turned down.
+ * Once the new boards arrive they are the newest, and this is null again.
+ */
+export async function redrawFor(businessId: string): Promise<BoardRedraw | null> {
+  const [newest] = await (await db()).select().from(designBoards).where(eq(designBoards.businessId, businessId)).orderBy(desc(designBoards.createdAt)).limit(1);
+  if (!newest || newest.chosenLetter !== REDRAWN) return null;
+  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? "") ?? "" };
 }
 
 export type BoardChoice = { letter: BoardLetter; feedback: string; by: string };
