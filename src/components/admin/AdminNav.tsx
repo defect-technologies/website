@@ -1,25 +1,6 @@
 "use client";
 
-import {
-  AddressBook,
-  Browsers,
-  CaretRight,
-  ChatsCircle,
-  ClockCounterClockwise,
-  Crosshair,
-  Detective,
-  Eye,
-  Eyedropper,
-  GearSix,
-  Hammer,
-  type Icon,
-  PencilSimpleLine,
-  PlugsConnected,
-  Robot,
-  SunHorizon,
-  VideoCamera,
-  Wallet,
-} from "@phosphor-icons/react";
+import { AddressBook, Browsers, CaretRight, ChatsCircle, ClockCounterClockwise, Crosshair, Detective, Eye, Eyedropper, GearSix, Hammer, PencilSimpleLine, PlugsConnected, Robot, SunHorizon, Swatches, VideoCamera, Wallet, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import KnifeStroke from "./KnifeStroke";
@@ -91,10 +72,11 @@ function SetupGroup({ pathname }: { pathname: string }) {
   );
 }
 
-export default function AdminNav({ counts, building }: { counts: { today: number; review: number; messages: number }; building: boolean }) {
+export default function AdminNav({ counts, building }: { counts: { today: number; review: number; designs: number; messages: number }; building: boolean }) {
   const pathname = usePathname();
   const items: Item[] = [
     { href: "/admin", label: "Today", icon: SunHorizon, count: counts.today },
+    { href: "/admin/designs", label: "Designs", icon: Swatches, count: counts.designs },
     { href: "/admin/review", label: "Review", icon: Crosshair, count: counts.review },
     { href: "/admin/builds", label: "Builds", icon: Hammer, live: building },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
