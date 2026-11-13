@@ -7,6 +7,7 @@ import { Notice } from "@/components/admin/ui";
 import EditorBrand from "@/components/editor/EditorBrand";
 import LinkSentNotice from "@/components/editor/LinkSentNotice";
 import PortalSignInForm from "@/components/portal/PortalSignInForm";
+import { messageFor } from "@/lib/messageFor";
 import { maskEmail, siteName } from "@/server/editor/signInLinks";
 import { env } from "@/server/env";
 import { safeNext } from "@/server/portal/accounts";
@@ -54,7 +55,7 @@ export default async function PortalSignInPage({ searchParams }: { searchParams:
   const next = site ? `/portal/edit/${site.slug}` : safeNext(rawNext);
   if (await currentPortalUser()) redirect(next);
   const sent = site && result === "sent";
-  const problem = ERRORS[error ?? result ?? ""];
+  const problem = messageFor(ERRORS, error ?? result);
   return (
     <main className="grid min-h-svh place-items-center px-4 py-12">
       <div className="flex w-full max-w-sm flex-col items-center gap-8 text-center">

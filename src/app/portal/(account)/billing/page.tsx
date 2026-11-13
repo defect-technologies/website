@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { buttonClasses } from "@/components/Button";
 import { Card, Notice } from "@/components/admin/ui";
 import PortalShell from "@/components/portal/PortalShell";
+import { messageFor } from "@/lib/messageFor";
 import { clientPlan, type ClientPlan } from "@/server/integrations/stripe";
 import { isOwnerOf, portalContext, type PortalContext } from "@/server/portal/context";
 import { siteName } from "@/server/editor/signInLinks";
@@ -52,11 +53,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const plan =site.stripeCustomerId ? await clientPlan(site.stripeCustomerId) : null;
   if (plan && plan.state !== "ok") console.error(`[portal] Plan for ${site.slug} unavailable`, plan);
   const current = plan?.state === "ok" ? plan.data : null;
+  const problem = messageFor(PROBLEMS, query.problem);
 
   return (
     <PortalShell context={context} path="/portal/billing">
       <h1 className="text-3xl font-semibold sm:text-4xl">Billing</h1>
-      {query.problem && PROBLEMS[query.problem] && <Notice tone="bad">{PROBLEMS[query.problem]}</Notice>}
+      {problem && <Notice tone="bad">{problem}</Notice>}
       <Card className="flex max-w-2xl flex-col gap-6 p-6 sm:p-8">
         {current ? (
           <div className="flex flex-col gap-3">

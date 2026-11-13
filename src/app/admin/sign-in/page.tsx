@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { buttonClasses } from "@/components/Button";
 import KnifeStroke from "@/components/admin/KnifeStroke";
 import { Notice } from "@/components/admin/ui";
+import { messageFor } from "@/lib/messageFor";
 import { currentFounder } from "@/server/auth/session";
 import { devShortcutsEnabled } from "@/server/env";
 
@@ -18,6 +19,7 @@ const ERRORS: Record<string, string> = {
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await currentFounder()) redirect("/admin");
   const { error } = await searchParams;
+  const problem = messageFor(ERRORS, error);
 
   return (
     <main className="grid min-h-svh place-items-center px-4">
@@ -26,9 +28,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           <KnifeStroke className="text-vermilion/20 absolute inset-x-0 top-1/2 -z-10 h-10 w-full -translate-y-1/3" />
           <p className="font-script text-ink text-6xl leading-[1.4]">defect.tech</p>
         </div>
-        {error && ERRORS[error] && (
+        {problem && (
           <Notice tone="bad" className="w-full text-left">
-            {ERRORS[error]}
+            {problem}
           </Notice>
         )}
         <div className="flex w-full flex-col gap-3">
