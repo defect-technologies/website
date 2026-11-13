@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { changesBuiltPreview, MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, RETRY_NOTE, SKIPPED_STEP } from "@/lib/previewJobs";
+import { changesBuiltPreview, founderNote, MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, RETRY_NOTE, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
+import { POINTING_NOTE } from "@/lib/review";
+import { type BuildKind, previewWaitsEmail, type PreviewWait } from "@/lib/turnEmails";
+import { isNeon } from "../db/client";
 import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
@@ -22,14 +25,23 @@ import { maybePickForSpotCheck } from "../spotChecks";
 import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
+import { tellFounders } from "./tellFounders";
 
 const ACTOR = "bot:runner";
 const PAUSE_WITHOUT_RESUME_MS = 60 * 60 * 1000;
 const LOG_TAIL_LIMIT = 8000;
 
-/** No work for the runner, with the reason in a header it can log. */
+/**
+ * Neon sleeps when nothing asks it and bills every minute awake, so on Neon the runner keeps to its two wake minutes
+ * an hour. Any other database can be asked often, and the runner is told to.
+ */
+function askAgainHeader(): Record<string, string> {
+  return isNeon(env.databaseUrl()) ? {} : { "X-Runner-Ask-Again": String(RUNNER_ASK_AGAIN_SECONDS) };
+}
+
+/** No work for the runner, with the reason in a header it can log and how soon to ask again. */
 function idle(reason: string) {
-  return new NextResponse(null, { status: 204, headers: { "X-Runner-Reason": reason } });
+  return new NextResponse(null, { status: 204, headers: { "X-Runner-Reason": reason, ...askAgainHeader() } });
 }
 
 /** Why the runner may not build previews right now, or null if it may. */
@@ -217,6 +229,17 @@ async function holdForOwner(lead: Business, previewUrl: string) {
   await record(ACTOR, "held a new preview until a founder looks", { businessId: lead.id, detail: previewUrl });
 }
 
+function buildKindOf(note: string): BuildKind {
+  const written = founderNote(note);
+  if (!written) return "built";
+  return written === POINTING_NOTE ? "updated" : "rebuilt";
+}
+
+/** The email that a built preview waits. One the owner must not see yet is answered on Today, where its flag is. */
+async function tellFoundersPreviewWaits(job: PreviewJob, lead: Business, wait: PreviewWait) {
+  await tellFounders((adminUrl) => previewWaitsEmail({ business: lead.businessName, build: buildKindOf(job.note), wait, link: wait === "owner" ? adminUrl : `${adminUrl}/review?id=${lead.id}` }));
+}
+
 /** The job is marked done last: a failure before that leaves it running, so the runner can report again and finish the lead. */
 async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   if (!body.previewUrl) throw new BotError(400, "A finished build needs previewUrl, the deployed preview's https address.");
@@ -233,6 +256,7 @@ async function finishBuilt(job: PreviewJob, lead: Business, body: Done) {
   const cost = body.apiEquivalentUsd === undefined ? "" : `, about $${body.apiEquivalentUsd.toFixed(2)} at API prices`;
   // A launched site's rebuilt design waits for the owner's OK; the Client care bot publishes it by launching again.
   await record(ACTOR, lead.vercelProjectId ? "built changes for the owner to review" : "built a preview", { businessId: lead.id, detail: `${body.previewUrl}${cost}` });
+  await tellFoundersPreviewWaits(job, lead, ownerHasOne ? "owner" : held ? "held" : null);
 }
 
 /** The address the site answers on once the owner connects their domain, or the Vercel one until then. */

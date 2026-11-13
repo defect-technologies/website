@@ -95,9 +95,17 @@ export type RunnerSettings = {
   autoQueue: boolean;
   /** A first build stops after it made three design boards, and goes on when a founder has chosen one. */
   designBoards: boolean;
+  /** Both founders get an email when designs wait for a choice or a built site waits for a look. */
+  tellFounders: boolean;
 };
 
-export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = { dailyCap: 10, pausedUntil: null, outreachPicksPreviews: false, autoQueue: true, designBoards: true };
+export const DEFAULT_RUNNER_SETTINGS: RunnerSettings = { dailyCap: 10, pausedUntil: null, outreachPicksPreviews: false, autoQueue: true, designBoards: true, tellFounders: true };
+
+/**
+ * How soon an idle runner is told to ask for work again, when the admin's database does not bill by the minute awake.
+ * A founder's choice or note then starts its build in about a minute.
+ */
+export const RUNNER_ASK_AGAIN_SECONDS = 60;
 
 /** The runner stops queuing new leads by itself while this many boards wait for a founder: a choice is the slow part. */
 export const MOST_BOARDS_WAITING = 5;
