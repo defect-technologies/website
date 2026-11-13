@@ -7,10 +7,11 @@ import { BOARD_LETTERS } from "@/lib/boards";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { boardsWaiting, chooseBoard, noteBehindBoards, redrawBoards } from "@/server/boards/store";
+import { chooseBoard, noteBehindBoards, redrawBoards } from "@/server/boards/store";
 import { businessById } from "@/server/leads/businesses";
 import { addTasteLessons } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
+import { nextTurnHref } from "@/server/turn";
 
 const Choice = z.object({
   id: z.string().uuid(),
@@ -36,13 +37,7 @@ export async function chooseBoardAction(formData: FormData) {
     await record(founder.email, "chose a design", { businessId: board.businessId, detail: `${choice.letter.toUpperCase()}: ${name}${choice.feedback ? `. ${choice.feedback}` : ""}`.slice(0, 500) });
   }
   revalidatePath("/admin", "layout");
-  redirect(await nextDesign());
-}
-
-/** Where a founder goes after a decision: the board that has waited longest, or the list when none waits. */
-async function nextDesign(): Promise<string> {
-  const [next] = await boardsWaiting();
-  return next ? `/admin/designs/${next.id}` : "/admin/designs";
+  redirect(await nextTurnHref());
 }
 
 const Redraw = z.object({ id: z.string().uuid(), feedback: z.string().trim().max(MAX_NOTE_TEXT).default("") });
@@ -61,5 +56,5 @@ export async function redrawBoardsAction(formData: FormData) {
     await record(founder.email, "asked for three new designs", { businessId: board.businessId, detail: request.feedback.slice(0, 500) });
   }
   revalidatePath("/admin", "layout");
-  redirect(await nextDesign());
+  redirect(await nextTurnHref());
 }

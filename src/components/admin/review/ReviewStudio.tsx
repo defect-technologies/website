@@ -11,6 +11,7 @@ import { type BridgeState, useReviewBridge } from "@/hooks/useReviewBridge";
 import type { Device, NoteAnchor, ReviewNote } from "@/lib/review";
 import { Button, buttonClasses } from "../../Button";
 import { askAnchor } from "@/lib/reviewAsks";
+import { TURN_PATH } from "@/lib/turn";
 import AskCard from "./AskCard";
 import Segmented, { type Segment } from "../Segmented";
 import { useRepairAnswer } from "./useRepairAnswer";
@@ -256,7 +257,8 @@ function Studio({ item, ...queue }: Props) {
       if (!outcome.ok) return;
       dictation.stop();
       saveNotes(item.id, item.previewUrl, []);
-      router.replace(queue.nextId ? `/admin/review?id=${queue.nextId}` : "/admin/review");
+      // The queue decides what is next: another site, or a design that waits for a choice.
+      router.replace(TURN_PATH);
       router.refresh();
     });
   };

@@ -1,8 +1,9 @@
 "use client";
 
-import { AddressBook, Browsers, CaretRight, ChatsCircle, ClockCounterClockwise, Crosshair, Detective, Eye, Eyedropper, GearSix, Hammer, PencilSimpleLine, PlugsConnected, Robot, SunHorizon, Swatches, VideoCamera, Wallet, type Icon } from "@phosphor-icons/react";
+import { AddressBook, Browsers, CaretRight, ChatsCircle, ClockCounterClockwise, Crosshair, Detective, Eye, Eyedropper, GearSix, Hammer, HandPointing, PencilSimpleLine, PlugsConnected, Robot, SunHorizon, Swatches, VideoCamera, Wallet, type Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { TURN_PATH } from "@/lib/turn";
 import KnifeStroke from "./KnifeStroke";
 import WorkingDot from "./overview/WorkingDot";
 import SearchBox from "./SearchBox";
@@ -72,12 +73,14 @@ function SetupGroup({ pathname }: { pathname: string }) {
   );
 }
 
-export default function AdminNav({ counts, building }: { counts: { today: number; review: number; designs: number; messages: number }; building: boolean }) {
+export default function AdminNav({ counts, building }: { counts: { today: number; turn: number; messages: number }; building: boolean }) {
   const pathname = usePathname();
+  // One number says how much waits for a founder's taste. Designs and Review are where that work is found by kind.
   const items: Item[] = [
     { href: "/admin", label: "Today", icon: SunHorizon, count: counts.today },
-    { href: "/admin/designs", label: "Designs", icon: Swatches, count: counts.designs },
-    { href: "/admin/review", label: "Review", icon: Crosshair, count: counts.review },
+    { href: TURN_PATH, label: "Your turn", icon: HandPointing, count: counts.turn },
+    { href: "/admin/designs", label: "Designs", icon: Swatches },
+    { href: "/admin/review", label: "Review", icon: Crosshair },
     { href: "/admin/builds", label: "Builds", icon: Hammer, live: building },
     { href: "/admin/sites", label: "Sites", icon: Browsers },
     { href: "/admin/messages", label: "Messages", icon: ChatsCircle, count: counts.messages },

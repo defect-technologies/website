@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 type Area = { prefix: string; cookie: string; publicPaths: string[]; signIn: string };
 
 /** The founders' admin. Owners sign in on their own sites, so /edit here has no session. */
-const AREAS: Area[] = [{ prefix: "/admin", cookie: "defect_admin", publicPaths: ["/admin/sign-in"], signIn: "/admin/sign-in" }];
+/** A browser fetches a web app manifest without the session's cookie, and it names only the app and its icons. */
+const ADMIN_MANIFEST = "/admin/manifest.webmanifest";
+
+const AREAS: Area[] = [{ prefix: "/admin", cookie: "defect_admin", publicPaths: ["/admin/sign-in", ADMIN_MANIFEST], signIn: "/admin/sign-in" }];
 
 /**
  * An early, cheap check: no session cookie, no page. It does not verify the
