@@ -51,6 +51,7 @@ beforeEach(async () => {
   await database.delete(messages);
   await database.delete(businesses);
   await database.delete(mailboxes);
+  await database.delete(schema.settings);
   inboxBatch = { emails: [], resumeFrom: null };
   sentBatch = { emails: [], resumeFrom: null };
   inboxReads = 0;
@@ -103,5 +104,23 @@ describe("syncMail", () => {
   it("reads Gmail once when two bots ask for fresh mail at the same time", async () => {
     await Promise.all([syncMailIfStale(0), syncMailIfStale(0)]);
     assert.equal(inboxReads, 1);
+  });
+
+  it("leaves the read to another server that is already syncing", async () => {
+    await database.insert(schema.settings).values({ key: "sync.mail.running", value: Date.now() });
+    await syncMailIfStale(0);
+    assert.equal(inboxReads, 0);
+  });
+
+  it("takes over from a server whose sync stopped long ago", async () => {
+    await database.insert(schema.settings).values({ key: "sync.mail.running", value: Date.now() - 60 * 60 * 1000 });
+    await syncMailIfStale(0);
+    assert.equal(inboxReads, 1);
+  });
+
+  it("lets the next bot read start once a sync has finished", async () => {
+    await syncMailIfStale(0);
+    await syncMailIfStale(0);
+    assert.equal(inboxReads, 2);
   });
 });

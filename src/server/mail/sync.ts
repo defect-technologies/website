@@ -1,9 +1,9 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { SENT_FROM_GMAIL } from "@/lib/senders";
 import { record } from "../activity";
 import { db } from "../db/client";
-import { businesses, mailboxes, messages, type Business, type Mailbox } from "../db/schema";
+import { businesses, mailboxes, messages, settings, type Business, type Mailbox } from "../db/schema";
 import { recordUnmatchedEmail } from "../inbound/requests";
 import { advanceStage, updateBusiness } from "../leads/businesses";
 import { mailSince, MailboxNeedsReconnect, type IncomingEmail } from "./gmail";
@@ -19,9 +19,20 @@ export function looksLikeOptOut(body: string) {
   return OPT_OUT_WORDS.test(body.slice(0, 400));
 }
 
-type Index = { byThread: Map<string, Business>; byEmail: Map<string, Business>; byDomain: Map<string, Business> };
+type Lead = Pick<Business, "id" | "email" | "ownerEmail" | "website" | "stage" | "repliedAt" | "lastContactAt">;
+const leadColumns = {
+  id: businesses.id,
+  email: businesses.email,
+  ownerEmail: businesses.ownerEmail,
+  website: businesses.website,
+  stage: businesses.stage,
+  repliedAt: businesses.repliedAt,
+  lastContactAt: businesses.lastContactAt,
+};
 
-function indexBusinesses(all: Business[], threads: { threadId: string | null; businessId: string }[]): Index {
+type Index = { byThread: Map<string, Lead>; byEmail: Map<string, Lead>; byDomain: Map<string, Lead> };
+
+function indexBusinesses(all: Lead[], threads: { threadId: string | null; businessId: string }[]): Index {
   const byId = new Map(all.map((b) => [b.id, b]));
   const index: Index = { byThread: new Map(), byEmail: new Map(), byDomain: new Map() };
   for (const { threadId, businessId } of threads) {
@@ -38,12 +49,12 @@ function indexBusinesses(all: Business[], threads: { threadId: string | null; bu
 }
 
 /** Thread first, then the exact address, then its company domain. Unmatched mail is left alone. */
-function matchBusiness(threadId: string, address: string, index: Index): Business | undefined {
+function matchBusiness(threadId: string, address: string, index: Index): Lead | undefined {
   return index.byThread.get(threadId) ?? index.byEmail.get(address) ?? index.byDomain.get(domainOf(address));
 }
 
 /** The cold inbox copies its mail to hello@, so the same email (one Message-ID) can arrive through two inboxes. */
-async function alreadyStored(email: IncomingEmail, business: Business): Promise<boolean> {
+async function alreadyStored(email: IncomingEmail, business: Lead): Promise<boolean> {
   if (!email.headerMessageId) return false;
   const [found] = await (await db())
     .select({ id: messages.id })
@@ -53,7 +64,7 @@ async function alreadyStored(email: IncomingEmail, business: Business): Promise<
   return Boolean(found);
 }
 
-async function store(mailbox: Mailbox, email: IncomingEmail, business: Business, direction: "in" | "out"): Promise<boolean> {
+async function store(mailbox: Mailbox, email: IncomingEmail, business: Lead, direction: "in" | "out"): Promise<boolean> {
   if (await alreadyStored(email, business)) return false;
   const inserted = await (await db())
     .insert(messages)
@@ -77,7 +88,7 @@ async function store(mailbox: Mailbox, email: IncomingEmail, business: Business,
   return inserted.length > 0;
 }
 
-async function noteReply(business: Business, email: IncomingEmail) {
+async function noteReply(business: Lead, email: IncomingEmail) {
   await updateBusiness(business.id, { repliedAt: business.repliedAt ?? email.at, lastContactAt: email.at });
   await advanceStage(business.id, "replied");
   const detail = looksLikeOptOut(email.body) ? "looks like an opt-out" : email.from;
@@ -109,7 +120,7 @@ async function syncInbox(mailbox: Mailbox, { replying, everyone }: InboxIndexes)
   return stored;
 }
 
-async function noteSent(business: Business, email: IncomingEmail) {
+async function noteSent(business: Lead, email: IncomingEmail) {
   if (!business.lastContactAt || business.lastContactAt < email.at) await updateBusiness(business.id, { lastContactAt: email.at });
   await record("mail sync", "saw an email sent from Gmail", { businessId: business.id, detail: email.to });
 }
@@ -137,10 +148,10 @@ async function failMailbox(mailbox: Mailbox, error: unknown) {
 
 export type MailSyncResult = { mailboxes: number; newMessages: number; errors: string[] };
 
-const REPLYING_STAGES: Business["stage"][] = ["sent", "clicked", "replied", "paid", "live"];
+const REPLYING_STAGES: Lead["stage"][] = ["sent", "clicked", "replied", "paid", "live"];
 
 /** Mail we send can go to a lead before its first tracked email, so Sent also matches leads with a built preview. */
-const EMAILED_STAGES: Business["stage"][] = ["preview_built", ...REPLYING_STAGES];
+const EMAILED_STAGES: Lead["stage"][] = ["preview_built", ...REPLYING_STAGES];
 
 async function syncMailbox(mailbox: Mailbox, inbound: InboxIndexes, outbound: Index): Promise<number> {
   return (await syncInbox(mailbox, inbound)) + (await syncSent(mailbox, outbound));
@@ -150,7 +161,7 @@ export async function syncMail(): Promise<MailSyncResult> {
   const all = await connectedMailboxes();
   const database = await db();
   const [allLeads, threads] = await Promise.all([
-    database.select().from(businesses),
+    database.select(leadColumns).from(businesses),
     database.selectDistinct({ threadId: messages.threadId, businessId: messages.businessId }).from(messages),
   ]);
   const leads = allLeads.filter((lead) => EMAILED_STAGES.includes(lead.stage));
@@ -182,11 +193,42 @@ export const BOT_READ_FRESH_MS = 2 * 60 * 1000;
  */
 let syncBeforeBotRead: Promise<void> | null = null;
 
+const SYNC_RUNNING_KEY = "sync.mail.running";
+/** A sync that stopped without releasing its claim is taken over after this long. */
+const SYNC_CLAIM_LEASE_MS = 5 * 60 * 1000;
+
+/** Takes the right to sync in one conditional statement, so a second server instance that asks at the same moment is refused. */
+async function claimSync(): Promise<boolean> {
+  const now = Date.now();
+  const claimed = await (await db())
+    .insert(settings)
+    .values({ key: SYNC_RUNNING_KEY, value: now })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value: now, updatedAt: new Date() },
+      setWhere: sql`(${settings.value} #>> '{}')::bigint < ${now - SYNC_CLAIM_LEASE_MS}`,
+    })
+    .returning({ key: settings.key });
+  return claimed.length > 0;
+}
+
+async function releaseSync() {
+  await (await db()).update(settings).set({ value: 0, updatedAt: new Date() }).where(eq(settings.key, SYNC_RUNNING_KEY));
+}
+
+async function syncUnderClaim() {
+  if (!(await claimSync())) return;
+  try {
+    await syncMail();
+  } finally {
+    await releaseSync().catch((error) => console.error("[mail] releasing the sync claim", error));
+  }
+}
+
 export async function syncMailIfStale(freshForMs: number) {
   const stale = (await connectedMailboxes()).some((mailbox) => !mailbox.lastSyncedAt || Date.now() - mailbox.lastSyncedAt.getTime() >= freshForMs);
   if (!stale) return;
-  syncBeforeBotRead ??= syncMail()
-    .then(() => undefined)
+  syncBeforeBotRead ??= syncUnderClaim()
     .catch((error) => console.error("[mail] sync before a bot read", error))
     .finally(() => {
       syncBeforeBotRead = null;

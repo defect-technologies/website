@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { record } from "../activity";
 import type { Founder } from "../auth/session";
 import { db } from "../db/client";
@@ -14,6 +14,7 @@ import { requestThreads } from "../inbound/threads";
 import { STUDIO_NAME, studioMailboxId } from "../onboarding/welcome";
 import { outreachSettings } from "../settings";
 import { blockers, composeBody, composeSubject, type EmailKind, type RequestThread } from "./compose";
+import { PACIFIC_MIDNIGHT } from "./pacificDay";
 import { sentToday } from "./queue";
 
 export type SendResult = { ok: true; to: string } | { ok: false; error: string };
@@ -29,15 +30,35 @@ const CLAIM_COLUMN = { first: businesses.firstSentAt, follow_up: businesses.foll
 const CLAIM_FIELD = { first: "firstSentAt", follow_up: "followUpSentAt", requested: "firstSentAt" } as const;
 const isCold = (kind: EmailKind) => kind !== "requested";
 
-/** Marks the email as going out in one statement, so a double click or both founders at once can't send it twice. */
-async function claim(kind: EmailKind, id: string): Promise<boolean> {
+type Claim = "claimed" | "taken" | "capped";
+
+/** Cold emails sent today, plus those claimed today whose message is not saved yet, so a send in flight counts. */
+const coldEmailsToday = sql`(
+  (select count(*) from messages where direction = 'out' and kind in ('first', 'follow_up') and at >= ${PACIFIC_MIDNIGHT})
+  + (select count(*) from businesses b where b.source <> 'request' and (
+      (b.first_sent_at >= ${PACIFIC_MIDNIGHT} and not exists (select 1 from messages m where m.business_id = b.id and m.kind = 'first'))
+      or (b.follow_up_sent_at >= ${PACIFIC_MIDNIGHT} and not exists (select 1 from messages m where m.business_id = b.id and m.kind = 'follow_up'))))
+)`;
+
+/**
+ * Marks the email as going out in one statement, so a double click or both founders at once can't send it twice.
+ * A cold email is claimed under a lock that also counts the day's sends, so two founders can't both take the last one.
+ */
+async function claim(kind: EmailKind, id: string, dailyLimit: number): Promise<Claim> {
   const column = CLAIM_COLUMN[kind];
-  const claimed = await (await db())
-    .update(businesses)
-    .set({ [CLAIM_FIELD[kind]]: new Date() })
-    .where(and(eq(businesses.id, id), isNull(column)))
-    .returning({ id: businesses.id });
-  return claimed.length > 0;
+  const claimOne = (database: Pick<Awaited<ReturnType<typeof db>>, "update">, withinLimit = sql`true`) =>
+    database
+      .update(businesses)
+      .set({ [CLAIM_FIELD[kind]]: new Date() })
+      .where(and(eq(businesses.id, id), isNull(column), withinLimit))
+      .returning({ id: businesses.id });
+  if (!isCold(kind)) return (await claimOne(await db())).length > 0 ? "claimed" : "taken";
+  return (await db()).transaction(async (transaction) => {
+    await transaction.execute(sql`select pg_advisory_xact_lock(hashtext('cold-send-cap'))`);
+    if ((await claimOne(transaction, sql`${coldEmailsToday} < ${dailyLimit}`)).length > 0) return "claimed";
+    const [open] = await transaction.select({ id: businesses.id }).from(businesses).where(and(eq(businesses.id, id), isNull(column)));
+    return open ? "capped" : "taken";
+  });
 }
 
 async function release(kind: EmailKind, id: string) {
@@ -59,10 +80,12 @@ function optedOutRecipient(edits: EmailEdits | undefined, blocked: Set<string>) 
   return address ? `${address} opted out, so it can't be emailed.` : null;
 }
 
+const dailyLimitReached = (limit: number) => `You've sent today's ${limit}. Raise the limit in Setup > Email template, or send tomorrow.`;
+
 async function prepare(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<Prepared | string> {
   const [stored, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
   if (!stored) return "That business no longer exists.";
-  if (isCold(kind) && sent >= settings.dailyLimit) return `You've sent today's ${settings.dailyLimit}. Raise the limit in Setup > Email template, or send tomorrow.`;
+  if (isCold(kind) && sent >= settings.dailyLimit) return dailyLimitReached(settings.dailyLimit);
   const optedOut = optedOutRecipient(edits, blocked);
   if (optedOut) return optedOut;
   const business = edits ? { ...stored, email: edits.to[0] } : stored;
@@ -170,8 +193,10 @@ async function rememberAfterSend(kind: EmailKind, prepared: Prepared, delivery: 
 export async function sendOutreach(kind: EmailKind, id: string, founder: Founder, problem?: string, edits?: EmailEdits): Promise<SendResult> {
   const prepared = await prepare(kind, id, problem, edits);
   if (typeof prepared === "string") return { ok: false, error: prepared };
-  if (!(await claim(kind, id))) return { ok: false, error: "This one already went out. The queue was out of date." };
-  const { senderName } = await outreachSettings();
+  const { senderName, dailyLimit } = await outreachSettings();
+  const claimed = await claim(kind, id, dailyLimit);
+  if (claimed === "capped") return { ok: false, error: dailyLimitReached(dailyLimit) };
+  if (claimed === "taken") return { ok: false, error: "This one already went out. The queue was out of date." };
   const delivery = await deliverOrRelease(kind, prepared, senderName);
   if ("ok" in delivery) return delivery;
   await rememberAfterSend(kind, prepared, delivery, founder, problem);

@@ -21,8 +21,20 @@ export async function integration<T>(settings: Record<string, string>, load: () 
 /** How long an outside service gets to answer before the call is given up. */
 export const OUTSIDE_CALL_TIMEOUT_MS = 15_000;
 
+/** A read is asked again after these waits when the service says it is busy or broken. A timeout is not asked again, so a stalled service never costs three full time limits. */
+const READ_RETRY_DELAYS_MS = [500, 1_500];
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 export async function getJson<T>(url: string, headers: Record<string, string>): Promise<T> {
-  const response = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS) });
-  if (!response.ok) throw new Error(`${new URL(url).host} answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
-  return (await response.json()) as T;
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(OUTSIDE_CALL_TIMEOUT_MS) });
+    if (response.ok) return (await response.json()) as T;
+    if (attempt < READ_RETRY_DELAYS_MS.length && RETRYABLE_STATUSES.has(response.status)) {
+      await pause(READ_RETRY_DELAYS_MS[attempt]);
+      continue;
+    }
+    throw new Error(`${new URL(url).host} answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
+  }
 }
