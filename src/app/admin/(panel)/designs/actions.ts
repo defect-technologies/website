@@ -7,7 +7,7 @@ import { BOARD_LETTERS } from "@/lib/boards";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { chooseBoard, noteBehindBoards } from "@/server/boards/store";
+import { boardsWaiting, chooseBoard, noteBehindBoards, redrawBoards } from "@/server/boards/store";
 import { businessById } from "@/server/leads/businesses";
 import { addTasteLessons } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
@@ -36,5 +36,30 @@ export async function chooseBoardAction(formData: FormData) {
     await record(founder.email, "chose a design", { businessId: board.businessId, detail: `${choice.letter.toUpperCase()}: ${name}${choice.feedback ? `. ${choice.feedback}` : ""}`.slice(0, 500) });
   }
   revalidatePath("/admin", "layout");
-  redirect("/admin/designs");
+  redirect(await nextDesign());
+}
+
+/** Where a founder goes after a decision: the board that has waited longest, or the list when none waits. */
+async function nextDesign(): Promise<string> {
+  const [next] = await boardsWaiting();
+  return next ? `/admin/designs/${next.id}` : "/admin/designs";
+}
+
+const Redraw = z.object({ id: z.string().uuid(), feedback: z.string().trim().max(MAX_NOTE_TEXT).default("") });
+
+/**
+ * A founder wants none of a lead's three designs. The first decision stands. It queues the job that draws three new
+ * ones, which carries what the founder said about these and any note the job that made them was given.
+ */
+export async function redrawBoardsAction(formData: FormData) {
+  const founder = await requireFounder();
+  const request = Redraw.parse({ id: formData.get("id"), feedback: formData.get("feedback") ?? "" });
+  const board = await redrawBoards(request.id, request.feedback, founder.email);
+  if (board) {
+    const lead = await businessById(board.businessId);
+    if (lead) await requestPreview(lead, founder.email, await noteBehindBoards(board));
+    await record(founder.email, "asked for three new designs", { businessId: board.businessId, detail: request.feedback.slice(0, 500) });
+  }
+  revalidatePath("/admin", "layout");
+  redirect(await nextDesign());
 }

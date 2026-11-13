@@ -50,13 +50,6 @@ export function noteFromRepair(ask: ReviewAsk): ReviewNote | null {
   return { id: crypto.randomUUID(), text: stillWrongText(ask.question), scope: "site", device: repair.device, path: ask.path, anchor: anchor && { ...anchor, tag: repair.tag } };
 }
 
-/** Dictated phrases join the draft as sentences. */
-export function appendPhrase(text: string, phrase: string): string {
-  const spoken = phrase.charAt(0).toUpperCase() + phrase.slice(1);
-  const ended = /[.!?]$/.test(spoken) ? spoken : `${spoken}.`;
-  return text.trim() ? `${text.trimEnd()} ${ended}` : ended;
-}
-
 export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);

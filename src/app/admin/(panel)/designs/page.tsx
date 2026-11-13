@@ -24,7 +24,10 @@ function Waiting({ board }: { board: BoardWithLead }) {
         </span>
         <span className="grid grid-cols-3 gap-3">
           {board.options.map((option) => (
-            <BoardPicture key={option.letter} src={option.pictures.desktop} alt={`Option ${option.letter.toUpperCase()}, ${option.name}`} className="aspect-[16/10] rounded-lg object-cover object-top" />
+            <span key={option.letter}>
+              <BoardPicture src={option.pictures.phone} alt={`Option ${option.letter.toUpperCase()}, ${option.name}`} className="aspect-[390/844] rounded-lg object-cover object-top lg:hidden" />
+              <BoardPicture src={option.pictures.desktop} alt={`Option ${option.letter.toUpperCase()}, ${option.name}`} className="aspect-[16/10] rounded-lg object-cover object-top max-lg:hidden" />
+            </span>
           ))}
         </span>
       </Link>

@@ -1,5 +1,9 @@
 import { Check } from "@phosphor-icons/react/dist/ssr";
+import type { CSSProperties } from "react";
 import type { BoardOption } from "@/lib/boards";
+
+/** The widths in pixels the runner draws an option's wide pictures at (site-kit, packages/kit/src/boards/render.ts). */
+export const DRAWN_AT = { board: 1600, desktop: 1440 } as const;
 
 const REACH: Record<number, string> = { 1: "Close to how they look today", 2: "A step away from today", 3: "Far from how they look today" };
 
@@ -39,9 +43,25 @@ export function Palette({ option }: { option: BoardOption }) {
 }
 
 /** A picture of a board or of its first screen. The outline keeps a white page from melting into the card. */
-export function BoardPicture({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
+export function BoardPicture({ src, alt, className = "", style }: { src: string; alt: string; className?: string; style?: CSSProperties }) {
   // eslint-disable-next-line @next/next/no-img-element -- the pictures are in the admin's own blob store, as the brand files are
-  return <img src={src} alt={alt} loading="lazy" className={`block w-full outline-1 -outline-offset-1 outline-black/10 ${className}`} />;
+  return <img src={src} alt={alt} loading="lazy" style={style} className={`block w-full outline-1 -outline-offset-1 outline-black/10 ${className}`} />;
+}
+
+/**
+ * An option's first screen on a desktop, with the same screen on a phone standing in its corner: the two a visitor
+ * can meet it on, in one look.
+ */
+export function FirstScreens({ option }: { option: BoardOption }) {
+  const name = `option ${option.letter.toUpperCase()}, ${option.name}`;
+  return (
+    <span className="relative block pb-6">
+      <BoardPicture src={option.pictures.desktop} alt={`The first screen of ${name}, on a desktop`} className="aspect-[16/10] rounded-lg object-cover object-top" />
+      <span className="shadow-lifted absolute right-3 bottom-0 block w-[22%] rounded-lg">
+        <BoardPicture src={option.pictures.phone} alt={`The first screen of ${name}, on a phone`} className="aspect-[390/844] rounded-lg object-cover object-top" />
+      </span>
+    </span>
+  );
 }
 
 export function OptionFacts({ option }: { option: BoardOption }) {

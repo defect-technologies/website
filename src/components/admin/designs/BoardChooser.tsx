@@ -1,16 +1,16 @@
-import { CaretRight, Hammer } from "@phosphor-icons/react/dist/ssr";
-import { chooseBoardAction } from "@/app/admin/(panel)/designs/actions";
+import { ArrowsClockwise, CaretRight, Hammer } from "@phosphor-icons/react/dist/ssr";
+import { chooseBoardAction, redrawBoardsAction } from "@/app/admin/(panel)/designs/actions";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { Card } from "@/components/admin/ui";
 import type { BoardOption } from "@/lib/boards";
-import { MAX_NOTE_TEXT } from "@/lib/review";
-import { BoardPicture, Letter, OptionFacts, Reach } from "./parts";
+import FeedbackField from "./FeedbackField";
+import { BoardPicture, FirstScreens, Letter, OptionFacts, Reach } from "./parts";
 
 function Choice({ option }: { option: BoardOption }) {
   return (
     <label className="group bg-surface shadow-card has-[:checked]:ring-ink has-[:focus-visible]:outline-ink flex cursor-pointer flex-col gap-4 rounded-2xl p-3 transition-shadow duration-150 has-[:checked]:ring-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
       <input type="radio" name="letter" value={option.letter} required className="sr-only" aria-label={`Option ${option.letter.toUpperCase()}: ${option.name}`} />
-      <BoardPicture src={option.pictures.desktop} alt={`The first screen of option ${option.letter.toUpperCase()}, ${option.name}`} className="aspect-[16/10] rounded-lg object-cover object-top" />
+      <FirstScreens option={option} />
       <span className="flex flex-col gap-3 px-2 pb-2">
         <span className="flex items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-3">
@@ -43,7 +43,7 @@ function FullBoard({ option, open }: { option: BoardOption; open: boolean }) {
 
 /**
  * The three options side by side, each a radio in one group, then every whole board, then what the founder wants
- * changed. One form: choosing builds the site.
+ * changed, typed or said. One form: choosing builds the site, and its second button asks for three new designs.
  */
 export default function BoardChooser({ boardId, options }: { boardId: string; options: BoardOption[] }) {
   return (
@@ -62,24 +62,20 @@ export default function BoardChooser({ boardId, options }: { boardId: string; op
       </div>
       <Card className="flex flex-col gap-4 p-5 lg:sticky lg:bottom-4 lg:flex-row lg:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <label htmlFor="board-feedback" className="text-sm font-medium">
-            What should change in the one you choose?
-          </label>
-          <textarea
-            id="board-feedback"
-            name="feedback"
-            rows={2}
-            maxLength={MAX_NOTE_TEXT}
-            className="bg-surface border-ink/15 focus-visible:border-ink focus-visible:outline-ink/20 field-sizing-content max-h-40 w-full resize-none rounded-lg border px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-0"
-          />
+          <FeedbackField />
           <label className="text-ink-soft flex min-h-9 w-fit cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" name="remember" className="accent-ink size-4" />
+            <input type="checkbox" name="remember" className="accent-ink size-4 shrink-0" />
             Remember this for every site
           </label>
         </div>
-        <SubmitButton variant="solid" icon={<Hammer size={18} aria-hidden="true" />}>
-          Build the chosen design
-        </SubmitButton>
+        <div className="flex shrink-0 flex-col gap-2">
+          <SubmitButton variant="solid" icon={<Hammer size={18} aria-hidden="true" />}>
+            Build the chosen design
+          </SubmitButton>
+          <SubmitButton variant="soft" formAction={redrawBoardsAction} formNoValidate icon={<ArrowsClockwise size={18} aria-hidden="true" />}>
+            Draw three new designs
+          </SubmitButton>
+        </div>
       </Card>
     </form>
   );

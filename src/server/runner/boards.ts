@@ -29,7 +29,7 @@ const Option = z.object({
   photoTreatment: short(20).default("plain"),
   texture: short(20).default("none"),
   explores: z.boolean().default(false),
-  pictures: z.object({ board: z.string().url().max(500), desktop: z.string().url().max(500), phone: z.string().url().max(500) }),
+  pictures: z.object({ board: z.string().url().max(500), desktop: z.string().url().max(500), phone: z.string().url().max(500), narrow: z.string().url().max(500).optional() }),
 });
 
 export const BoardsBody = z.object({
@@ -45,10 +45,10 @@ async function buildingJob(id: string): Promise<PreviewJob> {
   return job;
 }
 
-/** PUT /api/runner/:job/boards/:picture, the JPEG as the body. The picture is "a-board", "a-desktop" or "a-phone" (and b, c). */
+/** PUT /api/runner/:job/boards/:picture, the JPEG as the body. The picture is "a-board", "a-desktop", "a-phone" or "a-narrow" (and b, c). */
 export async function uploadBoardPicture(id: string, name: string, request: Request) {
   const job = await buildingJob(id);
-  if (!pictureName(name)) throw new BotError(400, `"${name}" is not a board picture. Send a-board, a-desktop or a-phone, and the same for b and c.`);
+  if (!pictureName(name)) throw new BotError(400, `"${name}" is not a board picture. Send a-board, a-desktop, a-phone or a-narrow, and the same for b and c.`);
   const bytes = await request.arrayBuffer();
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_PICTURE_BYTES) throw new BotError(413, "A board picture is a JPEG of 4 MB at most.");
   return { url: await storeBoardPicture(job.businessId, job.id, name, bytes) };
