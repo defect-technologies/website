@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, SKIPPED_STEP } from "@/lib/previewJobs";
+import { changesBuiltPreview, MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, RETRY_NOTE, SKIPPED_STEP } from "@/lib/previewJobs";
 import type { BotKey, BrandFile, Business, PreviewJob } from "../db/schema";
 import { env } from "../env";
 import { launchDomainOf } from "../integrations/domain";
@@ -114,7 +114,9 @@ export async function claimNext(key: BotKey, request: Request) {
   if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
-  const boards = { on: (await runnerSettings()).designBoards, choice: job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null };
+  const choice = job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null;
+  // A founder's choice is always built. Without one, a note about the preview the lead has keeps that preview's design.
+  const boards = { on: (await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl)), choice };
   // A client who has paid already has their plan, so their previews carry no "Make it live" button.
   return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id), boards);
 }
@@ -257,9 +259,6 @@ function finishDone(job: PreviewJob, lead: Business, body: Done) {
 function lastLines(text: string, count: number) {
   return text.trim().split("\n").slice(-count).join("\n");
 }
-
-/** The engine strips this exact text to tell an automatic retry from a founder's note: change it there in the same release. */
-export const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/review-*.md, and fix every failure they list before anything else.";
 
 /** A failed build tries once more by itself with a note pointing at what failed. After that, only a paying client's failure reaches a founder. */
 async function retryOrGiveUp(job: PreviewJob, lead: Business, body: Done) {

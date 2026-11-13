@@ -64,6 +64,28 @@ export type JobKind = (typeof JOB_KINDS)[number];
 /** How many times a lead's build may fail in a row before it's left for a founder. */
 export const MAX_FAILED_BUILDS = 2;
 
+/** The engine strips this exact text to tell an automatic retry from a founder's note: change it there in the same release. */
+export const RETRY_NOTE = "The last build of this site failed. Read verify/report.md and the latest design/review-*.md, and fix every failure they list before anything else.";
+
+/** What a founder wrote in a job's note, without the automatic retry's own words. */
+export function founderNote(note: string): string {
+  return note.replace(RETRY_NOTE, "").trim();
+}
+
+/** The line in a note that asks the builder for a new design. The pipeline reads the same line (pipeline.py, note_lines). */
+export function asksForNewDesign(note: string): boolean {
+  return note.split("\n").some((line) => line.trim().toLowerCase().replace(/\.+$/, "") === "start a new design");
+}
+
+/**
+ * Whether a build with this note changes the preview the lead already has. That build keeps the preview's design, so it
+ * makes no design boards: boards would stop it and replace the design the founder wrote about.
+ */
+export function changesBuiltPreview(note: string, previewUrl: string): boolean {
+  const written = founderNote(note);
+  return Boolean(written) && Boolean(previewUrl) && !asksForNewDesign(written);
+}
+
 /** Settings the founders control from Setup > Bots. */
 export type RunnerSettings = {
   dailyCap: number;

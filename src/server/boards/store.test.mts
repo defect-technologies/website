@@ -6,7 +6,7 @@
  * Runs against an in-memory Postgres (PGlite) migrated from drizzle/.
  */
 import assert from "node:assert/strict";
-import { mock, test } from "node:test";
+import { after, mock, test } from "node:test";
 import type { BoardLetter } from "@/lib/boards";
 import { startEmptyTestDatabase } from "../emptyTestDatabase";
 
@@ -17,6 +17,7 @@ process.env.BRAND_FILES_READ_WRITE_TOKEN = "vercel_blob_rw_TestStore_secret";
 const STORE = "https://teststore.public.blob.vercel-storage.com";
 
 const closeDatabase = await startEmptyTestDatabase();
+after(closeDatabase);
 const { db } = await import("../db/client");
 const { businesses, previewJobs } = await import("../db/schema");
 const { eq } = await import("drizzle-orm");
@@ -24,6 +25,7 @@ const store = await import("./store");
 const { isBoardPicture, pictureName } = await import("./pictures");
 const { BoardsBody, boardMemory, reportBoards } = await import("../runner/boards");
 const { buildsToday, claimNextJob, requestPreview } = await import("../runner/jobs");
+const { claimNext } = await import("../runner/api");
 const { BOARDS_STEP, isBoards, buildOutcome } = await import("@/lib/previewJobs");
 const database = await db();
 
@@ -120,5 +122,76 @@ test("decided boards teach the next build", async () => {
   assert.ok(memory.preferences.layouts.editorial > 1 && memory.preferences.layouts["split-hero"] < 1);
   assert.match(memory.markdown, /## Acme Heating \(chosen by Boris\)/);
   assert.match(memory.markdown, /- Said: Quieter orange\./);
-  await closeDatabase();
 });
+
+type Claim = { job: { id: string; note: string }; lead: { id: string }; boards?: boolean; board?: unknown };
+
+/**
+ * What the runner is handed for the lead's next job, as GET /api/runner/next answers it. It asks under its own name:
+ * the admin puts a runner's unfinished claims back in the queue, and the tests above leave some under "runner-1".
+ */
+async function claimed(lead: { id: string }, note: string) {
+  const [current] = await database.select().from(businesses).where(eq(businesses.id, lead.id));
+  await requestPreview(current, "brendan@g.studio", note);
+  const claim = (await claimNext({ name: "runner-1" } as never, new Request("https://defect.tech/api/runner/next?runner=runner-notes"))) as Claim;
+  assert.equal(claim.lead.id, lead.id, "the job claimed is the one just queued");
+  return claim;
+}
+
+async function finish(jobId: string) {
+  await database.update(previewJobs).set({ status: "done", finishedAt: new Date() }).where(eq(previewJobs.id, jobId));
+}
+
+test("a founder's note about a built preview gets no boards, so the build keeps the design the note is about", async () => {
+  made += 1;
+  const [lead] = await database.insert(businesses).values({ businessName: "Noted Roofing", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example` } as never).returning();
+  const first = await claimed(lead, "Their site is good, build it anyway.");
+  assert.equal(first.boards, true, "no preview yet: the first build makes boards, note or not");
+  await finish(first.job.id);
+
+  await database.update(businesses).set({ previewUrl: "https://noted-roofing-1.vercel.app" }).where(eq(businesses.id, lead.id));
+  const change = await claimed(lead, "On / at phone width, the <h1>: too large.");
+  assert.equal(change.boards, undefined, "boards would stop this build and replace the design");
+  await finish(change.job.id);
+
+  const fresh = await claimed(lead, "Start a new design.\nMake it bolder.");
+  assert.equal(fresh.boards, true);
+  await finish(fresh.job.id);
+
+  const again = await claimed(lead, "");
+  assert.equal(again.boards, true, "a build with no note is a new build");
+  await finish(again.job.id);
+});
+
+test("the job that builds a founder's choice carries the note of the job that made the boards", async () => {
+  made += 1;
+  const [lead] = await database.insert(businesses).values({ businessName: "Carried Electric", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example`, previewUrl: "https://carried-1.vercel.app" } as never).returning();
+  const { RETRY_NOTE } = await import("@/lib/previewJobs");
+  await requestPreview(lead, "brendan@g.studio", `Start a new design.\nUse their red.\n\n${RETRY_NOTE}`);
+  const boardsJob = (await claimNextJob("runner-1"))!;
+  await reportBoards(boardsJob.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  const board = (await store.waitingBoardFor(lead.id))!;
+  assert.equal(await store.noteBehindBoards(board), "Start a new design.\nUse their red.", "the founder's words, without the automatic retry's");
+  await store.chooseBoard(board.id, "b", "", "brendan@g.studio");
+
+  const build = await claimed(lead, await store.noteBehindBoards(board));
+  assert.equal(build.job.note, "Start a new design.\nUse their red.");
+  assert.equal(build.boards, true);
+  assert.deepEqual(build.board, { letter: "b", feedback: "", by: "Brendan" });
+  await finish(build.job.id);
+
+  await store.chooseBoard((await boardFromNotedPreview(lead)).id, "a", "", "brendan@g.studio");
+  const chosen = await claimed(lead, "On / at phone width, the <h1>: too large.");
+  assert.equal(chosen.boards, true, "a choice is always built, also with a note about the preview");
+  assert.deepEqual(chosen.board, { letter: "a", feedback: "", by: "Brendan" });
+  await finish(chosen.job.id);
+});
+
+/** Boards an older runner made from a note about a built preview: they wait, and a founder may still choose from them. */
+async function boardFromNotedPreview(lead: { id: string }) {
+  const [current] = await database.select().from(businesses).where(eq(businesses.id, lead.id));
+  await requestPreview(current, "brendan@g.studio", "On / at phone width, the <h1>: too large.");
+  const job = (await claimNextJob("runner-1"))!;
+  await reportBoards(job.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  return (await store.waitingBoardFor(lead.id))!;
+}
