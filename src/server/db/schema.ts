@@ -109,7 +109,7 @@ export const messages = pgTable(
     businessId: uuid("business_id")
       .notNull()
       .references(() => businesses.id),
-    mailboxId: uuid("mailbox_id").references(() => mailboxes.id),
+    mailboxId: uuid("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
     direction: direction("direction").notNull(),
     kind: messageKind("kind").notNull(),
     gmailId: text("gmail_id"),
@@ -123,7 +123,11 @@ export const messages = pgTable(
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
     readAt: timestamp("read_at", { withTimezone: true }),
   },
-  (table) => [uniqueIndex("messages_gmail_id").on(table.gmailId), index("messages_business").on(table.businessId)],
+  (table) => [
+    uniqueIndex("messages_gmail_id").on(table.gmailId),
+    index("messages_business").on(table.businessId),
+    index("messages_business_at").on(table.businessId, table.at.desc()),
+  ],
 );
 
 /** What opt-outs block, one key per row: a company email domain, an exact address at a shared provider like Gmail, a website domain, or "place:" and a Google place ID. See leads/contactKeys.ts. */
@@ -615,7 +619,7 @@ export const inboundRequests = pgTable(
     gmailId: text("gmail_id"),
     threadId: text("thread_id"),
     headerMessageId: text("header_message_id").notNull().default(""),
-    mailboxId: uuid("mailbox_id").references(() => mailboxes.id),
+    mailboxId: uuid("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
     /** The bot's one-line reason for how it sorted the email. */
     reason: text("reason").notNull().default(""),
     sortedBy: text("sorted_by").notNull().default(""),

@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { FOUNDER_EMAILS } from "@/lib/founders";
 import { monthlyBalances } from "@/lib/settleUp";
 import { db } from "../db/client";
@@ -31,22 +31,37 @@ async function allSettlements() {
   return (await db()).select().from(settlements).orderBy(asc(settlements.sentAt));
 }
 
+type SettlementRow = typeof settlements.$inferSelect;
+
+function balancesOf(expenseRows: Expense[], settlementRows: SettlementRow[]) {
+  const sent = settlementRows.map((row) => ({ month: row.month, from: row.fromFounder, to: row.toFounder, amountCents: row.amountCents }));
+  return monthlyBalances([FOUNDER_EMAILS[0], FOUNDER_EMAILS[1]], expenseRows, sent);
+}
+
 /** Every expense by month, with repeating expenses brought up to date first. */
 export async function balances() {
   await addAllDueRows();
   const [expenseRows, settlementRows, recurring] = await Promise.all([allExpenses(), allSettlements(), allRecurring()]);
-  const sent = settlementRows.map((row) => ({ month: row.month, from: row.fromFounder, to: row.toFounder, amountCents: row.amountCents }));
-  return { expenses: expenseRows, recurring, months: monthlyBalances([FOUNDER_EMAILS[0], FOUNDER_EMAILS[1]], expenseRows, sent) };
+  return { expenses: expenseRows, recurring, months: balancesOf(expenseRows, settlementRows) };
 }
 
-/** Records the Zelle that evens out a month. Returns null when nothing was owed. */
+/**
+ * Records the Zelle that evens out a month. Returns null when nothing is owed.
+ * The amount is worked out again inside a transaction that holds a lock for the month, so a second press
+ * waits, finds the month even, and records nothing.
+ */
 export async function settleMonth(month: string, recordedBy: string) {
-  const { months } = await balances();
-  const owed = months.find((balance) => balance.month === month)?.owed;
-  if (!owed) return null;
-  const [row] = await (await db())
-    .insert(settlements)
-    .values({ month, fromFounder: owed.from, toFounder: owed.to, amountCents: owed.amountCents, recordedBy })
-    .returning();
-  return row;
+  await addAllDueRows();
+  return (await db()).transaction(async (transaction) => {
+    await transaction.execute(sql`select pg_advisory_xact_lock(hashtext(${`settle-month:${month}`}))`);
+    const expenseRows = await transaction.select().from(expenses).orderBy(desc(expenses.spentOn), desc(expenses.createdAt));
+    const settlementRows = await transaction.select().from(settlements).orderBy(asc(settlements.sentAt));
+    const owed = balancesOf(expenseRows, settlementRows).find((balance) => balance.month === month)?.owed;
+    if (!owed) return null;
+    const [row] = await transaction
+      .insert(settlements)
+      .values({ month, fromFounder: owed.from, toFounder: owed.to, amountCents: owed.amountCents, recordedBy })
+      .returning();
+    return row;
+  });
 }
