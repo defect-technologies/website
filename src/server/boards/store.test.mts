@@ -124,7 +124,7 @@ test("decided boards teach the next build", async () => {
   assert.match(memory.markdown, /- Said: Quieter orange\./);
 });
 
-type Claim = { job: { id: string; note: string }; lead: { id: string }; boards?: boolean; board?: unknown };
+type Claim = { job: { id: string; note: string }; lead: { id: string }; boards?: boolean; board?: unknown; repair?: boolean };
 
 /**
  * What the runner is handed for the lead's next job, as GET /api/runner/next answers it. It asks under its own name:
@@ -147,15 +147,18 @@ test("a founder's note about a built preview gets no boards, so the build keeps 
   const [lead] = await database.insert(businesses).values({ businessName: "Noted Roofing", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example` } as never).returning();
   const first = await claimed(lead, "Their site is good, build it anyway.");
   assert.equal(first.boards, true, "no preview yet: the first build makes boards, note or not");
+  assert.equal(first.repair, undefined, "and there is nothing built to repair");
   await finish(first.job.id);
 
   await database.update(businesses).set({ previewUrl: "https://noted-roofing-1.vercel.app" }).where(eq(businesses.id, lead.id));
   const change = await claimed(lead, "On / at phone width, the <h1>: too large.");
   assert.equal(change.boards, undefined, "boards would stop this build and replace the design");
+  assert.equal(change.repair, true, "the note's changes are made on the built site as it is");
   await finish(change.job.id);
 
   const fresh = await claimed(lead, "Start a new design.\nMake it bolder.");
   assert.equal(fresh.boards, true);
+  assert.equal(fresh.repair, undefined);
   await finish(fresh.job.id);
 
   const again = await claimed(lead, "");
@@ -183,6 +186,7 @@ test("the job that builds a founder's choice carries the note of the job that ma
   await store.chooseBoard((await boardFromNotedPreview(lead)).id, "a", "", "brendan@g.studio");
   const chosen = await claimed(lead, "On / at phone width, the <h1>: too large.");
   assert.equal(chosen.boards, true, "a choice is always built, also with a note about the preview");
+  assert.equal(chosen.repair, undefined, "so its job is not a repair");
   assert.deepEqual(chosen.board, { letter: "a", feedback: "", by: "Brendan" });
   await finish(chosen.job.id);
 });

@@ -1,9 +1,10 @@
 "use client";
 
-import { AppWindow, ArrowsHorizontal, Check, CircleNotch, DeviceMobile, GlobeHemisphereWest, Image, Layout, Palette, Quotes, Shapes, SkipForward, TextAa, X, type Icon } from "@phosphor-icons/react";
+import { AppWindow, ArrowsHorizontal, Check, CircleNotch, DeviceMobile, GlobeHemisphereWest, Image, Layout, Palette, Quotes, Shapes, SkipForward, TextAa, Wrench, X, type Icon } from "@phosphor-icons/react";
 import type { CriticTarget } from "@/lib/critics";
-import type { AskTopic } from "@/lib/reviewAsks";
+import type { AskRepair, AskTopic, RepairView } from "@/lib/reviewAsks";
 import KnifeStroke from "../KnifeStroke";
+import Segmented, { type Segment } from "./Segmented";
 import type { AsksState } from "./useReviewAsks";
 import type { AskAnswer, AskFlow } from "./useAskFlow";
 
@@ -47,11 +48,11 @@ function Writing() {
   );
 }
 
-function Finished() {
+function Finished({ repairs }: { repairs: boolean }) {
   return (
     <p className="flex items-center gap-2 text-base font-medium">
       <KnifeStroke className="text-good h-3.5 w-10 shrink-0" />
-      That was every question
+      {repairs ? "That was every repair" : "That was every question"}
     </p>
   );
 }
@@ -72,7 +73,37 @@ function TargetMark({ target }: { target: CriticTarget }) {
   );
 }
 
-type Props = { state: AsksState; flow: AskFlow; onProposal: (accepted: boolean) => void; className?: string };
+/** How a repaired note is looked at and answered: which view the stage shows, and whether the repair fixed it. */
+export type RepairControls = { view: RepairView; onView: (view: RepairView) => void; onAnswer: (fixed: boolean) => void };
+
+type Props = { state: AsksState; flow: AskFlow; onProposal: (accepted: boolean) => void; repair: RepairControls; className?: string };
+
+const REPAIR_VIEWS: Segment<RepairView>[] = [
+  { value: "before", label: "Before" },
+  { value: "after", label: "After" },
+  { value: "live", label: "Live site" },
+];
+
+/** The stage's views for a repaired note. A note whose spot could not be pictured before the repair has no Before. */
+function RepairViews({ repair, controls }: { repair: AskRepair; controls: RepairControls }) {
+  const options = REPAIR_VIEWS.filter((option) => option.value !== "before" || repair.before);
+  return <Segmented label="What the preview shows" options={options} value={controls.view} onChange={controls.onView} />;
+}
+
+function RepairChoices({ onAnswer }: { onAnswer: (fixed: boolean) => void }) {
+  return (
+    <>
+      <button type="button" onClick={() => onAnswer(true)} className={`${CHOICE} bg-ink text-paper hover:bg-ink/85`}>
+        <Check size={16} weight="bold" aria-hidden="true" />
+        Fixed
+      </button>
+      <button type="button" onClick={() => onAnswer(false)} className={`${CHOICE} bg-paper-shade text-ink hover:bg-paper-shade/70`}>
+        <X size={16} weight="bold" aria-hidden="true" />
+        Still wrong
+      </button>
+    </>
+  );
+}
 
 function QuestionChoices({ flow }: { flow: AskFlow }) {
   return (
@@ -104,27 +135,35 @@ function ProposalChoices({ onAnswer }: { onAnswer: (accepted: boolean) => void }
   );
 }
 
+function Choices({ ask, flow, onProposal, repair }: { ask: NonNullable<AskFlow["current"]>; flow: AskFlow; onProposal: (accepted: boolean) => void; repair: RepairControls }) {
+  if (ask.repair) return <RepairChoices onAnswer={repair.onAnswer} />;
+  if (ask.proposal) return <ProposalChoices onAnswer={onProposal} />;
+  return <QuestionChoices flow={flow} />;
+}
+
 /**
  * One specific question about one part of the preview. Good and Skip move on; talking or typing answers it, and the
- * answer becomes a note on the element the question is about.
+ * answer becomes a note on the element the question is about. After a repair the question is the founder's own note,
+ * with its spot before and after on the stage: Fixed moves on, and Still wrong keeps the note for the next repair.
  */
-export default function AskCard({ state, flow, onProposal, className = "" }: Props) {
+export default function AskCard({ state, flow, onProposal, repair, className = "" }: Props) {
   if (state.status === "none") return null;
   const ask = flow.current;
-  const TopicIcon = ask ? TOPIC_ICON[ask.topic] : AppWindow;
+  const TopicIcon = ask?.repair ? Wrench : ask ? TOPIC_ICON[ask.topic] : AppWindow;
   return (
     <section aria-label="Question about this preview" aria-live="polite" className={`flex flex-col gap-2.5 ${className}`}>
       {state.status === "loading" && <Writing />}
-      {state.status === "ready" && flow.finished && <Finished />}
+      {state.status === "ready" && flow.finished && <Finished repairs={state.asks.some((entry) => entry.repair)} />}
       {ask && (
         <>
-          <div className="flex items-center gap-2.5">
-            <TopicIcon size={22} aria-hidden="true" className="text-ink-soft shrink-0" />
-            <p className="min-w-0 text-lg font-semibold text-pretty">{ask.question}</p>
+          <div className="flex items-start gap-2.5">
+            <TopicIcon size={22} aria-hidden="true" className="text-ink-soft mt-0.5 shrink-0" />
+            <p className={`min-w-0 text-lg font-semibold text-pretty ${ask.repair ? "max-lg:line-clamp-3" : ""}`}>{ask.question}</p>
           </div>
           {ask.proposal && <TargetMark target={ask.proposal.target} />}
+          {ask.repair && <RepairViews repair={ask.repair} controls={repair} />}
           <div className="flex items-center gap-2">
-            {ask.proposal ? <ProposalChoices onAnswer={onProposal} /> : <QuestionChoices flow={flow} />}
+            <Choices ask={ask} flow={flow} onProposal={onProposal} repair={repair} />
             <span className="ml-auto">
               <Progress state={state} flow={flow} />
             </span>

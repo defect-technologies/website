@@ -1,6 +1,6 @@
 import type { CriticKind, CriticTarget } from "@/lib/critics";
 import type { Device, NoteAnchor, NoteScope, ReviewNote } from "@/lib/review";
-import { askAnchor, type ReviewAsk } from "@/lib/reviewAsks";
+import { askAnchor, type ReviewAsk, stillWrongText } from "@/lib/reviewAsks";
 
 /** pickedOn is the width the frame had when the element was picked, which is what the note is about. */
 export type Draft = { text: string; anchor: NoteAnchor | null; pickedOn: Device | null; scope: NoteScope };
@@ -40,6 +40,14 @@ export function noteFromProposal(ask: ReviewAsk): ReviewNote | null {
   const { proposal } = ask;
   if (!proposal) return null;
   return { id: crypto.randomUUID(), text: proposal.text, scope: "site", device: proposal.device, path: ask.path, anchor: askAnchor(ask), kind: proposal.kind, target: proposal.target, proposalId: proposal.id };
+}
+
+/** A repair that did not fix its note gives the founder the note back, on the same element at the same width. */
+export function noteFromRepair(ask: ReviewAsk): ReviewNote | null {
+  const { repair } = ask;
+  if (!repair) return null;
+  const anchor = askAnchor(ask);
+  return { id: crypto.randomUUID(), text: stillWrongText(ask.question), scope: "site", device: repair.device, path: ask.path, anchor: anchor && { ...anchor, tag: repair.tag } };
 }
 
 /** Dictated phrases join the draft as sentences. */

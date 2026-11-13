@@ -1,3 +1,5 @@
+import { POINTING_NOTE } from "./review";
+
 /** Where a preview build is. Active ones block a second build of the same lead. */
 export const PREVIEW_JOB_STATUSES = ["queued", "claimed", "running", "done", "failed", "waiting_for_usage"] as const;
 export type PreviewJobStatus = (typeof PREVIEW_JOB_STATUSES)[number];
@@ -84,6 +86,22 @@ export function asksForNewDesign(note: string): boolean {
 export function changesBuiltPreview(note: string, previewUrl: string): boolean {
   const written = founderNote(note);
   return Boolean(written) && Boolean(previewUrl) && !asksForNewDesign(written);
+}
+
+/** The name the runner's own requests carry, such as the retry of a failed build. */
+export const RUNNER_ACTOR = "bot:runner";
+
+/**
+ * Whether the runner repairs the built site with this job's note and does not build it again: a founder's note about
+ * the preview the lead has. The repair reads nothing again, plans nothing and asks no outside reviewer, because the
+ * founder who wrote the note looks at the result. Another bot's request is built the long way, with its outside review.
+ * So is the update that lets the review page point at a preview: a repair keeps the site's kit, and that update exists
+ * to take the newest one.
+ */
+export function isRepair(job: { kind: string; note: string; requestedBy: string }, previewUrl: string): boolean {
+  const byAnotherBot = job.requestedBy.startsWith("bot:") && job.requestedBy !== RUNNER_ACTOR;
+  const takesNewKit = founderNote(job.note) === POINTING_NOTE;
+  return job.kind === "preview" && !byAnotherBot && !takesNewKit && changesBuiltPreview(job.note, previewUrl);
 }
 
 /** Settings the founders control from Setup > Bots. */
