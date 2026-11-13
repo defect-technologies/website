@@ -2,6 +2,7 @@
 
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import type { NoteAnchor } from "@/lib/review";
+import { readSections, type ReviewSection, SECTIONS_PROTOCOL } from "@/lib/reviewSections";
 
 const SOURCE = "defect-review";
 /**
@@ -14,9 +15,15 @@ const HELLO_TRIES = 20;
 export type BridgeState = "connecting" | "connected" | "unavailable";
 
 type BridgeMessage =
-  | { type: "ready" | "navigate"; path: string }
+  | { type: "ready" | "navigate"; path: string; version?: number }
   | ({ type: "picked" } & NoteAnchor)
-  | { type: "pick-cancelled" };
+  | { type: "pick-cancelled" }
+  | { type: "sections"; path: string; scrollY?: number; sections?: unknown };
+
+/** The sections of the page the frame is on, and how far down it was scrolled when it reported them. */
+export type PageSections = { path: string; scrollY: number; sections: ReviewSection[] };
+
+const NO_SECTIONS: PageSections = { path: "", scrollY: 0, sections: [] };
 
 function bridgeMessage(event: MessageEvent, origin: string): BridgeMessage | null {
   if (event.origin !== origin) return null;
@@ -43,6 +50,8 @@ export function useReviewBridge(frame: RefObject<HTMLIFrameElement | null>, prev
   const origin = originOf(previewUrl);
   const [state, setState] = useState<BridgeState>("connecting");
   const [path, setPath] = useState("/");
+  const [version, setVersion] = useState(1);
+  const [pageSections, setPageSections] = useState<PageSections>(NO_SECTIONS);
   const handlers = useRef({ onPicked, onPickCancelled });
   const answered = useRef(false);
   const greeting = useRef(0);
@@ -61,6 +70,9 @@ export function useReviewBridge(frame: RefObject<HTMLIFrameElement | null>, prev
         answered.current = true;
         setState("connected");
         setPath(message.path || "/");
+        if (message.type === "ready") setVersion(typeof message.version === "number" ? message.version : 1);
+      } else if (message.type === "sections") {
+        setPageSections({ path: message.path || "/", scrollY: typeof message.scrollY === "number" ? message.scrollY : 0, sections: readSections(message.sections) });
       } else if (message.type === "picked") {
         handlers.current.onPicked({ path: message.path, selector: message.selector, tag: message.tag, text: message.text });
       } else {
@@ -93,12 +105,15 @@ export function useReviewBridge(frame: RefObject<HTMLIFrameElement | null>, prev
   const setPicking = useCallback((on: boolean) => post({ type: "pick", on }), [post]);
   /**
    * Asks the preview to go to a page, scroll to an element, outline it and pin the question beside it. Previews built
-   * before kit 0.11.7 ignore it; 0.11.7 outlines without the question.
+   * before kit 0.11.7 ignore it; 0.11.7 outlines without the question. `block: "start"` shows a section from its top
+   * (kit 0.15.1); an older preview puts it in the middle of the screen.
    */
   const show = useCallback(
-    (target: { path: string; selector: string; question: string }) => post({ type: "show", path: target.path, selector: target.selector, label: target.question }),
+    (target: { path: string; selector: string; question: string; block?: "start" | "center" }) => post({ type: "show", path: target.path, selector: target.selector, label: target.question, block: target.block ?? "center" }),
     [post],
   );
+  /** Asks the preview for the sections of the page it is on. It answers from kit 0.15.1. */
+  const requestSections = useCallback(() => post({ type: "sections" }), [post]);
 
-  return { state, path, greet, setPicking, show };
+  return { state, path, greet, setPicking, show, requestSections, pageSections, reportsSections: version >= SECTIONS_PROTOCOL };
 }
