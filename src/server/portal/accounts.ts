@@ -10,8 +10,10 @@ import { hasPortalAccess } from "../sites/clientSites";
 import { startPortalSession } from "./session";
 
 const LINK_MINUTES = 15;
-const LINKS_PER_WINDOW = 3;
-const FAILURES_ALLOWED = 5;
+const LINKS_PER_CALLER = 3;
+const LINKS_PER_SITE = 10;
+const FAILURES_PER_CALLER = 5;
+const FAILURES_PER_SITE = 20;
 const LOCKOUT_MINUTES = 15;
 
 const hash = (code: string) => createHash("sha256").update(code).digest("hex");
@@ -39,6 +41,17 @@ async function failuresSince(email: string, minutes: number) {
   return row?.count ?? 0;
 }
 
+/** Counts of one caller's attempts for one email share the failures table, under a key no email can equal. */
+const callerBucket = (kind: "wrong-password" | "link-request", callerKey: string, email: string) => `${kind}|${callerKey}|${email}`;
+
+async function recordAttempt(bucket: string) {
+  await (await db()).insert(portalFailedSignIns).values({ email: bucket });
+}
+
+async function callerIsOverLimit(bucket: string | undefined, limit: number) {
+  return bucket !== undefined && (await failuresSince(bucket, LOCKOUT_MINUTES)) >= limit;
+}
+
 async function linksSince(email: string, minutes: number) {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
@@ -50,13 +63,16 @@ async function linksSince(email: string, minutes: number) {
 export type PasswordSignIn = "signed-in" | "wrong" | "locked";
 
 /** The same answer for an unknown email and a wrong password, so the form can't reveal who our clients are. */
-export async function signInWithPassword(rawEmail: string, password: string): Promise<PasswordSignIn> {
+export async function signInWithPassword(rawEmail: string, password: string, callerKey?: string): Promise<PasswordSignIn> {
   const email = normalize(rawEmail);
-  if ((await failuresSince(email, LOCKOUT_MINUTES)) >= FAILURES_ALLOWED) return "locked";
+  const callerFailures = callerKey ? callerBucket("wrong-password", callerKey, email) : undefined;
+  if ((await failuresSince(email, LOCKOUT_MINUTES)) >= FAILURES_PER_SITE) return "locked";
+  if (await callerIsOverLimit(callerFailures, FAILURES_PER_CALLER)) return "locked";
   const [account] = await (await db()).select().from(portalAccounts).where(eq(portalAccounts.email, email));
   const matches = Boolean(account?.passwordHash) && (await passwordMatches(password, account.passwordHash));
   if (!matches || !(await hasPortalAccess(email))) {
-    await (await db()).insert(portalFailedSignIns).values({ email });
+    await recordAttempt(email);
+    if (callerFailures) await recordAttempt(callerFailures);
     return "wrong";
   }
   await signIn(email);
@@ -78,14 +94,27 @@ function linkEmailText(url: string): string {
   ].join("\n");
 }
 
-export type LinkRequest = "sent" | "not-ready";
+export type LinkRequest = "sent" | "not-ready" | "limited";
 
-/** Emails a one-time sign-in link to an owner or editor. Answers "sent" either way, so nobody learns who has a site. */
-export async function emailPortalLink(rawEmail: string, next: string): Promise<LinkRequest> {
+/** Counts the request against its caller, and says whether that caller may still ask for a link for this email. */
+async function callerMayRequestLink(email: string, callerKey: string | undefined): Promise<boolean> {
+  if (!callerKey) return true;
+  const bucket = callerBucket("link-request", callerKey, email);
+  if (await callerIsOverLimit(bucket, LINKS_PER_CALLER)) return false;
+  await recordAttempt(bucket);
+  return true;
+}
+
+/**
+ * Emails a one-time sign-in link to an owner or editor. Answers "sent" for an email with no site, so nobody learns
+ * who has a site. A request over a cap answers "limited", and each caller has its own cap so one cannot use up another's.
+ */
+export async function emailPortalLink(rawEmail: string, next: string, callerKey?: string): Promise<LinkRequest> {
   if (!emailReady()) return "not-ready";
   const email = normalize(rawEmail);
+  if (!(await callerMayRequestLink(email, callerKey))) return "limited";
   if (!(await hasPortalAccess(email))) return "sent";
-  if ((await linksSince(email, LINK_MINUTES)) >= LINKS_PER_WINDOW) return "sent";
+  if ((await linksSince(email, LINK_MINUTES)) >= LINKS_PER_SITE) return "limited";
   const code = randomBytes(32).toString("base64url");
   await (await db()).insert(portalLinks).values({ codeHash: hash(code), email, next: safeNext(next), expiresAt: new Date(Date.now() + LINK_MINUTES * 60 * 1000) });
   const url = new URL("/portal/open", env.siteUrl());
