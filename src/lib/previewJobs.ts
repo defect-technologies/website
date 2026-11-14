@@ -75,8 +75,12 @@ export function founderNote(note: string): string {
 }
 
 /** The line in a note that asks the builder for a new design. The pipeline reads the same line (pipeline.py, note_lines). */
+export const NEW_DESIGN_NOTE = "Start a new design.";
+
+const NEW_DESIGN_LINE = NEW_DESIGN_NOTE.toLowerCase().replace(/\.+$/, "");
+
 export function asksForNewDesign(note: string): boolean {
-  return note.split("\n").some((line) => line.trim().toLowerCase().replace(/\.+$/, "") === "start a new design");
+  return note.split("\n").some((line) => line.trim().toLowerCase().replace(/\.+$/, "") === NEW_DESIGN_LINE);
 }
 
 /**

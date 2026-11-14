@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, type JobKind, type RunnerSettings, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
+import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, NEW_DESIGN_NOTE, type JobKind, type RunnerSettings, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { type BuildKind, previewWaitsEmail, type PreviewWait } from "@/lib/turnEmails";
 import { isNeon } from "../db/client";
@@ -119,31 +119,38 @@ function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand:
   };
 }
 
-/**
- * A new lead's first build. With design boards on it stops at three designs, so it goes ahead past the daily cap, until
- * as many designs wait for a founder as Setup > Bots allows. With boards off it is a whole build, held to the cap.
- */
-async function claimNewLead(runnerName: string, limits: Limits): Promise<PreviewJob | null> {
-  const { settings } = limits;
-  if (!settings.autoQueue || limits.paused) return null;
-  if (limits.noBuilds && !settings.designBoards) return null;
-  if (settings.designBoards && (await countBoardsWaiting()) >= settings.mostDesignsWaiting) return null;
+async function claimNewLead(runnerName: string, settings: RunnerSettings): Promise<PreviewJob | null> {
+  if (!settings.autoQueue) return null;
   const queued = await autoQueueNext();
   return queued ? claimJob(runnerName, queued.id) : null;
 }
 
 /**
- * The next job, most wanted first: work a founder or client is waiting on, then three designs for a new lead, then the
- * kit-only updates of old previews. Those updates are whole builds, so they wait while any design waits for a choice:
- * the build of that choice needs the day's build more.
+ * With design boards on, the runner draws designs for founders to review: first for an unreviewed preview whose
+ * kit-only update was queued (it gets three new designs, not the old design on a newer kit), then for a new lead.
+ * Both stop at their boards and build nothing, so they go ahead past the daily cap, until as many designs wait for a
+ * choice as Setup > Bots allows.
  */
+async function claimDesignWork(runnerName: string, settings: RunnerSettings): Promise<PreviewJob | null> {
+  if ((await countBoardsWaiting()) >= settings.mostDesignsWaiting) return null;
+  const update = await claimNextJob(runnerName, ["preview"], "backfill");
+  if (!update) return claimNewLead(runnerName, settings);
+  await record(ACTOR, "drew new designs in place of a kit-only update", { businessId: update.businessId });
+  return updateJob(update.id, { note: NEW_DESIGN_NOTE });
+}
+
+/** With design boards off, a new lead's first build and a kit-only update are whole builds, held to the daily cap. */
+async function claimBuildWork(runnerName: string, kinds: JobKind[], limits: Limits): Promise<PreviewJob | null> {
+  if (limits.noBuilds) return null;
+  return (await claimNewLead(runnerName, limits.settings)) ?? claimNextJob(runnerName, kinds, "backfill");
+}
+
+/** The next job: work a founder or client is waiting on first, then designs to review, or builds with boards off. */
 async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
   const kinds = kindsAllowed(search, limits.noBuilds);
   const asked = kinds.length ? await claimNextJob(runnerName, kinds, "asked") : null;
-  if (asked) return asked;
-  const newLead = await claimNewLead(runnerName, limits);
-  if (newLead || limits.noBuilds || (await countBoardsWaiting()) > 0) return newLead;
-  return claimNextJob(runnerName, kinds, "backfill");
+  if (asked || limits.paused) return asked;
+  return limits.settings.designBoards ? claimDesignWork(runnerName, limits.settings) : claimBuildWork(runnerName, kinds, limits);
 }
 
 /**

@@ -6,6 +6,7 @@ import EmptyState from "@/components/admin/EmptyState";
 import ReviewStudio from "@/components/admin/review/ReviewStudio";
 import { pointingUpdatesUnderway, queuePointingUpdates } from "@/server/review/pointingUpdates";
 import { reviewQueue } from "@/server/review/queue";
+import { runnerSettings } from "@/server/runner/settings";
 
 export const metadata: Metadata = { title: "Review" };
 
@@ -16,11 +17,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const firstLook = await reviewQueue();
   const queue = (await queuePointingUpdates(firstLook)) ? await reviewQueue() : firstLook;
   if (!queue.length) {
-    const updating = await pointingUpdatesUnderway();
+    const [updating, { designBoards }] = await Promise.all([pointingUpdatesUnderway(), runnerSettings()]);
     if (updating) {
+      const previews = `${updating} ${updating === 1 ? "preview" : "previews"}`;
       return (
-        <EmptyState title={`Updating ${updating} ${updating === 1 ? "preview" : "previews"}`} action={<ButtonLink href="/admin/builds" variant="soft" icon={<CheckCircle size={18} aria-hidden="true" />}>See what&rsquo;s building</ButtonLink>}>
-          Each comes back here as it finishes, and its questions take you to the part they ask about.
+        <EmptyState title={designBoards ? `New designs for ${previews}` : `Updating ${previews}`} action={<ButtonLink href={designBoards ? "/admin/designs" : "/admin/builds"} variant="soft" icon={<CheckCircle size={18} aria-hidden="true" />}>{designBoards ? "Open Designs" : "See what\u2019s building"}</ButtonLink>}>
+          {designBoards ? "Each gets three new designs, which land on Designs as they are drawn." : "Each comes back here as it finishes, and its questions take you to the part they ask about."}
         </EmptyState>
       );
     }
