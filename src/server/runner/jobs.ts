@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray, sql } from "drizzle-orm";
 import { ACTIVE_JOB_STATUSES, BOARDS_STEP, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
+import { POINTING_NOTE } from "@/lib/review";
 import { record } from "../activity";
 import { db } from "../db/client";
 import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
@@ -90,11 +91,12 @@ export async function nextLeadToBuild(): Promise<Business | null> {
   return lead ?? null;
 }
 
-/** Queues the next lead's preview, so an empty queue never leaves the runner idle. Returns whether one was queued. */
-export async function autoQueueNext(): Promise<boolean> {
+/** Queues the next lead's preview, so an empty queue never leaves the runner idle. Returns the job it queued. */
+export async function autoQueueNext(): Promise<PreviewJob | null> {
   const lead = await nextLeadToBuild();
-  if (!lead) return false;
-  return (await requestPreview(lead, AUTO_QUEUE_ACTOR)).created;
+  if (!lead) return null;
+  const request = await requestPreview(lead, AUTO_QUEUE_ACTOR);
+  return request.created ? request.job : null;
 }
 
 /** Builds started (or claimed) since midnight in Los Angeles. */
@@ -116,17 +118,40 @@ export async function spentToday(): Promise<number> {
   return row?.usd ?? 0;
 }
 
+const claimedBy = (runnerName: string) => ({ status: "claimed" as const, claimedAt: new Date(), runnerName, attempts: sql`${previewJobs.attempts} + 1` });
+
+/**
+ * Which queued jobs a claim takes. "asked" is work someone is waiting on: a choice, a note, a retry, a launch.
+ * "backfill" is the kit-only update of an old preview, which only fills a runner that has nothing better to do.
+ */
+export type QueuedWork = "asked" | "backfill";
+
+function queuedWorkIs(work: QueuedWork) {
+  const backfill = sql`starts_with(${previewJobs.note}, ${POINTING_NOTE})`;
+  return work === "backfill" ? backfill : sql`not ${backfill}`;
+}
+
 /**
  * Claims the oldest queued job of a kind this runner can do, in one statement. SKIP LOCKED means two runners
  * polling at once can never both get the same job.
  */
-export async function claimNextJob(runnerName: string, kinds: JobKind[] = ["preview"]): Promise<PreviewJob | null> {
+export async function claimNextJob(runnerName: string, kinds: JobKind[] = ["preview"], work: QueuedWork = "asked"): Promise<PreviewJob | null> {
   const kindList = sql.join(kinds.map((kind) => sql`${kind}`), sql`, `);
-  const oldestQueued = sql`(select ${previewJobs.id} from ${previewJobs} where ${previewJobs.status} = 'queued' and ${previewJobs.kind} in (${kindList}) order by ${previewJobs.createdAt} limit 1 for update skip locked)`;
+  const oldestQueued = sql`(select ${previewJobs.id} from ${previewJobs} where ${previewJobs.status} = 'queued' and ${previewJobs.kind} in (${kindList}) and ${queuedWorkIs(work)} order by ${previewJobs.createdAt} limit 1 for update skip locked)`;
   const [job] = await (await db())
     .update(previewJobs)
-    .set({ status: "claimed", claimedAt: new Date(), runnerName, attempts: sql`${previewJobs.attempts} + 1` })
+    .set(claimedBy(runnerName))
     .where(and(eq(previewJobs.id, oldestQueued), eq(previewJobs.status, "queued")))
+    .returning();
+  return job ?? null;
+}
+
+/** Claims this one queued job, unless another runner got to it first. */
+export async function claimJob(runnerName: string, jobId: string): Promise<PreviewJob | null> {
+  const [job] = await (await db())
+    .update(previewJobs)
+    .set(claimedBy(runnerName))
+    .where(and(eq(previewJobs.id, jobId), eq(previewJobs.status, "queued")))
     .returning();
   return job ?? null;
 }

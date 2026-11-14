@@ -18,8 +18,13 @@ function Setting({ name, on, children }: { name: keyof RunnerSettings; on: boole
 export function RunnerSettingsForm({ settings }: { settings: RunnerSettings }) {
   return (
     <form action={saveRunnerSettingsAction} className="flex flex-col items-start gap-4">
-      <div className="w-36">
-        <TextField label="Builds a day" name="dailyCap" type="number" min={0} max={100} defaultValue={settings.dailyCap} required />
+      <div className="flex flex-wrap gap-4">
+        <div className="w-36">
+          <TextField label="Builds a day" name="dailyCap" type="number" min={0} max={100} defaultValue={settings.dailyCap} required />
+        </div>
+        <div className="w-44">
+          <TextField label="Designs waiting at most" name="mostDesignsWaiting" type="number" min={1} max={100} defaultValue={settings.mostDesignsWaiting} required />
+        </div>
       </div>
       <div className="flex flex-col gap-1">
         <Setting name="autoQueue" on={settings.autoQueue}>

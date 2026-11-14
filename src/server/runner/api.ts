@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, MOST_BOARDS_WAITING, type JobKind, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
+import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, type JobKind, type RunnerSettings, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { type BuildKind, previewWaitsEmail, type PreviewWait } from "@/lib/turnEmails";
 import { isNeon } from "../db/client";
@@ -24,7 +24,7 @@ import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
 import { updateBusiness } from "../leads/businesses";
 import { maybePickForSpotCheck } from "../spotChecks";
-import { autoQueueNext, buildsToday, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
+import { autoQueueNext, buildsToday, claimJob, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
 import { repairChecks, repairNotesFor, RepairsField } from "./repairs";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
@@ -48,13 +48,19 @@ function idle(reason: string) {
 }
 
 /** Why the runner may not build previews right now, or null if it may. */
-async function whyNoBuilds(): Promise<string | null> {
-  const current = await runnerSettings();
-  const pause = activePause(current);
-  if (pause) return `Paused until ${pause.toISOString()} after Claude's usage limit.`;
+type Limits = { settings: RunnerSettings; noBuilds: string | null; paused: boolean };
+
+/**
+ * What the runner may start now. Claude's usage pause stops everything that uses Claude. The daily cap stops builds
+ * only: a job that stops at its design boards builds nothing and doesn't count against the cap.
+ */
+async function limitsNow(): Promise<Limits> {
+  const settings = await runnerSettings();
+  const pause = activePause(settings);
+  if (pause) return { settings, noBuilds: `Paused until ${pause.toISOString()} after Claude's usage limit.`, paused: true };
   const today = await buildsToday();
-  if (today >= current.dailyCap) return `Daily cap reached: ${today} of ${current.dailyCap} builds today (Pacific).`;
-  return null;
+  const capped = today >= settings.dailyCap ? `Daily cap reached: ${today} of ${settings.dailyCap} builds today (Pacific).` : null;
+  return { settings, noBuilds: capped, paused: false };
 }
 
 /**
@@ -113,12 +119,31 @@ function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand:
   };
 }
 
-async function claimAutoQueued(runnerName: string, kinds: JobKind[]): Promise<PreviewJob | null> {
-  const current = await runnerSettings();
-  if (!current.autoQueue) return null;
-  // A founder's choice is the slow part: more boards than they can look at would only wait, and each cost a crawl.
-  if (current.designBoards && (await countBoardsWaiting()) >= MOST_BOARDS_WAITING) return null;
-  return (await autoQueueNext()) ? claimNextJob(runnerName, kinds) : null;
+/**
+ * A new lead's first build. With design boards on it stops at three designs, so it goes ahead past the daily cap, until
+ * as many designs wait for a founder as Setup > Bots allows. With boards off it is a whole build, held to the cap.
+ */
+async function claimNewLead(runnerName: string, limits: Limits): Promise<PreviewJob | null> {
+  const { settings } = limits;
+  if (!settings.autoQueue || limits.paused) return null;
+  if (limits.noBuilds && !settings.designBoards) return null;
+  if (settings.designBoards && (await countBoardsWaiting()) >= settings.mostDesignsWaiting) return null;
+  const queued = await autoQueueNext();
+  return queued ? claimJob(runnerName, queued.id) : null;
+}
+
+/**
+ * The next job, most wanted first: work a founder or client is waiting on, then three designs for a new lead, then the
+ * kit-only updates of old previews. Those updates are whole builds, so they wait while any design waits for a choice:
+ * the build of that choice needs the day's build more.
+ */
+async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
+  const kinds = kindsAllowed(search, limits.noBuilds);
+  const asked = kinds.length ? await claimNextJob(runnerName, kinds, "asked") : null;
+  if (asked) return asked;
+  const newLead = await claimNewLead(runnerName, limits);
+  if (newLead || limits.noBuilds || (await countBoardsWaiting()) > 0) return newLead;
+  return claimNextJob(runnerName, kinds, "backfill");
 }
 
 /**
@@ -141,11 +166,9 @@ export async function claimNext(key: BotKey, request: Request) {
   for (const orphan of await requeueOrphans(runnerName)) {
     await record(ACTOR, "put a cut-off build back in the queue", { businessId: orphan.businessId, detail: `${runnerName} asked for new work while it was still marked as building this one` });
   }
-  const noBuilds = await whyNoBuilds();
-  const kinds = kindsAllowed(search, noBuilds);
-  if (kinds.length === 0) return idle(noBuilds ?? "Nothing to do.");
-  const job = (await claimNextJob(runnerName, kinds)) ?? (noBuilds ? null : await claimAutoQueued(runnerName, kinds));
-  if (!job) return idle(noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
+  const limits = await limitsNow();
+  const job = await claimWork(runnerName, search, limits);
+  if (!job) return idle(limits.noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
   const { boards, repair } = await designAndRepairFor(job, lead);
