@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
-import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, REDRAWN } from "@/lib/boards";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, REDRAWN, revisedLetter, revisingMark } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { founderNote } from "@/lib/previewJobs";
 import { db } from "../db/client";
@@ -92,14 +92,16 @@ export async function noteBehindBoards(board: Pick<DesignBoard, "jobId">): Promi
 }
 
 /**
- * Records that a founder wanted none of a board's options and asked for three new ones, with what they said. Null when
- * the board is gone or was already decided: the first decision stands.
+ * Records that a founder asked for the boards to be drawn again, with what they said: three new ones, or three
+ * revisions of the option `base` names. Null when the board is gone, has no such option or was already decided: the
+ * first decision stands.
  */
-export async function redrawBoards(id: string, feedback: string, by: string): Promise<DesignBoard | null> {
-  if (!(await boardById(id))) return null;
+export async function redrawBoards(id: string, feedback: string, by: string, base?: BoardLetter): Promise<DesignBoard | null> {
+  const board = await boardById(id);
+  if (!board || (base && !board.options.some((option) => option.letter === base))) return null;
   const [turnedDown] = await (await db())
     .update(designBoards)
-    .set({ chosenLetter: REDRAWN, feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
+    .set({ chosenLetter: base ? revisingMark(base) : REDRAWN, feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
     .where(and(eq(designBoards.id, id), isNull(designBoards.chosenAt)))
     .returning();
   return turnedDown ?? null;
@@ -111,8 +113,22 @@ export async function redrawBoards(id: string, feedback: string, by: string): Pr
  */
 export async function redrawFor(businessId: string): Promise<BoardRedraw | null> {
   const [newest] = await (await db()).select().from(designBoards).where(eq(designBoards.businessId, businessId)).orderBy(desc(designBoards.createdAt)).limit(1);
-  if (!newest || newest.chosenLetter !== REDRAWN) return null;
-  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? "") ?? "" };
+  const base = revisedLetter(newest?.chosenLetter ?? null);
+  if (!newest || (newest.chosenLetter !== REDRAWN && !base)) return null;
+  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? "") ?? "", ...(base ? { base } : {}) };
+}
+
+/** The board a lead had before this one, when a founder asked for these as revisions of one of its options. */
+export async function revisionOf(board: Pick<DesignBoard, "businessId" | "createdAt">): Promise<{ option: BoardOption; feedback: string } | null> {
+  const [earlier] = await (await db())
+    .select()
+    .from(designBoards)
+    .where(and(eq(designBoards.businessId, board.businessId), lt(designBoards.createdAt, board.createdAt)))
+    .orderBy(desc(designBoards.createdAt))
+    .limit(1);
+  const letter = revisedLetter(earlier?.chosenLetter ?? null);
+  const option = letter ? earlier?.options.find((entry) => entry.letter === letter) : undefined;
+  return option ? { option, feedback: earlier!.feedback } : null;
 }
 
 export type BoardChoice = { letter: BoardLetter; feedback: string; by: string };

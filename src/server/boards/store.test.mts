@@ -261,3 +261,33 @@ test("an option may carry its board for a phone, and one from somewhere else is 
   assert.equal(BoardsBody.parse({ options: threeOptions(lead.id) }).options[0].pictures.narrow, undefined, "an older runner sends none");
   await store.chooseBoard(board.id, "a", "", "brendan@g.studio");
 });
+
+test("a founder can have one option revised with their words: the runner is told which, and the new boards say what they revise", async () => {
+  made += 1;
+  const [lead] = await database.insert(businesses).values({ businessName: "Revised Tattoo", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example` } as never).returning();
+  await requestPreview(lead, "auto-queue");
+  const boardsJob = (await claimNextJob("runner-1"))!;
+  await reportBoards(boardsJob.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  const board = (await store.waitingBoardFor(lead.id))!;
+  const decidedBefore = (await store.boardsDecided()).length;
+
+  assert.equal(await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", "d" as never), null, "an option that isn't there can't be revised");
+  const revised = await store.redrawBoards(board.id, " Fonts too basic: answer their logo. ", "boris.nezlobin@gmail.com", "c");
+  assert.equal(revised?.chosenLetter, "revise:c");
+  assert.equal(await store.chooseBoard(board.id, "a", "", "brendan@g.studio"), null, "the first decision stands");
+  assert.equal((await store.boardsDecided()).length, decidedBefore, "a revision is not a choice: nothing is built from it");
+  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "Fonts too basic: answer their logo.", by: "Boris", base: "c" });
+
+  const revision = await claimed(lead, await store.noteBehindBoards(board));
+  assert.equal(revision.boards, true);
+  assert.deepEqual(revision.boardsAgain, { feedback: "Fonts too basic: answer their logo.", by: "Boris", base: "c" });
+  assert.equal(revision.board, undefined, "nothing is built");
+
+  await reportBoards(revision.job.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  const revisions = (await store.waitingBoardFor(lead.id))!;
+  const of = await store.revisionOf(revisions);
+  assert.equal(of?.option.letter, "c");
+  assert.equal(of?.feedback, "Fonts too basic: answer their logo.");
+  assert.equal(await store.revisionOf(board), null, "the first boards revise nothing");
+  assert.equal(await store.redrawFor(lead.id), null);
+});

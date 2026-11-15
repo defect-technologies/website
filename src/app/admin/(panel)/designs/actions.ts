@@ -42,6 +42,28 @@ export async function chooseBoardAction(formData: FormData) {
 
 const Redraw = z.object({ id: z.string().uuid(), feedback: z.string().trim().max(MAX_NOTE_TEXT).default("") });
 
+const Revise = z.object({ id: z.string().uuid(), letter: z.enum(BOARD_LETTERS), feedback: z.string().trim().min(1).max(MAX_NOTE_TEXT), remember: z.boolean() });
+
+/**
+ * A founder liked one of a lead's designs and wants it revised with their words before anything is built. The first
+ * decision stands. It queues the job that draws three revisions of that option, which carries their words and any note
+ * the job that made the boards was given. Words they asked to keep for every site also become a taste lesson.
+ */
+export async function reviseBoardAction(formData: FormData) {
+  const founder = await requireFounder();
+  const request = Revise.parse({ id: formData.get("id"), letter: formData.get("letter"), feedback: formData.get("feedback") ?? "", remember: formData.get("remember") === "on" });
+  const board = await redrawBoards(request.id, request.feedback, founder.email, request.letter);
+  if (board) {
+    const lead = await businessById(board.businessId);
+    if (lead) await requestPreview(lead, founder.email, await noteBehindBoards(board));
+    if (request.remember) await addTasteLessons([request.feedback], founder.email, board.businessId);
+    const name = board.options.find((option) => option.letter === request.letter)?.name ?? "";
+    await record(founder.email, "asked for a design to be revised", { businessId: board.businessId, detail: `${request.letter.toUpperCase()}: ${name}. ${request.feedback}`.slice(0, 500) });
+  }
+  revalidatePath("/admin", "layout");
+  redirect(TURN_PATH);
+}
+
 /**
  * A founder wants none of a lead's three designs. The first decision stands. It queues the job that draws three new
  * ones, which carries what the founder said about these and any note the job that made them was given.

@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowsClockwise, ArrowSquareOut, GlobeHemisphereWest, Hammer, Keyboard, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, ArrowSquareOut, GlobeHemisphereWest, Hammer, Keyboard, PencilSimpleLine, X } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { chooseBoardAction, redrawBoardsAction } from "@/app/admin/(panel)/designs/actions";
+import { chooseBoardAction, redrawBoardsAction, reviseBoardAction } from "@/app/admin/(panel)/designs/actions";
 import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import type { BoardLetter, BoardOption } from "@/lib/boards";
 import { DOCK_CARD, DockAction, DockConfirm, DockMic, DockSideButton, DockSpoken, DockTypeField, useCloseOnTouchElsewhere } from "../dock";
@@ -14,12 +14,15 @@ import WidePicture from "./WidePicture";
 const NEW = "new";
 type Slide = BoardLetter | typeof NEW;
 
-type Props = { boardId: string; businessName: string; website: string; options: BoardOption[] };
+/** For three revisions of an earlier option: which option they revise and what the founder asked for. */
+type Revision = { letter: string; name: string; feedback: string };
+
+type Props = { boardId: string; businessName: string; website: string; options: BoardOption[]; revision: Revision | null };
 
 /** A screen starts under the floating top bar, so the bar never covers the logo and menu of a first screen. */
 const BELOW_TOP_BAR = "pt-[calc(max(0.75rem,env(safe-area-inset-top))+3.5rem)]";
 
-function OptionSlide({ option, website }: { option: BoardOption; website: string }) {
+function OptionSlide({ option, website, revision }: { option: BoardOption; website: string; revision: Revision | null }) {
   const name = `Option ${option.letter.toUpperCase()}, ${option.name}`;
   return (
     <section aria-label={name} className={`w-full shrink-0 snap-center overflow-y-auto overscroll-y-contain pb-44 ${BELOW_TOP_BAR}`}>
@@ -32,6 +35,14 @@ function OptionSlide({ option, website }: { option: BoardOption; website: string
           </span>
           <Reach boldness={option.boldness} />
         </div>
+        {revision && (
+          <p className="text-ink-soft text-sm text-pretty">
+            <span className="text-ink font-medium">
+              Revision of {revision.letter.toUpperCase()}, {revision.name}:
+            </span>{" "}
+            {revision.feedback}
+          </p>
+        )}
         <p className="text-ink-soft text-pretty">{option.idea}</p>
         <OptionFacts option={option} />
         {website && (
@@ -103,23 +114,44 @@ function slidesOf(options: BoardOption[]): Segment<Slide>[] {
   return [...options.map((option) => ({ value: option.letter as Slide, label: option.letter.toUpperCase() })), { value: NEW, label: "New" }];
 }
 
-/**
- * Choosing a lead's design on a phone. Each option is a screen to swipe to, with its first screen as a visitor's phone
- * shows it, then its idea, colours, type and the wide pictures. The dock's button asks to confirm the option in view,
- * with what the founder said or typed, and only the confirm builds it. The last screen asks for three new designs.
- */
-export default function PhoneChooser({ boardId, businessName, website, options }: Props) {
-  const track = useRef<HTMLDivElement>(null);
-  const slides = slidesOf(options);
-  const [slide, setSlide] = useState<Slide>(slides[0].value);
-  const [note, setNote] = useState("");
-  const [everySite, setEverySite] = useState(false);
-  const [typing, setTyping] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const dictation = useDictation((phrase) => setNote((current) => appendPhrase(current, phrase)));
-  useCloseOnTouchElsewhere(confirming, () => setConfirming(false));
+/** What the dock's button and its confirm card say for the screen in view. With a note, an option can be revised first. */
+function decisionFor(slide: Slide, options: BoardOption[], hasNote: boolean) {
+  if (slide === NEW) return { letter: "", inView: undefined, icon: <ArrowsClockwise size={20} aria-hidden="true" />, label: "Draw 3 new", title: "Draw three new designs?", revisable: false };
+  const letter = slide.toUpperCase();
+  const inView = options.find((option) => option.letter === slide);
+  const named = `${letter}, ${inView?.name ?? "this design"}`;
+  return {
+    letter,
+    inView,
+    icon: <Hammer size={20} aria-hidden="true" />,
+    label: `Build ${letter}`,
+    title: hasNote ? `${named}: build it, or revise it first?` : `Build ${named}?`,
+    revisable: hasNote,
+  };
+}
 
+/** Closes the chooser, names the business and switches between the options and the last screen. */
+function TopBar({ businessName, slides, slide, onShow }: { businessName: string; slides: Segment<Slide>[]; slide: Slide; onShow: (next: Slide) => void }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="bg-paper/95 text-ink shadow-lifted pointer-events-auto flex min-h-11 min-w-0 items-center rounded-full pr-4 backdrop-blur">
+        <Link href="/admin/designs" className="focus-visible:outline-ink grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2">
+          <X size={18} aria-hidden="true" />
+          <span className="sr-only">Close and go back to Designs</span>
+        </Link>
+        <h1 className="min-w-0 truncate text-sm font-semibold">{businessName}</h1>
+      </div>
+      <div className="shadow-lifted pointer-events-auto shrink-0 rounded-full">
+        <Segmented label="Design in view" options={slides} value={slide} onChange={onShow} />
+      </div>
+    </div>
+  );
+}
+
+/** The track of screens to swipe through, and which one is in view. */
+function useSlides(slides: Segment<Slide>[]) {
+  const track = useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = useState<Slide>(slides[0].value);
   const show = (next: Slide) => {
     const element = track.current;
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -131,15 +163,35 @@ export default function PhoneChooser({ boardId, businessName, website, options }
     const inView = slides[Math.round(element.scrollLeft / element.clientWidth)]?.value;
     if (inView && inView !== slide) setSlide(inView);
   };
+  return { track, slide, show, onScroll };
+}
 
-  const decide = () => {
+/**
+ * Choosing a lead's design on a phone. Each option is a screen to swipe to, with its first screen as a visitor's phone
+ * shows it, then its idea, colours, type and the wide pictures. The dock's button asks to confirm the option in view,
+ * with what the founder said or typed, and only the confirm builds it. The last screen asks for three new designs.
+ */
+export default function PhoneChooser({ boardId, businessName, website, options, revision }: Props) {
+  const slides = slidesOf(options);
+  const { track, slide, show, onScroll } = useSlides(slides);
+  const [note, setNote] = useState("");
+  const [everySite, setEverySite] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const dictation = useDictation((phrase) => setNote((current) => appendPhrase(current, phrase)));
+  useCloseOnTouchElsewhere(confirming, () => setConfirming(false));
+
+  /** Builds the option in view, or with `revise` has it revised with the note first. The last screen draws three new. */
+  const decide = (revise = false) => {
     const form = new FormData();
     form.set("id", boardId);
     form.set("feedback", note);
     if (slide !== NEW) form.set("letter", slide);
     if (everySite) form.set("remember", "on");
     dictation.stop();
-    startTransition(() => (slide === NEW ? redrawBoardsAction(form) : chooseBoardAction(form)));
+    const action = slide === NEW ? redrawBoardsAction : revise ? reviseBoardAction : chooseBoardAction;
+    startTransition(() => action(form));
   };
   const askToConfirm = () => {
     dictation.stop();
@@ -147,28 +199,14 @@ export default function PhoneChooser({ boardId, businessName, website, options }
     setConfirming(true);
   };
 
-  const drawing = slide === NEW;
-  const letter = drawing ? "" : slide.toUpperCase();
-  const inView = options.find((option) => option.letter === slide);
-  const actionIcon = drawing ? <ArrowsClockwise size={20} aria-hidden="true" /> : <Hammer size={20} aria-hidden="true" />;
-  const actionLabel = drawing ? "Draw 3 new" : `Build ${letter}`;
+  const decision = decisionFor(slide, options, Boolean(note.trim()));
+  const revise = decision.revisable ? { label: `Revise ${decision.letter}`, icon: <PencilSimpleLine size={18} aria-hidden="true" />, onPress: () => decide(true) } : undefined;
   return (
     <div className="bg-paper fixed inset-0 z-20 flex flex-col lg:hidden">
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div className="bg-paper/95 text-ink shadow-lifted pointer-events-auto flex min-h-11 min-w-0 items-center rounded-full pr-4 backdrop-blur">
-          <Link href="/admin/designs" className="focus-visible:outline-ink grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2">
-            <X size={18} aria-hidden="true" />
-            <span className="sr-only">Close and go back to Designs</span>
-          </Link>
-          <h1 className="min-w-0 truncate text-sm font-semibold">{businessName}</h1>
-        </div>
-        <div className="shadow-lifted pointer-events-auto shrink-0 rounded-full">
-          <Segmented label="Design in view" options={slides} value={slide} onChange={show} />
-        </div>
-      </div>
+      <TopBar businessName={businessName} slides={slides} slide={slide} onShow={show} />
       <div ref={track} onScroll={onScroll} className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
         {options.map((option) => (
-          <OptionSlide key={option.letter} option={option} website={website} />
+          <OptionSlide key={option.letter} option={option} website={website} revision={revision} />
         ))}
         <NewSlide businessName={businessName} />
       </div>
@@ -183,14 +221,15 @@ export default function PhoneChooser({ boardId, businessName, website, options }
         )}
         {confirming && (
           <DockConfirm
-            title={drawing ? "Draw three new designs?" : `Build ${letter}, ${inView?.name ?? "this design"}?`}
-            icon={actionIcon}
-            confirmLabel={actionLabel}
+            title={decision.title}
+            icon={decision.icon}
+            confirmLabel={decision.label}
             pending={pending}
-            onConfirm={decide}
+            onConfirm={() => decide()}
             onCancel={() => setConfirming(false)}
+            alternative={revise}
           >
-            <DecisionPreview option={inView} businessName={businessName} note={note} />
+            <DecisionPreview option={decision.inView} businessName={businessName} note={note} />
           </DockConfirm>
         )}
         {!confirming && !typing && note.trim() && !dictation.listening && <NoteCard note={note} everySite={everySite} onEdit={() => setTyping(true)} />}
@@ -204,7 +243,7 @@ export default function PhoneChooser({ boardId, businessName, website, options }
           <span className="flex flex-1 justify-center">
             <DockMic talk={{ supported: dictation.supported, listening: dictation.listening, onToggle: dictation.toggle }} label="Say what should change" />
           </span>
-          <DockAction icon={actionIcon} label={actionLabel} pending={pending} onPress={askToConfirm} />
+          <DockAction icon={decision.icon} label={decision.label} pending={pending} onPress={askToConfirm} />
         </div>
       </div>
     </div>

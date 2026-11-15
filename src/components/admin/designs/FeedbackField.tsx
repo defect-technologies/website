@@ -1,14 +1,12 @@
 "use client";
 
 import { Microphone, Stop } from "@phosphor-icons/react";
-import { useState } from "react";
 import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { Button } from "../../Button";
 
 /** What should change in the chosen design, typed or said. It is the form's `feedback` field. */
-export default function FeedbackField() {
-  const [text, setText] = useState("");
+export default function FeedbackField({ text, setText }: { text: string; setText: (update: (current: string) => string) => void }) {
   const dictation = useDictation((phrase) => setText((current) => appendPhrase(current, phrase)));
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -23,7 +21,7 @@ export default function FeedbackField() {
           maxLength={MAX_NOTE_TEXT}
           value={dictation.listening ? `${text} ${dictation.interim}`.trim() : text}
           readOnly={dictation.listening}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => setText(() => event.target.value)}
           className="bg-surface border-ink/15 focus-visible:border-ink focus-visible:outline-ink/20 field-sizing-content max-h-40 min-w-0 flex-1 resize-none rounded-lg border px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-0"
         />
         {dictation.supported && (

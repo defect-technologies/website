@@ -11,10 +11,28 @@ export type BoardLetter = (typeof BOARD_LETTERS)[number];
  */
 export const REDRAWN = "redrawn";
 
-/** What the runner is handed to draw a lead's boards again: the founder's words about the three it turned down. */
+/**
+ * A founder liked one option and asked for it to be revised with their words: the board is decided with "revise:c" in
+ * place of a letter. Nothing is built from it, and the runner draws three revisions of that option.
+ */
+const REVISE_PREFIX = "revise:";
+
+export const revisingMark = (letter: BoardLetter) => `${REVISE_PREFIX}${letter}`;
+
+/** The option a decided board asked to have revised, if that is how it was decided. */
+export function revisedLetter(chosenLetter: string | null): BoardLetter | null {
+  const letter = chosenLetter?.startsWith(REVISE_PREFIX) ? chosenLetter.slice(REVISE_PREFIX.length) : "";
+  return (BOARD_LETTERS as readonly string[]).includes(letter) ? (letter as BoardLetter) : null;
+}
+
+/**
+ * What the runner is handed to draw a lead's boards again: the founder's words, and for a revision the letter of the
+ * option to revise (`base`). Without a base it is three new designs.
+ */
 export interface BoardRedraw {
   feedback: string;
   by: string;
+  base?: BoardLetter;
 }
 
 /**

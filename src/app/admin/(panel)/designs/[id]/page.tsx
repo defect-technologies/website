@@ -6,10 +6,10 @@ import BoardChooser from "@/components/admin/designs/BoardChooser";
 import PhoneChooser from "@/components/admin/designs/PhoneChooser";
 import { BoardPicture, Letter, OptionFacts, Reach } from "@/components/admin/designs/parts";
 import { Card, Notice, PageHeader, When } from "@/components/admin/ui";
-import { type BoardOption, REDRAWN } from "@/lib/boards";
+import { type BoardOption, REDRAWN, revisedLetter } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
-import { boardById, type BoardWithLead } from "@/server/boards/store";
+import { boardById, revisionOf, type BoardWithLead } from "@/server/boards/store";
 import { businessById } from "@/server/leads/businesses";
 
 export const metadata: Metadata = { title: "Choose a design" };
@@ -24,6 +24,14 @@ function Decision({ board }: { board: BoardWithLead }) {
       </Notice>
     );
   }
+  const revised = board.options.find((option) => option.letter === revisedLetter(board.chosenLetter));
+  if (revised) {
+    return (
+      <Notice tone="good">
+        {founder} asked for {revised.letter.toUpperCase()}, {revised.name}, to be revised <When date={board.chosenAt} />. Its three revisions come to Designs when they are drawn.
+      </Notice>
+    );
+  }
   const chosen = board.options.find((option) => option.letter === board.chosenLetter);
   return (
     <Notice tone="good">
@@ -33,6 +41,8 @@ function Decision({ board }: { board: BoardWithLead }) {
 }
 
 function Decided({ board }: { board: BoardWithLead }) {
+  // The option a founder chose, or asked to have revised.
+  const marked = revisedLetter(board.chosenLetter) ?? board.chosenLetter;
   return (
     <div className="flex flex-col gap-6">
       <Decision board={board} />
@@ -44,14 +54,14 @@ function Decided({ board }: { board: BoardWithLead }) {
       )}
       <ul className="grid gap-5 lg:grid-cols-3">
         {board.options.map((option: BoardOption) => (
-          <li key={option.letter} className={`bg-surface shadow-card flex flex-col gap-4 rounded-2xl p-3 ${option.letter === board.chosenLetter ? "ring-good ring-2" : "opacity-70"}`}>
+          <li key={option.letter} className={`bg-surface shadow-card flex flex-col gap-4 rounded-2xl p-3 ${option.letter === marked ? "ring-good ring-2" : "opacity-70"}`}>
             <a href={option.pictures.board} target="_blank" rel="noreferrer" className="focus-visible:outline-ink rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2">
               <BoardPicture src={option.pictures.desktop} alt={`The first screen of option ${option.letter.toUpperCase()}, ${option.name}. Opens its whole board.`} className="aspect-[16/10] rounded-lg object-cover object-top" />
             </a>
             <div className="flex flex-col gap-3 px-2 pb-2">
               <div className="flex items-center justify-between gap-3">
                 <span className="flex min-w-0 items-center gap-3">
-                  <Letter letter={option.letter} chosen={option.letter === board.chosenLetter} />
+                  <Letter letter={option.letter} chosen={option.letter === marked} />
                   <span className="truncate text-xl font-semibold">{option.name}</span>
                 </span>
                 <Reach boldness={option.boldness} />
@@ -62,6 +72,19 @@ function Decided({ board }: { board: BoardWithLead }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** For three revisions of an earlier option: which option they revise, and what the founder asked for. */
+function RevisionNote({ revision }: { revision: Awaited<ReturnType<typeof revisionOf>> }) {
+  if (!revision) return null;
+  return (
+    <Card className="flex flex-col gap-1 p-5">
+      <h2 className="text-lg font-semibold">
+        Revisions of {revision.option.letter.toUpperCase()}, {revision.option.name}
+      </h2>
+      <p className="text-ink-soft max-w-prose text-pretty whitespace-pre-line">{revision.feedback}</p>
+    </Card>
   );
 }
 
@@ -88,12 +111,20 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
       </>
     );
   }
+  const revision = await revisionOf(board);
   // A phone gets the chooser made for a thumb; a wide screen gets the three options side by side.
   return (
     <>
-      <PhoneChooser boardId={board.id} businessName={board.businessName} website={lead?.website ?? ""} options={board.options} />
+      <PhoneChooser
+        boardId={board.id}
+        businessName={board.businessName}
+        website={lead?.website ?? ""}
+        options={board.options}
+        revision={revision ? { letter: revision.option.letter, name: revision.option.name, feedback: revision.feedback } : null}
+      />
       <div className="flex flex-col gap-8 max-lg:hidden">
         {header}
+        <RevisionNote revision={revision} />
         <BoardChooser boardId={board.id} options={board.options} />
       </div>
     </>

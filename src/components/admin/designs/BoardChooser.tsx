@@ -1,9 +1,7 @@
-import { ArrowsClockwise, CaretRight, Hammer } from "@phosphor-icons/react/dist/ssr";
-import { chooseBoardAction, redrawBoardsAction } from "@/app/admin/(panel)/designs/actions";
-import SubmitButton from "@/components/admin/SubmitButton";
-import { Card } from "@/components/admin/ui";
+import { CaretRight } from "@phosphor-icons/react/dist/ssr";
+import { chooseBoardAction } from "@/app/admin/(panel)/designs/actions";
 import type { BoardOption } from "@/lib/boards";
-import FeedbackField from "./FeedbackField";
+import DecisionBar from "./DecisionBar";
 import { BoardPicture, FirstScreens, Letter, OptionFacts, Reach } from "./parts";
 
 function Choice({ option }: { option: BoardOption }) {
@@ -43,7 +41,8 @@ function FullBoard({ option, open }: { option: BoardOption; open: boolean }) {
 
 /**
  * The three options side by side, each a radio in one group, then every whole board, then what the founder wants
- * changed, typed or said. One form: choosing builds the site, and its second button asks for three new designs.
+ * changed, typed or said. One form: choosing builds the site, revising draws three takes on the chosen one with the
+ * founder's words, and the last button asks for three new designs.
  */
 export default function BoardChooser({ boardId, options }: { boardId: string; options: BoardOption[] }) {
   return (
@@ -60,23 +59,7 @@ export default function BoardChooser({ boardId, options }: { boardId: string; op
           <FullBoard key={option.letter} option={option} open={index === 0} />
         ))}
       </div>
-      <Card className="flex flex-col gap-4 p-5 lg:sticky lg:bottom-4 lg:flex-row lg:items-end">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <FeedbackField />
-          <label className="text-ink-soft flex min-h-9 w-fit cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" name="remember" className="accent-ink size-4 shrink-0" />
-            Remember this for every site
-          </label>
-        </div>
-        <div className="flex shrink-0 flex-col gap-2">
-          <SubmitButton variant="solid" icon={<Hammer size={18} aria-hidden="true" />}>
-            Build the chosen design
-          </SubmitButton>
-          <SubmitButton variant="soft" formAction={redrawBoardsAction} formNoValidate icon={<ArrowsClockwise size={18} aria-hidden="true" />}>
-            Draw three new designs
-          </SubmitButton>
-        </div>
-      </Card>
+      <DecisionBar />
     </form>
   );
 }

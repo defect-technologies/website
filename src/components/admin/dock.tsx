@@ -47,6 +47,8 @@ export function DockAction({ icon, label, pending, onPress }: ActionProps) {
   );
 }
 
+type Choice = { label: string; icon: ReactNode; onPress: () => void };
+
 type ConfirmProps = {
   title: string;
   /** What the decision carries, such as the option's picture or the note that goes with it. */
@@ -56,22 +58,36 @@ type ConfirmProps = {
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** A second way to decide, beside the confirm: both sit in one row, and Not yet moves below them. */
+  alternative?: Choice;
 };
 
+const spinnerOr = (pending: boolean, icon: ReactNode) => (pending ? <CircleNotch size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon);
+
 /** A decision that can't be taken back waits here for a second, deliberate tap. Nothing happens on its own. */
-export function DockConfirm({ title, children, icon, confirmLabel, pending, onConfirm, onCancel }: ConfirmProps) {
+export function DockConfirm({ title, children, icon, confirmLabel, pending, onConfirm, onCancel, alternative }: ConfirmProps) {
+  const notYet = (
+    <Button variant={alternative ? "ghost" : "soft"} onClick={onCancel} disabled={pending} className="flex-1">
+      Not yet
+    </Button>
+  );
   return (
     <div data-dock-confirm role="dialog" aria-label={title} className={`${DOCK_CARD} flex flex-col gap-3`}>
       <p className="text-base font-semibold text-balance">{title}</p>
       {children}
       <div className="flex gap-2">
-        <Button variant="soft" onClick={onCancel} disabled={pending} className="flex-1">
-          Not yet
-        </Button>
-        <Button variant="solid" onClick={onConfirm} disabled={pending} aria-busy={pending} autoFocus className="flex-1" icon={pending ? <CircleNotch size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon}>
+        {alternative ? (
+          <Button variant="soft" onClick={alternative.onPress} disabled={pending} className="flex-1" icon={alternative.icon}>
+            {alternative.label}
+          </Button>
+        ) : (
+          notYet
+        )}
+        <Button variant="solid" onClick={onConfirm} disabled={pending} aria-busy={pending} autoFocus className="flex-1" icon={spinnerOr(pending, icon)}>
           {confirmLabel}
         </Button>
       </div>
+      {alternative && <div className="flex">{notYet}</div>}
     </div>
   );
 }
