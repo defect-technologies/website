@@ -6,7 +6,7 @@ import { useRef, useState, useTransition } from "react";
 import { chooseBoardAction, redrawBoardsAction } from "@/app/admin/(panel)/designs/actions";
 import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import type { BoardLetter, BoardOption } from "@/lib/boards";
-import { DOCK_CARD, DockAction, DockMic, DockSideButton, DockSpoken, DockTypeField, useStopOnTouch } from "../dock";
+import { DOCK_CARD, DockAction, DockConfirm, DockMic, DockSideButton, DockSpoken, DockTypeField, useCloseOnTouchElsewhere } from "../dock";
 import Segmented, { type Segment } from "../Segmented";
 import { BoardPicture, DRAWN_AT, Letter, OptionFacts, Reach } from "./parts";
 import WidePicture from "./WidePicture";
@@ -85,14 +85,28 @@ function NoteCard({ note, everySite, onEdit }: { note: string; everySite: boolea
   );
 }
 
+/** What the founder is about to decide, with the option's first screen and their note, so the second tap is an informed one. */
+function DecisionPreview({ option, businessName, note }: { option: BoardOption | undefined; businessName: string; note: string }) {
+  const words = note.trim();
+  if (!option) return <p className="text-ink-soft text-pretty">{words ? `The builder draws three more for ${businessName} and follows your note: ${words}` : `The builder draws three more for ${businessName}.`}</p>;
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-14 shrink-0">
+        <BoardPicture src={option.pictures.phone} alt="" className="aspect-[390/844] rounded-md object-cover object-top" />
+      </span>
+      <p className={`line-clamp-5 text-sm text-pretty ${words ? "text-ink" : "text-ink-soft"}`}>{words || "No note. The site is built from this design as it is."}</p>
+    </div>
+  );
+}
+
 function slidesOf(options: BoardOption[]): Segment<Slide>[] {
   return [...options.map((option) => ({ value: option.letter as Slide, label: option.letter.toUpperCase() })), { value: NEW, label: "New" }];
 }
 
 /**
  * Choosing a lead's design on a phone. Each option is a screen to swipe to, with its first screen as a visitor's phone
- * shows it, then its idea, colours, type and the wide pictures. The dock builds the option in view, after a countdown
- * any touch stops, with what the founder said or typed. The last screen asks for three new designs.
+ * shows it, then its idea, colours, type and the wide pictures. The dock's button asks to confirm the option in view,
+ * with what the founder said or typed, and only the confirm builds it. The last screen asks for three new designs.
  */
 export default function PhoneChooser({ boardId, businessName, website, options }: Props) {
   const track = useRef<HTMLDivElement>(null);
@@ -101,10 +115,10 @@ export default function PhoneChooser({ boardId, businessName, website, options }
   const [note, setNote] = useState("");
   const [everySite, setEverySite] = useState(false);
   const [typing, setTyping] = useState(false);
-  const [armed, setArmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const dictation = useDictation((phrase) => setNote((current) => appendPhrase(current, phrase)));
-  useStopOnTouch(armed, () => setArmed(false));
+  useCloseOnTouchElsewhere(confirming, () => setConfirming(false));
 
   const show = (next: Slide) => {
     const element = track.current;
@@ -127,15 +141,17 @@ export default function PhoneChooser({ boardId, businessName, website, options }
     dictation.stop();
     startTransition(() => (slide === NEW ? redrawBoardsAction(form) : chooseBoardAction(form)));
   };
-  /** The first tap starts the countdown, and a second one decides at once. */
-  const press = () => {
-    if (!armed) return setArmed(true);
-    setArmed(false);
-    decide();
+  const askToConfirm = () => {
+    dictation.stop();
+    setTyping(false);
+    setConfirming(true);
   };
 
   const drawing = slide === NEW;
   const letter = drawing ? "" : slide.toUpperCase();
+  const inView = options.find((option) => option.letter === slide);
+  const actionIcon = drawing ? <ArrowsClockwise size={20} aria-hidden="true" /> : <Hammer size={20} aria-hidden="true" />;
+  const actionLabel = drawing ? "Draw 3 new" : `Build ${letter}`;
   return (
     <div className="bg-paper fixed inset-0 z-20 flex flex-col lg:hidden">
       <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -165,7 +181,19 @@ export default function PhoneChooser({ boardId, businessName, website, options }
             </label>
           </DockTypeField>
         )}
-        {!typing && note.trim() && !dictation.listening && <NoteCard note={note} everySite={everySite} onEdit={() => setTyping(true)} />}
+        {confirming && (
+          <DockConfirm
+            title={drawing ? "Draw three new designs?" : `Build ${letter}, ${inView?.name ?? "this design"}?`}
+            icon={actionIcon}
+            confirmLabel={actionLabel}
+            pending={pending}
+            onConfirm={decide}
+            onCancel={() => setConfirming(false)}
+          >
+            <DecisionPreview option={inView} businessName={businessName} note={note} />
+          </DockConfirm>
+        )}
+        {!confirming && !typing && note.trim() && !dictation.listening && <NoteCard note={note} everySite={everySite} onEdit={() => setTyping(true)} />}
         <div aria-live="polite" className="empty:hidden">
           <DockSpoken spoken={`${note} ${dictation.interim}`.trim()} listening={dictation.listening} notice={dictation.error ? { text: dictation.error, bad: true } : null} />
         </div>
@@ -176,14 +204,7 @@ export default function PhoneChooser({ boardId, businessName, website, options }
           <span className="flex flex-1 justify-center">
             <DockMic talk={{ supported: dictation.supported, listening: dictation.listening, onToggle: dictation.toggle }} label="Say what should change" />
           </span>
-          <DockAction
-            icon={drawing ? <ArrowsClockwise size={20} aria-hidden="true" /> : <Hammer size={20} aria-hidden="true" />}
-            label={drawing ? "Draw 3 new" : `Build ${letter}`}
-            armedLabel={(left) => (drawing ? `Drawing in ${left}` : `Building ${letter} in ${left}`)}
-            pending={pending}
-            armed={armed}
-            onPress={press}
-          />
+          <DockAction icon={actionIcon} label={actionLabel} pending={pending} onPress={askToConfirm} />
         </div>
       </div>
     </div>

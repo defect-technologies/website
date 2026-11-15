@@ -11,7 +11,7 @@ import { chooseBoard, noteBehindBoards, redrawBoards } from "@/server/boards/sto
 import { businessById } from "@/server/leads/businesses";
 import { addTasteLessons } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
-import { nextTurnHref } from "@/server/turn";
+import { TURN_PATH } from "@/lib/turn";
 
 const Choice = z.object({
   id: z.string().uuid(),
@@ -37,7 +37,7 @@ export async function chooseBoardAction(formData: FormData) {
     await record(founder.email, "chose a design", { businessId: board.businessId, detail: `${choice.letter.toUpperCase()}: ${name}${choice.feedback ? `. ${choice.feedback}` : ""}`.slice(0, 500) });
   }
   revalidatePath("/admin", "layout");
-  redirect(await nextTurnHref());
+  redirect(TURN_PATH);
 }
 
 const Redraw = z.object({ id: z.string().uuid(), feedback: z.string().trim().max(MAX_NOTE_TEXT).default("") });
@@ -56,5 +56,5 @@ export async function redrawBoardsAction(formData: FormData) {
     await record(founder.email, "asked for three new designs", { businessId: board.businessId, detail: request.feedback.slice(0, 500) });
   }
   revalidatePath("/admin", "layout");
-  redirect(await nextTurnHref());
+  redirect(TURN_PATH);
 }

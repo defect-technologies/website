@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, ne, notExists, sql } from "drizzle-orm";
 import { ACTIVE_JOB_STATUSES } from "@/lib/previewJobs";
 import { db } from "../db/client";
 import { businesses, previewJobs, previewReviews, type Business } from "../db/schema";
@@ -14,6 +14,19 @@ const notReviewedYet = (database: Awaited<ReturnType<typeof db>>) =>
       .select({ one: sql`1` })
       .from(previewReviews)
       .where(and(eq(previewReviews.businessId, businesses.id), eq(previewReviews.previewUrl, businesses.previewUrl))),
+  );
+
+/**
+ * The runner built the preview the lead has. A founder's notes go back to the runner as a repair of its own copy of the
+ * site, so a preview deployed by hand (Nikkei Nexus, from its own repository) or built on a laptop has nothing to
+ * review here.
+ */
+const builtByTheRunner = (database: Awaited<ReturnType<typeof db>>) =>
+  exists(
+    database
+      .select({ one: sql`1` })
+      .from(previewJobs)
+      .where(and(eq(previewJobs.businessId, businesses.id), eq(previewJobs.previewUrl, businesses.previewUrl), eq(previewJobs.status, "done"))),
   );
 
 const notBuilding = (database: Awaited<ReturnType<typeof db>>) =>
@@ -42,7 +55,7 @@ export async function reviewQueue(limit = 60): Promise<ReviewItem[]> {
       area: businesses.area,
     })
     .from(businesses)
-    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database)))
+    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database)))
     .orderBy(asc(sql`case when ${businesses.stage} = 'new' then 0 else 1 end`), desc(businesses.previewBuiltAt))
     .limit(limit);
 }
@@ -52,6 +65,6 @@ export async function reviewQueueCount(): Promise<number> {
   const [row] = await database
     .select({ count: sql<number>`count(*)::int` })
     .from(businesses)
-    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database)));
+    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database)));
   return row?.count ?? 0;
 }

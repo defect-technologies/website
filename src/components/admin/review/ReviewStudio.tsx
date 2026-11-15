@@ -206,23 +206,23 @@ function Studio({ item, ...queue }: Props) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [pointing, setPointing] = useState(false);
   const [result, setResult] = useState<ReviewResult | null>(null);
-  const [armed, setArmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const { notes, change, remove, add } = useNotes(item);
-  // On a phone the last answer starts the send countdown; on a desktop the founder sends with the button.
+  // On a phone the last answer asks whether to send; on a desktop the founder sends with the button.
   const { asks, flow, currentAsk, openQuestion, device, setDevice } = useStudioAsks({
     businessId: item.id,
     previewUrl: item.previewUrl,
     nextId: queue.nextId,
-    onLastAnswer: () => window.matchMedia("(width < 64rem)").matches && setArmed(true),
+    onLastAnswer: () => window.matchMedia("(width < 64rem)").matches && setConfirming(true),
   });
   const live = useRef({ draft, pointing, device, path: "/" });
 
   const onPicked = useCallback(
     (anchor: NoteAnchor) => {
       const { draft: current, device: width, path } = live.current;
-      setArmed(false);
+      setConfirming(false);
       if (current.text.trim()) add(noteFromDraft(current, width, path));
       setDraft({ text: "", anchor, pickedOn: width, scope: current.text.trim() ? "site" : current.scope });
       field.current?.focus({ preventScroll: true });
@@ -282,7 +282,7 @@ function Studio({ item, ...queue }: Props) {
       if (!outcome.ok) return;
       dictation.stop();
       saveNotes(item.id, item.previewUrl, []);
-      // The queue decides what is next: another site, or a design that waits for a choice.
+      // Back to Your turn, which lists what waits next: another site, or a design to choose.
       router.replace(TURN_PATH);
       router.refresh();
     });
@@ -293,7 +293,7 @@ function Studio({ item, ...queue }: Props) {
 
   useStudioShortcuts({ point, stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
   const count = notes.length + (draft.text.trim() ? 1 : 0);
-  const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, count, armed, setArmed, submit, ask: { open: Boolean(openQuestion), answered: flow.noted } });
+  const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, confirming, setConfirming, submit, ask: { open: Boolean(openQuestion), answered: flow.noted } });
 
   return (
     <div className="bg-paper fixed inset-0 z-20 flex flex-col gap-3 lg:p-4">
@@ -335,8 +335,10 @@ function Studio({ item, ...queue }: Props) {
         notice={dockNotice(result, dictation.error)}
         count={count}
         pending={pending}
-        armed={armed}
-        onSubmit={phone.tapSend}
+        confirming={confirming}
+        onSubmit={phone.askToSend}
+        onConfirm={phone.confirm}
+        onCancel={phone.cancel}
         ask={askCard(CARD)}
       />
     </div>

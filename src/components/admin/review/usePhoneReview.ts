@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { splitSpokenNotesAction } from "@/app/admin/(panel)/review/studioActions";
 import type { Device, ReviewNote } from "@/lib/review";
-import { useStopOnTouch } from "../dock";
+import { useCloseOnTouchElsewhere } from "../dock";
 import { type Draft, EMPTY_DRAFT, noteFromDraft } from "./reviewDraft";
 
 type Dictation = { listening: boolean; interim: string; toggle: () => void; stop: () => void };
@@ -15,21 +15,20 @@ type Options = {
   add: (note: ReviewNote) => void;
   device: Device;
   path: string;
-  count: number;
-  armed: boolean;
-  setArmed: (armed: boolean) => void;
+  confirming: boolean;
+  setConfirming: (confirming: boolean) => void;
   submit: () => void;
-  /** The open question, if any: talking answers it instead of starting the countdown. */
+  /** The open question, if any: talking answers it instead of asking to send. */
   ask: { open: boolean; answered: () => void };
 };
 
 /**
  * The phone flow: talking ends with a tap on the mic, Claude splits what was said into notes (each for this site or
- * every site, all pointing where the draft pointed), and the notes then send themselves after a countdown.
+ * every site, all pointing where the draft pointed), and the dock then asks whether to send them.
  */
-export function usePhoneReview({ draft, setDraft, dictation, add, device, path, count, armed, setArmed, submit, ask }: Options) {
+export function usePhoneReview({ draft, setDraft, dictation, add, device, path, confirming, setConfirming, submit, ask }: Options) {
   const [splitting, setSplitting] = useState(false);
-  useStopOnTouch(armed, () => setArmed(false));
+  useCloseOnTouchElsewhere(confirming, () => setConfirming(false));
 
   const finishTalking = async () => {
     const spoken = `${draft.text} ${dictation.interim}`.trim();
@@ -42,24 +41,19 @@ export function usePhoneReview({ draft, setDraft, dictation, add, device, path, 
     setDraft({ ...EMPTY_DRAFT });
     if (!notes.length) return;
     if (ask.open) ask.answered();
-    else setArmed(true);
+    else setConfirming(true);
   };
 
   const toggleTalk = () => {
-    setArmed(false);
+    setConfirming(false);
     if (dictation.listening) void finishTalking();
     else dictation.toggle();
   };
 
-  /** Sending is immediate; approving with no notes starts the countdown first, and a second tap approves now. */
-  const tapSend = () => {
-    if (count || armed) {
-      setArmed(false);
-      submit();
-      return;
-    }
-    setArmed(true);
+  const confirm = () => {
+    setConfirming(false);
+    submit();
   };
 
-  return { splitting, toggleTalk, tapSend };
+  return { splitting, toggleTalk, askToSend: () => setConfirming(true), confirm, cancel: () => setConfirming(false) };
 }

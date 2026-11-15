@@ -2,7 +2,7 @@
 
 import { Check, Crosshair, Keyboard, PaperPlaneTilt } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
-import { DOCK_CARD, DockAction, DockMic, DockSideButton, DockSpoken, DockTypeField } from "../dock";
+import { DOCK_CARD, DockAction, DockConfirm, DockMic, DockSideButton, DockSpoken, DockTypeField } from "../dock";
 
 type Typing = { text: string; onChange: (text: string) => void; onAdd: () => void };
 
@@ -16,8 +16,11 @@ type Props = {
   notice: { text: string; bad: boolean } | null;
   count: number;
   pending: boolean;
-  armed: boolean;
+  /** The send or approve waits for a second tap on its confirm card. */
+  confirming: boolean;
   onSubmit: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
   /** The open question about the preview, shown above the controls. */
   ask: ReactNode;
 };
@@ -27,17 +30,31 @@ export const CARD = DOCK_CARD;
 
 /**
  * The review page's controls on a phone, within thumb reach: point at a part of the preview, talk, and send.
- * Notes split from speech send themselves after a countdown that any touch stops.
+ * Sending or approving asks once more on a card above the dock; nothing goes to the builder without that tap.
  */
-export default function PhoneDock({ pointing, onPoint, typing, talk, spoken, splitting, notice, count, pending, armed, onSubmit, ask }: Props) {
+export default function PhoneDock({ pointing, onPoint, typing, talk, spoken, splitting, notice, count, pending, confirming, onSubmit, onConfirm, onCancel, ask }: Props) {
   const [typingOpen, setTypingOpen] = useState(false);
   const keepTyped = () => {
     typing.onAdd();
     setTypingOpen(false);
   };
+  const actionIcon = count ? <PaperPlaneTilt size={20} aria-hidden="true" /> : <Check size={20} weight="bold" aria-hidden="true" />;
+  const actionLabel = count ? `Send ${count}` : "Approve";
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
-      {ask}
+      {!confirming && ask}
+      {confirming && (
+        <DockConfirm
+          title={count ? `Send ${count} ${count === 1 ? "note" : "notes"} to the builder?` : "Approve this preview as it is?"}
+          icon={actionIcon}
+          confirmLabel={actionLabel}
+          pending={pending}
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        >
+          <p className="text-ink-soft text-sm text-pretty">{count ? "The builder repairs the site, and it comes back to you with a before and after of each note." : "It goes to outreach with no changes."}</p>
+        </DockConfirm>
+      )}
       {typingOpen && <DockTypeField id="phone-note" label="Type a note" text={typing.text} onChange={typing.onChange} onKeep={keepTyped} keepLabel="Add note" />}
       <div aria-live="polite" className="empty:hidden">
         <DockSpoken spoken={spoken} listening={talk.listening} working={splitting} notice={notice} />
@@ -52,14 +69,7 @@ export default function PhoneDock({ pointing, onPoint, typing, talk, spoken, spl
         <span className="flex flex-1 justify-center">
           <DockMic talk={talk} disabled={splitting} label="Talk about this preview" />
         </span>
-        <DockAction
-          icon={count ? <PaperPlaneTilt size={20} aria-hidden="true" /> : <Check size={20} weight="bold" aria-hidden="true" />}
-          label={count ? `Send ${count}` : "Approve"}
-          armedLabel={(left) => (count ? `Sending in ${left}` : `Approving in ${left}`)}
-          pending={pending}
-          armed={armed}
-          onPress={onSubmit}
-        />
+        <DockAction icon={actionIcon} label={actionLabel} pending={pending} onPress={onSubmit} />
       </div>
     </div>
   );

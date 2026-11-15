@@ -1,8 +1,8 @@
 "use client";
 
 import { CircleNotch, Microphone, Plus, Stop } from "@phosphor-icons/react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { AUTO_SEND_SECONDS } from "@/lib/review";
+import { type ReactNode, useEffect, useRef } from "react";
+import { Button } from "@/components/Button";
 
 // The controls a founder holds a phone by: a dock within thumb reach, with what it is about to do shown above it.
 // The Review page and the Designs page are both worked from one.
@@ -10,62 +10,28 @@ import { AUTO_SEND_SECONDS } from "@/lib/review";
 /** The floating surface for anything shown above a dock's buttons. */
 export const DOCK_CARD = "bg-paper/95 shadow-lifted pointer-events-auto rounded-2xl px-4 py-3 text-pretty backdrop-blur";
 
-/** Seconds left before onFire runs, counting only while armed. */
-function useCountdown(armed: boolean, onFire: () => void) {
-  const [left, setLeft] = useState(AUTO_SEND_SECONDS);
-  const fire = useRef(onFire);
+const isInsideDock = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest("[data-dock-action], [data-dock-confirm]"));
+
+/** Any touch outside the dock's action and its confirm card closes the card, so it never outlives what it asked about. */
+export function useCloseOnTouchElsewhere(open: boolean, close: () => void) {
+  const closeRef = useRef(close);
   useEffect(() => {
-    fire.current = onFire;
+    closeRef.current = close;
   });
   useEffect(() => {
-    if (!armed) return;
-    const started = Date.now();
-    const timer = setInterval(() => {
-      const remaining = AUTO_SEND_SECONDS - Math.floor((Date.now() - started) / 1000);
-      setLeft(Math.max(0, remaining));
-      if (remaining > 0) return;
-      clearInterval(timer);
-      fire.current();
-    }, 250);
-    return () => {
-      clearInterval(timer);
-      setLeft(AUTO_SEND_SECONDS);
-    };
-  }, [armed]);
-  return left;
-}
-
-const isDockAction = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest("[data-dock-action]"));
-
-/** Any touch on the page except the dock's action stops a running countdown, so the founder can change their mind. */
-export function useStopOnTouch(armed: boolean, disarm: () => void) {
-  const stop = useRef(disarm);
-  useEffect(() => {
-    stop.current = disarm;
-  });
-  useEffect(() => {
-    if (!armed) return;
+    if (!open) return;
     const onTouch = (event: PointerEvent) => {
-      if (!isDockAction(event.target)) stop.current();
+      if (!isInsideDock(event.target)) closeRef.current();
     };
     document.addEventListener("pointerdown", onTouch, true);
     return () => document.removeEventListener("pointerdown", onTouch, true);
-  }, [armed]);
+  }, [open]);
 }
 
-type ActionProps = {
-  icon: ReactNode;
-  label: string;
-  /** What the button says while it counts down, such as "Sending in 4". */
-  armedLabel: (secondsLeft: number) => string;
-  pending: boolean;
-  armed: boolean;
-  onPress: () => void;
-};
+type ActionProps = { icon: ReactNode; label: string; pending: boolean; onPress: () => void };
 
-/** The dock's one action. While armed it fills as it counts down and then presses itself. */
-export function DockAction({ icon, label, armedLabel, pending, armed, onPress }: ActionProps) {
-  const left = useCountdown(armed && !pending, onPress);
+/** The dock's one action. */
+export function DockAction({ icon, label, pending, onPress }: ActionProps) {
   return (
     <button
       type="button"
@@ -73,14 +39,40 @@ export function DockAction({ icon, label, armedLabel, pending, armed, onPress }:
       onClick={onPress}
       disabled={pending}
       aria-busy={pending}
-      className="bg-ink text-paper shadow-lifted relative inline-flex min-h-14 min-w-28 items-center justify-center overflow-hidden rounded-full px-4 text-base font-medium transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-45"
+      className="bg-ink text-paper shadow-lifted inline-flex min-h-14 min-w-28 items-center justify-center gap-2 rounded-full px-4 text-base font-medium transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-45"
     >
-      {armed && !pending && <span aria-hidden="true" className="bg-paper/20 animate-countdown absolute inset-0 origin-left motion-reduce:animate-none" />}
-      <span className="relative inline-flex items-center gap-2 tabular-nums">
-        {pending ? <CircleNotch size={20} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon}
-        {armed ? armedLabel(left) : label}
-      </span>
+      {pending ? <CircleNotch size={20} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon}
+      {label}
     </button>
+  );
+}
+
+type ConfirmProps = {
+  title: string;
+  /** What the decision carries, such as the option's picture or the note that goes with it. */
+  children?: ReactNode;
+  icon: ReactNode;
+  confirmLabel: string;
+  pending: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+/** A decision that can't be taken back waits here for a second, deliberate tap. Nothing happens on its own. */
+export function DockConfirm({ title, children, icon, confirmLabel, pending, onConfirm, onCancel }: ConfirmProps) {
+  return (
+    <div data-dock-confirm role="dialog" aria-label={title} className={`${DOCK_CARD} flex flex-col gap-3`}>
+      <p className="text-base font-semibold text-balance">{title}</p>
+      {children}
+      <div className="flex gap-2">
+        <Button variant="soft" onClick={onCancel} disabled={pending} className="flex-1">
+          Not yet
+        </Button>
+        <Button variant="solid" onClick={onConfirm} disabled={pending} aria-busy={pending} autoFocus className="flex-1" icon={pending ? <CircleNotch size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -43,9 +43,9 @@ export function Palette({ option }: { option: BoardOption }) {
 }
 
 /** A picture of a board or of its first screen. The outline keeps a white page from melting into the card. */
-export function BoardPicture({ src, alt, className = "", style }: { src: string; alt: string; className?: string; style?: CSSProperties }) {
+export function BoardPicture({ src, alt, className = "", style, loading = "lazy" }: { src: string; alt: string; className?: string; style?: CSSProperties; loading?: "lazy" | "eager" }) {
   // eslint-disable-next-line @next/next/no-img-element -- the pictures are in the admin's own blob store, as the brand files are
-  return <img src={src} alt={alt} loading="lazy" style={style} className={`block w-full outline-1 -outline-offset-1 outline-black/10 ${className}`} />;
+  return <img src={src} alt={alt} loading={loading} style={style} className={`block w-full outline-1 -outline-offset-1 outline-black/10 ${className}`} />;
 }
 
 /**
