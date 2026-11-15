@@ -296,7 +296,9 @@ function buildKindOf(note: string): BuildKind {
 
 /** The email that a built preview waits. One the owner must not see yet is answered on Today, where its flag is. */
 async function tellFoundersPreviewWaits(job: PreviewJob, lead: Business, wait: PreviewWait) {
-  await tellFounders((adminUrl) => previewWaitsEmail({ business: lead.businessName, build: buildKindOf(job.note), wait, link: wait === "owner" ? adminUrl : `${adminUrl}/review?id=${lead.id}` }));
+  const onToday = wait === "owner";
+  const email = (adminUrl: string) => previewWaitsEmail({ business: lead.businessName, build: buildKindOf(job.note), wait, link: onToday ? adminUrl : `${adminUrl}/review?id=${lead.id}`, list: onToday ? null : `${adminUrl}/turn` });
+  await tellFounders(email, onToday ? {} : { onYourTurn: lead.id });
 }
 
 /** The job is marked done last: a failure before that leaves it running, so the runner can report again and finish the lead. */

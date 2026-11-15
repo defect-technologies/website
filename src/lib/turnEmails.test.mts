@@ -9,27 +9,28 @@ const OPTIONS = [
 ];
 
 test("the email about three designs names them and links to where one is chosen", () => {
-  const email = designsWaitEmail("JW Heating & Air", OPTIONS, "https://defect.tech/admin/designs/board-1");
+  const email = designsWaitEmail("JW Heating & Air", OPTIONS, "https://defect.tech/admin/designs/board-1", "https://defect.tech/admin/turn");
   assert.equal(email.subject, "Choose a design for JW Heating & Air");
   assert.equal(
     email.body,
-    ["Three designs for JW Heating & Air are ready.", "A. Cream sunburst\nB. Night ribbon\nC. Open house", "Choose one: https://defect.tech/admin/designs/board-1", "The build starts when one of you has chosen."].join("\n\n"),
+    ["Three designs for JW Heating & Air are ready.", "A. Cream sunburst\nB. Night ribbon\nC. Open house", "Choose one: https://defect.tech/admin/designs/board-1", "The build starts when one of you has chosen.", "Designs and sites that come after this one wait on Your turn without an email, until you have cleared it: https://defect.tech/admin/turn"].join("\n\n"),
   );
 });
 
 test("the email about a built site says what was built and why it waits", () => {
   const link = "https://defect.tech/admin/review?id=lead-1";
-  const built = previewWaitsEmail({ business: "Acme Roofing", build: "built", wait: null, link });
+  const list = "https://defect.tech/admin/turn";
+  const built = previewWaitsEmail({ business: "Acme Roofing", build: "built", wait: null, link, list });
   assert.equal(built.subject, "Review the site for Acme Roofing");
-  assert.equal(built.body, `The site for Acme Roofing is built.\n\nReview it: ${link}`);
+  assert.equal(built.body, `The site for Acme Roofing is built.\n\nReview it: ${link}\n\nDesigns and sites that come after this one wait on Your turn without an email, until you have cleared it: ${list}`);
 
-  const rebuilt = previewWaitsEmail({ business: "Acme Roofing", build: "rebuilt", wait: "held", link });
+  const rebuilt = previewWaitsEmail({ business: "Acme Roofing", build: "rebuilt", wait: "held", link, list });
   assert.match(rebuilt.body, /^The site for Acme Roofing is rebuilt with the changes its note asked for\./);
   assert.match(rebuilt.body, /stays out of outreach until one of you approves it/);
 
-  const forOwner = previewWaitsEmail({ business: "Acme Roofing", build: "rebuilt", wait: "owner", link: "https://defect.tech/admin" });
+  const forOwner = previewWaitsEmail({ business: "Acme Roofing", build: "rebuilt", wait: "owner", link: "https://defect.tech/admin", list: null });
   assert.match(forOwner.body, /The owner still sees the earlier preview/);
   assert.match(forOwner.body, /Review it: https:\/\/defect\.tech\/admin$/);
 
-  assert.match(previewWaitsEmail({ business: "Acme Roofing", build: "updated", wait: null, link }).body, /^The preview for Acme Roofing is updated\. You can now point at its parts\./);
+  assert.match(previewWaitsEmail({ business: "Acme Roofing", build: "updated", wait: null, link, list }).body, /^The preview for Acme Roofing is updated\. You can now point at its parts\./);
 });

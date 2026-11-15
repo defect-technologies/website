@@ -26,6 +26,16 @@ const waitingDesign = (board: BoardWithLead): WaitingDesign => ({
   since: board.createdAt,
 });
 
+/**
+ * How many other things wait on Your turn besides this lead's. The founders are emailed only when this is 0: once
+ * something waits, they come to the list and find the rest, and a runner drawing designs every few minutes would
+ * otherwise send an email for each.
+ */
+export async function waitingBesides(businessId: string): Promise<number> {
+  const [sites, boards] = await Promise.all([reviewQueue(), boardsWaiting()]);
+  return sites.filter((site) => site.id !== businessId).length + boards.filter((board) => board.businessId !== businessId).length;
+}
+
 /** Everything that waits for a founder's taste, in the order to take it. */
 export async function turns(): Promise<Turn[]> {
   const [previews, boards] = await Promise.all([reviewQueue(), boardsWaiting()]);
