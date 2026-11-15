@@ -145,6 +145,17 @@ async function claimBuildWork(runnerName: string, kinds: JobKind[], limits: Limi
   return (await claimNewLead(runnerName, limits.settings)) ?? claimNextJob(runnerName, kinds, "backfill");
 }
 
+/**
+ * Why the runner has nothing to do, most telling first. With design boards on, the designs that wait for a choice
+ * stop new ones before the daily cap does, and saying "Daily cap reached" then sent a founder looking in the wrong place.
+ */
+async function whyIdle(limits: Limits): Promise<string> {
+  if (limits.paused) return limits.noBuilds ?? "Paused.";
+  const waiting = limits.settings.designBoards ? await countBoardsWaiting() : 0;
+  if (waiting >= limits.settings.mostDesignsWaiting) return `${waiting} designs wait for a founder's choice, as many as Setup > Bots allows, so no new ones are drawn.`;
+  return limits.noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.";
+}
+
 /** The next job: work a founder or client is waiting on first, then designs to review, or builds with boards off. */
 async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
   const kinds = kindsAllowed(search, limits.noBuilds);
@@ -175,7 +186,7 @@ export async function claimNext(key: BotKey, request: Request) {
   }
   const limits = await limitsNow();
   const job = await claimWork(runnerName, search, limits);
-  if (!job) return idle(limits.noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.");
+  if (!job) return idle(await whyIdle(limits));
   const lead = await leadForJob(job);
   await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
   const { boards, repair } = await designAndRepairFor(job, lead);
