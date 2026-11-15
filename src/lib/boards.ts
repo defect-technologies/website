@@ -96,6 +96,8 @@ export interface BoardDecision {
 /** How much more (above 1) or less (below 1) often site-kit draws a value. The kit keeps every value between a quarter and four times. */
 export interface BoardPreferences {
   layouts: Record<string, number>;
+  /** How the founders lean on each heading face they were shown. site-kit turns these into a lean on the faces' character. */
+  headings: Record<string, number>;
 }
 
 /** Showings a value is assumed to have had with an average result, so one early choice doesn't swing the draw. */
@@ -132,8 +134,8 @@ function leaning({ shown, chosen }: Tally): number {
 
 /** What the founders' choices so far tell the next draw. */
 export function boardPreferences(decisions: BoardDecision[]): BoardPreferences {
-  const layouts = tally(decisions, (option) => option.layout);
-  return { layouts: Object.fromEntries([...layouts].sort(([a], [b]) => a.localeCompare(b)).map(([layout, counts]) => [layout, leaning(counts)])) };
+  const leanings = (counts: Map<string, Tally>) => Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b)).map(([value, tallied]) => [value, leaning(tallied)]));
+  return { layouts: leanings(tally(decisions, (option) => option.layout)), headings: leanings(tally(decisions, (option) => option.fonts.heading)) };
 }
 
 function luminance(colour: string): number {

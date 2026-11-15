@@ -31,7 +31,7 @@ function decision(chosen: BoardLetter, layouts: [string, string, string], extra:
 }
 
 test("a layout nobody has been shown leans the draw neither way", () => {
-  assert.deepEqual(boardPreferences([]), { layouts: {} });
+  assert.deepEqual(boardPreferences([]), { layouts: {}, headings: {} });
 });
 
 test("a layout the founders keep choosing is drawn more, and one they keep passing over less", () => {
@@ -86,4 +86,11 @@ test("recent compositions are listed for the next composer, and boards without o
   assert.match(markdown, /Don't repeat any of these/);
   assert.ok(markdown.includes("- Cypher Tattoo, C: The yellow sign fills the screen."));
   assert.ok(!markdown.includes("Cypher Tattoo, A"));
+});
+
+test("the heading faces the founders choose lean the next draw's type the same way", () => {
+  const faces = (a: string, b: string, c: string) => [option("a", "split-hero", { fonts: { heading: a, body: "DM Sans" } }), option("b", "type-led", { fonts: { heading: b, body: "DM Sans" } }), option("c", "editorial", { fonts: { heading: c, body: "DM Sans" } })];
+  const decisions = [1, 2, 3].map(() => ({ ...decision("c", ["split-hero", "type-led", "editorial"]), options: faces("Source Serif 4", "Tinos", "Pirata One") }));
+  const { headings } = boardPreferences(decisions);
+  assert.ok(headings["Pirata One"] > 1.5 && headings["Source Serif 4"] < 0.7);
 });
