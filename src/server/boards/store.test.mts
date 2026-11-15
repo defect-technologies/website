@@ -291,3 +291,23 @@ test("a founder can have one option revised with their words: the runner is told
   assert.equal(await store.revisionOf(board), null, "the first boards revise nothing");
   assert.equal(await store.redrawFor(lead.id), null);
 });
+
+test("an option may carry its whole page on a desktop and a phone, and how it is composed, which the next composer is told not to repeat", async () => {
+  const { lead, job } = await leadWithRunningJob("Composed Tattoo");
+  const picture = (letter: string, view: string) => `${STORE}/boards/${lead.id}/job/${letter}-${view}-x1.jpg`;
+  const composition = (letter: string) => `A flash sheet of the artists' work with the booking ledger beside it (${letter}).`;
+  const options = threeOptions(lead.id).map((entry) => ({ ...entry, composition: composition(entry.letter), pictures: { ...entry.pictures, page: picture(entry.letter, "page"), pagePhone: picture(entry.letter, "pagePhone") } }));
+  assert.deepEqual(pictureName("b-pagePhone"), { letter: "b", view: "pagePhone" });
+  const stranger = structuredClone(options);
+  stranger[0].pictures.page = "https://evil.example/a-page.jpg";
+  await assert.rejects(() => reportBoards(job.id, BoardsBody.parse({ options: stranger })), /one this job uploaded/);
+  await reportBoards(job.id, BoardsBody.parse({ options }));
+  const board = (await store.waitingBoardFor(lead.id))!;
+  assert.equal(board.options[2].pictures.pagePhone, picture("c", "pagePhone"));
+  assert.equal(board.options[0].composition, composition("a"));
+
+  const memory = await boardMemory();
+  assert.match(memory.compositions, /^# How recent boards composed their pages/);
+  assert.ok(memory.compositions.includes(`- Composed Tattoo, A: ${composition("a")}`));
+  await store.chooseBoard(board.id, "a", "", "brendan@g.studio");
+});

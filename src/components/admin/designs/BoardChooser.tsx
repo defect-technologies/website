@@ -2,6 +2,7 @@ import { CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { chooseBoardAction } from "@/app/admin/(panel)/designs/actions";
 import type { BoardOption } from "@/lib/boards";
 import DecisionBar from "./DecisionBar";
+import WholePages from "./WholePages";
 import { BoardPicture, FirstScreens, Letter, OptionFacts, Reach } from "./parts";
 
 function Choice({ option }: { option: BoardOption }) {
@@ -54,6 +55,7 @@ export default function BoardChooser({ boardId, options }: { boardId: string; op
           <Choice key={option.letter} option={option} />
         ))}
       </fieldset>
+      <WholePages options={options} />
       <div className="flex flex-col gap-3">
         {options.map((option, index) => (
           <FullBoard key={option.letter} option={option} open={index === 0} />

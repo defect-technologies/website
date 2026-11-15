@@ -78,3 +78,12 @@ test("agreement counts only boards the system made a pick for", () => {
   const picked = (pick: BoardLetter, chosen: BoardLetter) => decision(chosen, ["split-hero", "type-led", "editorial"], { pick: { letter: pick, reason: "" } });
   assert.deepEqual(pickAgreement([picked("a", "a"), picked("b", "a"), picked("c", "c"), decision("a", ["split-hero", "type-led", "editorial"])]), { matched: 2, of: 3 });
 });
+
+test("recent compositions are listed for the next composer, and boards without one add nothing", async () => {
+  const { recentCompositionsMarkdown } = await import("./boards");
+  assert.equal(recentCompositionsMarkdown([{ business: "Old Plumbing", options: [{ letter: "a" }] }]), "");
+  const markdown = recentCompositionsMarkdown([{ business: "Cypher Tattoo", options: [{ letter: "c", composition: "The yellow sign fills the screen." }, { letter: "a" }] }]);
+  assert.match(markdown, /Don't repeat any of these/);
+  assert.ok(markdown.includes("- Cypher Tattoo, C: The yellow sign fills the screen."));
+  assert.ok(!markdown.includes("Cypher Tattoo, A"));
+});

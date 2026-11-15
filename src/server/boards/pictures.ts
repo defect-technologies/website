@@ -4,7 +4,10 @@ import { BOARD_LETTERS, BOARD_VIEWS, type BoardLetter, type BoardView } from "@/
 import { BotError } from "../bots/http";
 import { env } from "../env";
 
-/** A board's picture is a JPEG of about 200 kB; anything much larger is not one. */
+/**
+ * A board's picture is a JPEG of about 200 kB, and a whole page a few MB; anything much larger is not one. It also has
+ * to fit in one request to a Vercel function, which takes at most 4.5 MB.
+ */
 export const MAX_PICTURE_BYTES = 4 * 1024 * 1024;
 
 /** Boards live beside the brand files, in the admin's own store, never in the client sites' store. */

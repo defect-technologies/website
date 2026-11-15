@@ -36,14 +36,15 @@ export interface BoardRedraw {
 }
 
 /**
- * The pictures of one option: its whole board, its first screen on a desktop and on a phone, and (from site-kit 0.15.0)
- * the board in one column at a phone's width, for a founder who chooses on a phone.
+ * The pictures of one option: its whole board, its first screen on a desktop and on a phone, (from site-kit 0.15.0)
+ * the board in one column at a phone's width, and (from site-kit 0.16.0) its whole home page on a desktop and on a
+ * phone, composed for this business.
  */
-export const BOARD_VIEWS = ["board", "desktop", "phone", "narrow"] as const;
+export const BOARD_VIEWS = ["board", "desktop", "phone", "narrow", "page", "pagePhone"] as const;
 export type BoardView = (typeof BOARD_VIEWS)[number];
 
-/** Where an option's pictures are. Boards made before the narrow board have none. */
-export type BoardPictures = { board: string; desktop: string; phone: string; narrow?: string };
+/** Where an option's pictures are. Boards made before the narrow board or the whole page have none of those. */
+export type BoardPictures = { board: string; desktop: string; phone: string; narrow?: string; page?: string; pagePhone?: string };
 
 export interface BoardControls {
   shape: string | null;
@@ -71,6 +72,8 @@ export interface BoardOption {
   texture: string;
   /** Drawn without the founders' preferences, so the options never narrow to what was chosen before. */
   explores: boolean;
+  /** How its home page is composed, in a sentence. Boards made before composed pages have none. */
+  composition?: string;
   pictures: BoardPictures;
 }
 
@@ -152,7 +155,8 @@ function buttons(controls: BoardControls): string {
 /** An option in one line, in words a model and a founder both read. */
 export function describeOption(option: BoardOption): string {
   const colours = `a ${pageTone(option)} page (${option.palette.background}) with ${option.palette.accent} as the brand colour`;
-  return `"${option.name}": ${colours}; headings in ${option.fonts.heading}, text in ${option.fonts.body}; a ${option.layout} first screen; ${buttons(option.controls)}; motif: ${option.motif.name}.`;
+  const page = option.composition ? `a page composed as ${option.composition.replace(/\.$/, "")}` : `a ${option.layout} first screen`;
+  return `"${option.name}": ${colours}; headings in ${option.fonts.heading}, text in ${option.fonts.body}; ${page}; ${buttons(option.controls)}; motif: ${option.motif.name}.`;
 }
 
 function decisionLines(decision: BoardDecision): string[] {
@@ -191,4 +195,17 @@ export function boardLessonsMarkdown(decisions: BoardDecision[]): string {
 export function pickAgreement(decisions: BoardDecision[]): { matched: number; of: number } {
   const withPick = decisions.filter((decision) => decision.pick).slice(0, AGREEMENT_SITES);
   return { matched: withPick.filter((decision) => decision.pick?.letter === decision.chosen).length, of: withPick.length };
+}
+
+/** How many of the newest boards' compositions the next composer is shown, so it doesn't repeat them. */
+export const RECENT_COMPOSITION_BOARDS = 30;
+
+/**
+ * What the next page composer reads (lead/recent-compositions.md): how recent boards, for every business, composed
+ * their pages. The founders saw the same few first screens on every business; this is what keeps a new one apart.
+ */
+export function recentCompositionsMarkdown(boards: { business: string; options: Pick<BoardOption, "letter" | "composition">[] }[]): string {
+  const lines = boards.flatMap((board) => board.options.filter((option) => option.composition).map((option) => `- ${board.business}, ${option.letter.toUpperCase()}: ${option.composition}`));
+  if (!lines.length) return "";
+  return ["# How recent boards composed their pages", "", "Every business gets its own. Don't repeat any of these, and don't make one that would read as a variation of one:", "", ...lines, ""].join("\n");
 }

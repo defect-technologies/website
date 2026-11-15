@@ -26,7 +26,11 @@ function OptionSlide({ option, website, revision }: { option: BoardOption; websi
   const name = `Option ${option.letter.toUpperCase()}, ${option.name}`;
   return (
     <section aria-label={name} className={`w-full shrink-0 snap-center overflow-y-auto overscroll-y-contain pb-44 ${BELOW_TOP_BAR}`}>
-      <BoardPicture src={option.pictures.phone} alt={`${name}: its first screen on a phone`} />
+      {option.pictures.pagePhone ? (
+        <BoardPicture src={option.pictures.pagePhone} alt={`${name}: its whole home page on a phone`} />
+      ) : (
+        <BoardPicture src={option.pictures.phone} alt={`${name}: its first screen on a phone`} />
+      )}
       <div className="flex flex-col gap-4 px-4 py-6">
         <div className="flex items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-3">
@@ -44,6 +48,7 @@ function OptionSlide({ option, website, revision }: { option: BoardOption; websi
           </p>
         )}
         <p className="text-ink-soft text-pretty">{option.idea}</p>
+        {option.composition && <p className="text-ink-soft text-sm text-pretty">{option.composition}</p>}
         <OptionFacts option={option} />
         {website && (
           <a href={website} target="_blank" rel="noreferrer" className="text-ink-soft inline-flex min-h-11 w-fit items-center gap-1.5 text-sm underline decoration-ink/25 underline-offset-4">

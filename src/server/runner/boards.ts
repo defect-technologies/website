@@ -1,12 +1,12 @@
 import "server-only";
 import { z } from "zod";
-import { BOARD_LETTERS, boardLessonsMarkdown, boardPreferences, pickAgreement } from "@/lib/boards";
+import { BOARD_LETTERS, boardLessonsMarkdown, boardPreferences, pickAgreement, RECENT_COMPOSITION_BOARDS, recentCompositionsMarkdown } from "@/lib/boards";
 import { BOARDS_STEP } from "@/lib/previewJobs";
 import { designsWaitEmail } from "@/lib/turnEmails";
 import { record } from "../activity";
 import { BotError } from "../bots/http";
 import { isBoardPicture, MAX_PICTURE_BYTES, pictureName, storeBoardPicture } from "../boards/pictures";
-import { decisions, saveBoards } from "../boards/store";
+import { decisions, newestBoards, saveBoards } from "../boards/store";
 import type { PreviewJob } from "../db/schema";
 import { isActive, jobById, leadForJob, updateJob } from "./jobs";
 import { tellFounders } from "./tellFounders";
@@ -29,7 +29,15 @@ const Option = z.object({
   photoTreatment: short(20).default("plain"),
   texture: short(20).default("none"),
   explores: z.boolean().default(false),
-  pictures: z.object({ board: z.string().url().max(500), desktop: z.string().url().max(500), phone: z.string().url().max(500), narrow: z.string().url().max(500).optional() }),
+  composition: short(400).default(""),
+  pictures: z.object({
+    board: z.string().url().max(500),
+    desktop: z.string().url().max(500),
+    phone: z.string().url().max(500),
+    narrow: z.string().url().max(500).optional(),
+    page: z.string().url().max(500).optional(),
+    pagePhone: z.string().url().max(500).optional(),
+  }),
 });
 
 export const BoardsBody = z.object({
@@ -48,7 +56,7 @@ async function buildingJob(id: string): Promise<PreviewJob> {
 /** PUT /api/runner/:job/boards/:picture, the JPEG as the body. The picture is "a-board", "a-desktop", "a-phone" or "a-narrow" (and b, c). */
 export async function uploadBoardPicture(id: string, name: string, request: Request) {
   const job = await buildingJob(id);
-  if (!pictureName(name)) throw new BotError(400, `"${name}" is not a board picture. Send a-board, a-desktop, a-phone or a-narrow, and the same for b and c.`);
+  if (!pictureName(name)) throw new BotError(400, `"${name}" is not a board picture. Send a-board, a-desktop, a-phone, a-narrow, a-page or a-pagePhone, and the same for b and c.`);
   const bytes = await request.arrayBuffer();
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_PICTURE_BYTES) throw new BotError(413, "A board picture is a JPEG of 4 MB at most.");
   return { url: await storeBoardPicture(job.businessId, job.id, name, bytes) };
@@ -76,6 +84,7 @@ export async function reportBoards(id: string, body: z.infer<typeof BoardsBody>)
  * (lead/board-preferences.json), and `markdown` is what the option writer reads (lead/board-lessons.md).
  */
 export async function boardMemory() {
-  const decided = await decisions();
-  return { preferences: boardPreferences(decided), markdown: boardLessonsMarkdown(decided), agreement: pickAgreement(decided), decided: decided.length };
+  const [decided, recent] = await Promise.all([decisions(), newestBoards(RECENT_COMPOSITION_BOARDS)]);
+  const compositions = recentCompositionsMarkdown(recent.map((board) => ({ business: board.businessName, options: board.options })));
+  return { preferences: boardPreferences(decided), markdown: boardLessonsMarkdown(decided), compositions, agreement: pickAgreement(decided), decided: decided.length };
 }

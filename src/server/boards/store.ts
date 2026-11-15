@@ -39,6 +39,12 @@ export async function boardsWaiting(): Promise<BoardWithLead[]> {
   return rows.map(withLead);
 }
 
+/** The newest boards for every business, decided or not: what the next composer is told not to repeat. */
+export async function newestBoards(limit: number): Promise<BoardWithLead[]> {
+  const rows = await (await db()).select(WITH_LEAD).from(designBoards).innerJoin(businesses, eq(businesses.id, designBoards.businessId)).orderBy(desc(designBoards.createdAt)).limit(limit);
+  return rows.map(withLead);
+}
+
 export async function countBoardsWaiting(): Promise<number> {
   const [row] = await (await db()).select({ total: count() }).from(designBoards).where(isNull(designBoards.chosenAt));
   return row?.total ?? 0;
