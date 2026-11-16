@@ -74,6 +74,11 @@ export function founderNote(note: string): string {
   return note.replace(RETRY_NOTE, "").trim();
 }
 
+/** The kit-only update of an old preview, which the Review page queues so it can point at the preview's parts. */
+export function isKitUpdate(note: string): boolean {
+  return founderNote(note) === POINTING_NOTE;
+}
+
 /** The line in a note that asks the builder for a new design. The pipeline reads the same line (pipeline.py, note_lines). */
 export const NEW_DESIGN_NOTE = "Start a new design.";
 

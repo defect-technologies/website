@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Bot } from "@/lib/bots";
 import { record } from "../activity";
-import { changesBuiltPreview, founderNote, isRepair, MAX_FAILED_BUILDS, NEW_DESIGN_NOTE, type JobKind, type RunnerSettings, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
+import { changesBuiltPreview, founderNote, isKitUpdate, isRepair, MAX_FAILED_BUILDS, NEW_DESIGN_NOTE, type JobKind, type RunnerSettings, RETRY_NOTE, RUNNER_ACTOR, RUNNER_ASK_AGAIN_SECONDS, SKIPPED_STEP } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { type BuildKind, previewWaitsEmail, type PreviewWait } from "@/lib/turnEmails";
 import { isNeon } from "../db/client";
@@ -18,7 +18,7 @@ import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { asClause } from "@/lib/emailTemplate";
 import { CriticNotesField } from "../review/criticNotes";
-import { choiceForJob, countBoardsWaiting, redrawFor, type BoardChoice } from "../boards/store";
+import { choiceForJob, countBoardsWaiting, newestBoardFor, noteBehindBoards, redrawFor, type BoardChoice } from "../boards/store";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
@@ -160,8 +160,21 @@ async function whyIdle(limits: Limits): Promise<string> {
 async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
   const kinds = kindsAllowed(search, limits.noBuilds);
   const asked = kinds.length ? await claimNextJob(runnerName, kinds, "asked") : null;
-  if (asked || limits.paused) return asked;
+  if (asked || limits.paused) return asked && founderJob(asked);
+  // New designs a founder asked for build nothing, so they go ahead past the daily cap, and before any the runner draws itself.
+  const redraw = await claimNextJob(runnerName, ["preview"], "redraw");
+  if (redraw) return founderJob(redraw);
   return limits.settings.designBoards ? claimDesignWork(runnerName, limits.settings) : claimBuildWork(runnerName, kinds, limits);
+}
+
+/**
+ * A job queued as a kit-only update that a founder's decision made theirs (one queued before a decision took over
+ * its job) carries the note of the job that made the boards, as the decision itself would have queued it.
+ */
+async function founderJob(job: PreviewJob): Promise<PreviewJob> {
+  if (!isKitUpdate(job.note)) return job;
+  const board = await newestBoardFor(job.businessId);
+  return board ? updateJob(job.id, { note: await noteBehindBoards(board) }) : job;
 }
 
 /**

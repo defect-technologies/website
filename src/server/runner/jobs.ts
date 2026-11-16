@@ -1,10 +1,10 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray, sql } from "drizzle-orm";
-import { ACTIVE_JOB_STATUSES, BOARDS_STEP, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
+import { ACTIVE_JOB_STATUSES, BOARDS_STEP, isKitUpdate, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { record } from "../activity";
 import { db } from "../db/client";
-import { businesses, previewJobs, type Business, type PreviewJob } from "../db/schema";
+import { businesses, designBoards, previewJobs, type Business, type PreviewJob } from "../db/schema";
 import { businessById, updateBusiness } from "../leads/businesses";
 import { PACIFIC_MIDNIGHT as LA_MIDNIGHT } from "../outreach/pacificDay";
 
@@ -23,9 +23,26 @@ const REQUEST_ACTION: Record<JobKind, (note: string) => string> = {
   launch: () => "requested a launch",
 };
 
+/**
+ * A request takes over a kit-only update still queued for the lead: the update was filling a runner with nothing
+ * better to do, and a founder's choice or note is better. Before this, Boris's revision of a design sat behind the
+ * update and lost its place in the queue.
+ */
+async function takeOver(existing: PreviewJob, requestedBy: string, note: string): Promise<RequestResult> {
+  const [job] = await (await db())
+    .update(previewJobs)
+    .set({ requestedBy, note })
+    .where(and(eq(previewJobs.id, existing.id), eq(previewJobs.status, "queued")))
+    .returning();
+  if (!job) return { job: existing, created: false };
+  await record(requestedBy, REQUEST_ACTION[job.kind as JobKind](note), { businessId: job.businessId, detail: note });
+  return { job, created: true };
+}
+
 /** Queues a build (or a launch) for the lead, or returns the job already queued or running. */
 export async function requestPreview(lead: Business, requestedBy: string, note = "", kind: JobKind = "preview"): Promise<RequestResult> {
   const existing = await activeJobFor(lead.id);
+  if (existing?.status === "queued" && kind === "preview" && isKitUpdate(existing.note) && !isKitUpdate(note)) return takeOver(existing, requestedBy, note);
   if (existing) return { job: existing, created: false };
   const [job] = await (await db())
     .insert(previewJobs)
@@ -121,14 +138,26 @@ export async function spentToday(): Promise<number> {
 const claimedBy = (runnerName: string) => ({ status: "claimed" as const, claimedAt: new Date(), runnerName, attempts: sql`${previewJobs.attempts} + 1` });
 
 /**
- * Which queued jobs a claim takes. "asked" is work someone is waiting on: a choice, a note, a retry, a launch.
+ * Which queued jobs a claim takes. "asked" is work someone is waiting on: a choice to build, a note, a retry, a
+ * launch. "redraw" is new designs a founder asked for, three new ones or revisions of one, which build nothing.
  * "backfill" is the kit-only update of an old preview, which only fills a runner that has nothing better to do.
+ * A founder's decision about the lead's newest board makes even a job queued as an update theirs.
  */
-export type QueuedWork = "asked" | "backfill";
+export type QueuedWork = "asked" | "redraw" | "backfill";
+
+/** The lead's newest board was decided this way, and nothing has acted on it yet. */
+const newestBoardDecided = (decision: ReturnType<typeof sql>) =>
+  sql`exists (select 1 from ${designBoards} decided where decided.business_id = ${previewJobs.businessId} and decided.chosen_at is not null and ${decision}
+    and not exists (select 1 from ${designBoards} newer where newer.business_id = decided.business_id and newer.created_at > decided.created_at))`;
+
+const choiceWaits = newestBoardDecided(sql`decided.chosen_letter in ('a', 'b', 'c') and decided.built_job_id is null`);
+const redrawWaits = newestBoardDecided(sql`(decided.chosen_letter = 'redrawn' or decided.chosen_letter like 'revise:%')`);
 
 function queuedWorkIs(work: QueuedWork) {
-  const backfill = sql`starts_with(${previewJobs.note}, ${POINTING_NOTE})`;
-  return work === "backfill" ? backfill : sql`not ${backfill}`;
+  const kitUpdate = sql`starts_with(${previewJobs.note}, ${POINTING_NOTE})`;
+  if (work === "redraw") return redrawWaits;
+  if (work === "backfill") return sql`${kitUpdate} and not ${choiceWaits} and not ${redrawWaits}`;
+  return sql`(not ${kitUpdate} or ${choiceWaits}) and not ${redrawWaits}`;
 }
 
 /**

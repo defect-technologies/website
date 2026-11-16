@@ -155,6 +155,19 @@ export async function choiceForJob(businessId: string, jobId: string): Promise<B
   return { letter: board.chosenLetter, feedback: board.feedback, by: founderName(board.chosenBy ?? "") ?? "" };
 }
 
+/** The lead's newest boards, decided or not. */
+export async function newestBoardFor(businessId: string): Promise<DesignBoard | null> {
+  const [board] = await (await db()).select().from(designBoards).where(eq(designBoards.businessId, businessId)).orderBy(desc(designBoards.createdAt)).limit(1);
+  return board ?? null;
+}
+
+/** Of these leads, the ones that have design boards: they get new designs, so their old preview needs no kit update. */
+export async function withBoards(businessIds: string[]): Promise<Set<string>> {
+  if (!businessIds.length) return new Set();
+  const rows = await (await db()).selectDistinct({ id: designBoards.businessId }).from(designBoards).where(inArray(designBoards.businessId, businessIds));
+  return new Set(rows.map((row) => row.id));
+}
+
 /** Whether the lead has boards that still wait for a founder: a build of it would be built without their choice. */
 export async function waitingBoardFor(businessId: string): Promise<DesignBoard | null> {
   const [board] = await (await db()).select().from(designBoards).where(and(eq(designBoards.businessId, businessId), isNull(designBoards.chosenAt))).orderBy(desc(designBoards.createdAt)).limit(1);

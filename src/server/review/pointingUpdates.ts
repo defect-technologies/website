@@ -4,6 +4,7 @@ import { ACTIVE_JOB_STATUSES } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { record } from "../activity";
 import { db } from "../db/client";
+import { withBoards } from "../boards/store";
 import { previewJobs } from "../db/schema";
 import { businessById } from "../leads/businesses";
 import { requestPreview } from "../runner/jobs";
@@ -37,10 +38,11 @@ async function buildStartTimes(items: ReviewItem[]): Promise<Map<string, Date | 
  */
 export async function queuePointingUpdates(queue: ReviewItem[]): Promise<number> {
   let queued = 0;
-  const startTimes = await buildStartTimes(queue);
+  const [startTimes, redesigned] = await Promise.all([buildStartTimes(queue), withBoards(queue.map((item) => item.id))]);
   for (const item of queue) {
     const startedAt = startTimes.get(item.id);
-    if (!startedAt || startedAt >= BRIDGE_KIT_MERGED_AT) continue;
+    // A lead with design boards is getting a new design: updating its old preview's kit would only hold up its own job.
+    if (!startedAt || startedAt >= BRIDGE_KIT_MERGED_AT || redesigned.has(item.id)) continue;
     const lead = await businessById(item.id);
     if (lead && (await requestPreview(lead, ACTOR, POINTING_NOTE)).created) queued++;
   }

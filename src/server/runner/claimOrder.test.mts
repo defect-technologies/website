@@ -24,7 +24,7 @@ const { POINTING_NOTE } = await import("@/lib/review");
 const { NEW_DESIGN_NOTE } = await import("@/lib/previewJobs");
 const database = await db();
 
-type Claim = { job: { id: string; note: string }; lead: { id: string; slug: string }; boards?: boolean };
+type Claim = { job: { id: string; note: string }; lead: { id: string; slug: string }; boards?: boolean; boardsAgain?: unknown; board?: unknown };
 
 let made = 0;
 async function lead(fields: Record<string, unknown> = {}) {
@@ -125,4 +125,47 @@ test("with design boards off, a new lead is built before a kit-only update, whic
   const update = await ask();
   assert.equal(update?.lead.id, old.id);
   assert.equal(update?.job.note, POINTING_NOTE);
+});
+
+/** A lead whose old preview got new designs, which wait for a choice: the boards job carried "Start a new design." */
+async function redesignedLead() {
+  const owner = await builtLead();
+  const [boardsJob] = await database.insert(previewJobs).values({ businessId: owner.id, requestedBy: "admin", note: NEW_DESIGN_NOTE, status: "done" }).returning();
+  const options = ["a", "b", "c"].map((letter) => ({ letter, name: `Direction ${letter}` }));
+  const [board] = await database.insert(designBoards).values({ businessId: owner.id, jobId: boardsJob.id, options, pick: null } as never).returning();
+  return { owner, board };
+}
+
+test("a revision of a lead whose kit-only update was queued before it is drawn first, past the cap and the designs waiting", async () => {
+  await updateRunnerSettings({ dailyCap: 0, mostDesignsWaiting: 1 }, "one@example.com");
+  const { owner, board } = await redesignedLead();
+  await requestPreview(await builtLead(), "admin", POINTING_NOTE);
+  // As happened on Nov 15: the Review page had queued the lead's kit update again, then Boris revised its design.
+  await database.insert(previewJobs).values({ businessId: owner.id, requestedBy: "admin", note: POINTING_NOTE, createdAt: new Date(Date.now() + 1000) });
+  const store = await import("../boards/store");
+  await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", "c");
+  const claim = await ask();
+  assert.equal(claim?.lead.id, owner.id, "Boris's revision, not the older update for another lead");
+  assert.deepEqual(claim?.boardsAgain, { feedback: "Fonts too basic.", by: "Boris", base: "c" });
+  assert.equal(claim?.job.note, NEW_DESIGN_NOTE, "it carries the note behind the boards, not the kit update's");
+});
+
+test("a founder's decision takes over a kit-only update queued for the same lead, and a lead with boards is never queued one again", async () => {
+  const { owner } = await redesignedLead();
+  const queued = await requestPreview(owner, "admin", POINTING_NOTE);
+  const taken = await requestPreview(owner, "boris.nezlobin@gmail.com", NEW_DESIGN_NOTE);
+  assert.equal(taken.job.id, queued.job.id);
+  assert.equal(taken.created, true);
+  assert.equal(taken.job.note, NEW_DESIGN_NOTE);
+  assert.equal(taken.job.requestedBy, "boris.nezlobin@gmail.com");
+  const again = await requestPreview(owner, "admin", POINTING_NOTE);
+  assert.equal(again.created, false, "an update never takes over a founder's job");
+
+  await database.update(previewJobs).set({ status: "done" });
+  await database.update(previewJobs).set({ startedAt: new Date("2026-10-12T00:00:00Z"), previewUrl: owner.previewUrl }).where(eq(previewJobs.businessId, owner.id));
+  const { queuePointingUpdates } = await import("../review/pointingUpdates");
+  const plain = await builtLead();
+  await database.insert(previewJobs).values({ businessId: plain.id, requestedBy: "auto-queue", status: "done", previewUrl: plain.previewUrl, startedAt: new Date("2026-10-12T00:00:00Z") });
+  const item = (lead: typeof owner) => ({ id: lead.id, businessName: lead.businessName, website: lead.website, previewUrl: lead.previewUrl, stage: lead.stage, previewBuiltAt: null, niche: "", area: "" });
+  assert.equal(await queuePointingUpdates([item(owner), item(plain)]), 1, "only the lead without boards gets the update");
 });
