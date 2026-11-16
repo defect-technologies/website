@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowsClockwise, ArrowSquareOut, GlobeHemisphereWest, Hammer, Keyboard, PencilSimpleLine, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, ArrowSquareOut, Hammer, Keyboard, PencilSimpleLine, X } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { chooseBoardAction, redrawBoardsAction, reviseBoardAction } from "@/app/admin/(panel)/designs/actions";
@@ -86,16 +86,10 @@ function NewSlide({ businessName }: { businessName: string }) {
 }
 
 /** What the founder wants changed, shown above the dock once it is said or typed. Tapping it opens the keyboard. */
-function NoteCard({ note, everySite, onEdit }: { note: string; everySite: boolean; onEdit: () => void }) {
+function NoteCard({ note, onEdit }: { note: string; onEdit: () => void }) {
   return (
     <button type="button" onClick={onEdit} className={`${DOCK_CARD} focus-visible:outline-ink flex flex-col gap-1 text-left focus-visible:outline-2`}>
       <span className="line-clamp-3 text-base">{note}</span>
-      {everySite && (
-        <span className="text-ink-soft inline-flex items-center gap-1.5 text-sm">
-          <GlobeHemisphereWest size={14} aria-hidden="true" />
-          For every site
-        </span>
-      )}
       <span className="sr-only">Change this note</span>
     </button>
   );
@@ -180,7 +174,6 @@ export default function PhoneChooser({ boardId, businessName, website, options, 
   const slides = slidesOf(options);
   const { track, slide, show, onScroll } = useSlides(slides);
   const [note, setNote] = useState("");
-  const [everySite, setEverySite] = useState(false);
   const [typing, setTyping] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -193,7 +186,6 @@ export default function PhoneChooser({ boardId, businessName, website, options, 
     form.set("id", boardId);
     form.set("feedback", note);
     if (slide !== NEW) form.set("letter", slide);
-    if (everySite) form.set("remember", "on");
     dictation.stop();
     const action = slide === NEW ? redrawBoardsAction : revise ? reviseBoardAction : chooseBoardAction;
     startTransition(() => action(form));
@@ -217,12 +209,7 @@ export default function PhoneChooser({ boardId, businessName, website, options, 
       </div>
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {typing && (
-          <DockTypeField id="design-note" label="What should change" text={note} onChange={setNote} onKeep={() => setTyping(false)} keepLabel="Keep this note">
-            <label className="text-ink-soft flex min-h-9 w-fit cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={everySite} onChange={(event) => setEverySite(event.target.checked)} className="accent-ink size-4 shrink-0" />
-              Remember this for every site
-            </label>
-          </DockTypeField>
+          <DockTypeField id="design-note" label="What should change" text={note} onChange={setNote} onKeep={() => setTyping(false)} keepLabel="Keep this note" />
         )}
         {confirming && (
           <DockConfirm
@@ -237,7 +224,7 @@ export default function PhoneChooser({ boardId, businessName, website, options, 
             <DecisionPreview option={decision.inView} businessName={businessName} note={note} />
           </DockConfirm>
         )}
-        {!confirming && !typing && note.trim() && !dictation.listening && <NoteCard note={note} everySite={everySite} onEdit={() => setTyping(true)} />}
+        {!confirming && !typing && note.trim() && !dictation.listening && <NoteCard note={note} onEdit={() => setTyping(true)} />}
         <div aria-live="polite" className="empty:hidden">
           <DockSpoken spoken={`${note} ${dictation.interim}`.trim()} listening={dictation.listening} notice={dictation.error ? { text: dictation.error, bad: true } : null} />
         </div>

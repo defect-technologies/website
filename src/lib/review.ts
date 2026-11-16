@@ -1,11 +1,8 @@
 import { type CriticKind, type CriticTarget, TARGET_SENTENCE } from "./critics";
+import { byFounder, founderName } from "./founders";
 
 export const REVIEW_VERDICTS = ["approved", "changes"] as const;
 export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
-
-export const NOTE_SCOPES = ["site", "every"] as const;
-/** "site" changes only this preview; "every" also becomes a taste lesson for every build after it. */
-export type NoteScope = (typeof NOTE_SCOPES)[number];
 
 export const DEVICES = ["desktop", "tablet", "phone"] as const;
 export type Device = (typeof DEVICES)[number];
@@ -23,7 +20,6 @@ export type NoteAnchor = {
 export type ReviewNote = {
   id: string;
   text: string;
-  scope: NoteScope;
   device: Device;
   /** The page the frame was on when the note was written. */
   path: string;
@@ -56,19 +52,28 @@ function whereLine(note: ReviewNote): string {
  */
 export function compileReviewNote(notes: ReviewNote[], previewUrl: string): string {
   const lines = notes.map((note, index) => {
-    const lesson = note.scope === "every" ? " This is also a standing taste lesson for every site (lead/taste.md)." : "";
     const targetSentence = note.target ? ` ${TARGET_SENTENCE[note.target]}` : "";
-    return `${index + 1}. ${whereLine(note)}: ${note.text.trim()}${targetSentence}${lesson}`;
+    return `${index + 1}. ${whereLine(note)}: ${note.text.trim()}${targetSentence}`;
   });
   const head = `A founder reviewed the preview at ${previewUrl} and wants these changes. Make every one of them; where a note names an element, change that element and anything else on the site with the same problem.`;
   return [head, "", ...lines].join("\n").slice(0, MAX_COMPILED_NOTE);
 }
 
-export function tasteMarkdown(lessons: { text: string }[]): string {
+/**
+ * lead/taste.md: each founder's standing lessons under their name. The two founders' taste is kept apart because it can
+ * differ; where it does, the founder who chose the design decides.
+ */
+export function tasteMarkdown(lessons: { text: string; createdBy: string }[]): string {
   if (!lessons.length) return "";
   const intro =
-    "These are the founders' standing rules of taste, written while reviewing earlier previews. They outrank DESIGN.md's defaults where the two conflict, and every one must hold on this site.";
-  return ["# Founder taste lessons", "", intro, "", ...lessons.map((lesson) => `- ${lesson.text.replace(/\s+/g, " ").trim()}`), ""].join("\n");
+    "These are the founders' standing rules of taste, each under the founder who wrote it. They outrank DESIGN.md's defaults where the two conflict, and every one must hold on this site unless the other founder's lesson says the opposite. Where the founders' lessons disagree, design/board.md names the founder who chose this design: follow theirs. While three options are drawn, let one option follow one founder's lesson and another option the other's.";
+  const sections = byFounder(lessons.map((lesson) => ({ by: founderName(lesson.createdBy), text: lesson.text }))).flatMap(([by, theirs]) => [
+    `## ${by}`,
+    "",
+    ...theirs.map((lesson) => `- ${lesson.text.replace(/\s+/g, " ").trim()}`),
+    "",
+  ]);
+  return ["# Founder taste lessons", "", intro, "", ...sections].join("\n");
 }
 
 /** The rebuild a preview gets so the review page can point at its elements; it only moves the site to the newest kit. */

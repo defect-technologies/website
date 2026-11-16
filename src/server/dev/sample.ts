@@ -96,7 +96,7 @@ async function sampleCritics(bySlug: Map<string, Business>) {
   );
   const [history] = await database.insert(previewJobs).values({ businessId: cedar.id, status: "done", requestedBy: "bot:outreach", previewUrl: "https://example.com/?old", finishedAt: daysAgo(20), criticNotes: answeredNotes.map((entry) => entry.note) }).returning();
   await database.insert(criticAnswers).values(answeredNotes.map(({ note, accepted }) => ({ jobId: history.id, businessId: cedar.id, proposalId: note.id, kind: note.kind, target: note.target, accepted, answeredBy: "sample@dev.localhost" })));
-  const written = CRITIC_HISTORY.flatMap(([kind, , , missed]) => Array.from({ length: missed }, (_, index) => ({ id: `${kind}-mine-${index}`, text: "Made up.", scope: "site" as const, device: "phone" as const, path: "/", anchor: null, kind })));
+  const written = CRITIC_HISTORY.flatMap(([kind, , , missed]) => Array.from({ length: missed }, (_, index) => ({ id: `${kind}-mine-${index}`, text: "Made up.", device: "phone" as const, path: "/", anchor: null, kind })));
   await database.insert(previewReviews).values({ businessId: cedar.id, previewUrl: "https://example.com/?old", verdict: "changes", notes: written, reviewedBy: "sample@dev.localhost", reviewedAt: daysAgo(19) });
 }
 

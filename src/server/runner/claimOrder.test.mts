@@ -143,7 +143,7 @@ test("a revision of a lead whose kit-only update was queued before it is drawn f
   // As happened on Nov 15: the Review page had queued the lead's kit update again, then Boris revised its design.
   await database.insert(previewJobs).values({ businessId: owner.id, requestedBy: "admin", note: POINTING_NOTE, createdAt: new Date(Date.now() + 1000) });
   const store = await import("../boards/store");
-  await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", "c");
+  await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", { base: "c" });
   const claim = await ask();
   assert.equal(claim?.lead.id, owner.id, "Boris's revision, not the older update for another lead");
   assert.deepEqual(claim?.boardsAgain, { feedback: "Fonts too basic.", by: "Boris", base: "c", board: board.id });

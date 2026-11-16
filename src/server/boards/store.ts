@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
-import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, REDRAWN, revisedLetter, revisingMark } from "@/lib/boards";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
+import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, isRedrawn, redrawnMark, REPLACED, revisedLetter, revisingMark, verdictOf } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { founderNote } from "@/lib/previewJobs";
 import { db } from "../db/client";
@@ -66,14 +66,31 @@ function isLetter(value: string | null): value is BoardLetter {
   return (BOARD_LETTERS as readonly string[]).includes(value ?? "");
 }
 
-/** A decided board as the learning code reads it (src/lib/boards.ts). */
-export function decisionOf(board: BoardWithLead): BoardDecision | null {
-  if (!isLetter(board.chosenLetter)) return null;
-  return { business: board.businessName, options: board.options, chosen: board.chosenLetter, feedback: board.feedback, by: founderName(board.chosenBy ?? "") ?? "a founder", pick: board.pick ?? null };
+/**
+ * Boards a founder has decided in any way (chosen, revised or turned down), the newest first. Boards Redraw all
+ * replaced are left out: that judged the system, not the designs.
+ */
+async function boardsJudged(limit: number): Promise<BoardWithLead[]> {
+  const rows = await (await db())
+    .select(WITH_LEAD)
+    .from(designBoards)
+    .innerJoin(businesses, eq(businesses.id, designBoards.businessId))
+    .where(and(isNotNull(designBoards.chosenAt), ne(designBoards.chosenLetter, REPLACED)))
+    .orderBy(desc(designBoards.chosenAt))
+    .limit(limit);
+  return rows.map(withLead);
 }
 
+/** A decided board as the learning code reads it (src/lib/boards.ts), with the founder who decided it. */
+export function decisionOf(board: BoardWithLead): BoardDecision | null {
+  const decided = verdictOf(board.chosenLetter);
+  if (!decided) return null;
+  return { business: board.businessName, options: board.options, ...decided, feedback: board.feedback, by: founderName(board.chosenBy ?? ""), pick: board.pick ?? null };
+}
+
+/** Every founder's decisions, the newest first: what the next draw and option writer learn each founder's taste from. */
 export async function decisions(limit = DECISIONS_KEPT): Promise<BoardDecision[]> {
-  return (await boardsDecided(limit)).map(decisionOf).filter((decision): decision is BoardDecision => decision !== null);
+  return (await boardsJudged(limit)).map(decisionOf).filter((decision): decision is BoardDecision => decision !== null);
 }
 
 /** Records a founder's choice. Null when the board is gone, has no such option or was already chosen from: the first choice stands. */
@@ -98,29 +115,31 @@ export async function noteBehindBoards(board: Pick<DesignBoard, "jobId">): Promi
 }
 
 /**
- * Records that a founder asked for the boards to be drawn again, with what they said: three new ones, or three
- * revisions of the option `base` names. Null when the board is gone, has no such option or was already decided: the
- * first decision stands.
+ * Records that a founder asked for the boards to be drawn again, with what they said: three revisions of the option
+ * `base` names, or three new ones, noting the option they had `selected` while they wrote. Null when the board is gone,
+ * has no such option or was already decided: the first decision stands.
  */
-export async function redrawBoards(id: string, feedback: string, by: string, base?: BoardLetter): Promise<DesignBoard | null> {
+export async function redrawBoards(id: string, feedback: string, by: string, again: { base?: BoardLetter; selected?: BoardLetter | null } = {}): Promise<DesignBoard | null> {
   const board = await boardById(id);
-  if (!board || (base && !board.options.some((option) => option.letter === base))) return null;
+  const named = again.base ?? again.selected;
+  if (!board || (named && !board.options.some((option) => option.letter === named))) return null;
   const [turnedDown] = await (await db())
     .update(designBoards)
-    .set({ chosenLetter: base ? revisingMark(base) : REDRAWN, feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
+    .set({ chosenLetter: again.base ? revisingMark(again.base) : redrawnMark(again.selected ?? null), feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
     .where(and(eq(designBoards.id, id), isNull(designBoards.chosenAt)))
     .returning();
   return turnedDown ?? null;
 }
 
 /**
- * Turns down every board that waits, as "Draw 3 new" does one, so the runner draws each lead's designs again with the
- * system it has now. Returns the boards it turned down; one a founder decided meanwhile is left alone.
+ * Replaces every board that waits, so the runner draws each lead's designs again with the system it has now. No founder
+ * judged these designs, so it records no words and teaches no taste. Returns the boards it replaced; one a founder
+ * decided meanwhile is left alone.
  */
-export async function redrawWaiting(feedback: string, by: string): Promise<DesignBoard[]> {
+export async function redrawWaiting(by: string): Promise<DesignBoard[]> {
   return (await db())
     .update(designBoards)
-    .set({ chosenLetter: REDRAWN, feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
+    .set({ chosenLetter: REPLACED, feedback: "", chosenBy: by, chosenAt: new Date() })
     .where(isNull(designBoards.chosenAt))
     .returning();
 }
@@ -131,9 +150,12 @@ export async function redrawWaiting(feedback: string, by: string): Promise<Desig
  */
 export async function redrawFor(businessId: string): Promise<BoardRedraw | null> {
   const [newest] = await (await db()).select().from(designBoards).where(eq(designBoards.businessId, businessId)).orderBy(desc(designBoards.createdAt)).limit(1);
-  const base = revisedLetter(newest?.chosenLetter ?? null);
-  if (!newest || (newest.chosenLetter !== REDRAWN && !base)) return null;
-  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? "") ?? "", ...(base ? { base } : {}), board: newest.id };
+  if (!newest || !(isRedrawn(newest.chosenLetter) || revisedLetter(newest.chosenLetter))) return null;
+  const decided = verdictOf(newest.chosenLetter);
+  const letter = decided?.letter;
+  const named = !letter ? {} : decided.verdict === "revise" ? { base: letter } : { selected: letter };
+  const replaced = newest.chosenLetter === REPLACED ? { replaced: true as const } : {};
+  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? ""), ...named, ...replaced, board: newest.id };
 }
 
 /** The board a lead had before this one, when a founder asked for these as revisions of one of its options. */
@@ -164,7 +186,7 @@ export async function choiceForJob(businessId: string, jobId: string): Promise<B
     .limit(1);
   if (!board || !isLetter(board.chosenLetter)) return null;
   if (!board.builtJobId) await (await db()).update(designBoards).set({ builtJobId: jobId }).where(eq(designBoards.id, board.id));
-  return { letter: board.chosenLetter, feedback: board.feedback, by: founderName(board.chosenBy ?? "") ?? "" };
+  return { letter: board.chosenLetter, feedback: board.feedback, by: founderName(board.chosenBy ?? "") };
 }
 
 /** The lead's newest boards, decided or not. */

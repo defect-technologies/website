@@ -23,8 +23,8 @@ type Options = {
 };
 
 /**
- * The phone flow: talking ends with a tap on the mic, Claude splits what was said into notes (each for this site or
- * every site, all pointing where the draft pointed), and the dock then asks whether to send them.
+ * The phone flow: talking ends with a tap on the mic, Claude splits what was said into notes (all pointing where the
+ * draft pointed), and the dock then asks whether to send them.
  */
 export function usePhoneReview({ draft, setDraft, dictation, add, device, path, confirming, setConfirming, submit, ask }: Options) {
   const [splitting, setSplitting] = useState(false);
@@ -37,7 +37,7 @@ export function usePhoneReview({ draft, setDraft, dictation, add, device, path, 
     setSplitting(true);
     const notes = await splitSpokenNotesAction(spoken);
     setSplitting(false);
-    for (const note of notes) add(noteFromDraft({ ...draft, text: note.text, scope: draft.scope === "every" ? "every" : note.scope }, device, path, { kind: note.kind, target: note.target }));
+    for (const note of notes) add(noteFromDraft({ ...draft, text: note.text }, device, path, { kind: note.kind, target: note.target }));
     setDraft({ ...EMPTY_DRAFT });
     if (!notes.length) return;
     if (ask.open) ask.answered();

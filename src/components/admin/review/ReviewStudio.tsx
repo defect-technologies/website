@@ -224,7 +224,7 @@ function Studio({ item, ...queue }: Props) {
       const { draft: current, device: width, path } = live.current;
       setConfirming(false);
       if (current.text.trim()) add(noteFromDraft(current, width, path));
-      setDraft({ text: "", anchor, pickedOn: width, scope: current.text.trim() ? "site" : current.scope });
+      setDraft({ text: "", anchor, pickedOn: width });
       field.current?.focus({ preventScroll: true });
     },
     [add],

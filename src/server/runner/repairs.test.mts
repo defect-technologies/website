@@ -31,8 +31,8 @@ const database = await db();
 const OLD = "https://acme-1.vercel.app";
 const NEW = "https://acme-2.vercel.app";
 const NOTES: ReviewNote[] = [
-  { id: "n1", text: "Too much text.", scope: "site", device: "phone", path: "/", anchor: { path: "/", selector: "main h2", tag: "h2", text: "About us" }, kind: "text", target: "section" },
-  { id: "n2", text: "Heavier headings.", scope: "every", device: "desktop", path: "/services", anchor: null },
+  { id: "n1", text: "Too much text.", device: "phone", path: "/", anchor: { path: "/", selector: "main h2", tag: "h2", text: "About us" }, kind: "text", target: "section" },
+  { id: "n2", text: "Heavier headings.", device: "desktop", path: "/services", anchor: null },
 ];
 
 let made = 0;
@@ -113,7 +113,7 @@ test("a repaired preview asks the founder about each repaired note, in their own
 
   const back = noteFromRepair(asks[0])!;
   assert.equal(back.text, "Still wrong after the repair: Too much text.");
-  assert.deepEqual([back.scope, back.device, back.path], ["site", "phone", "/"]);
+  assert.deepEqual([back.device, back.path], ["phone", "/"]);
   assert.deepEqual(back.anchor, { path: "/", selector: "main h2", tag: "h2", text: "About us" }, "the same element, so the next repair finds it");
   assert.equal(noteFromRepair({ ...asks[0], repair: undefined }), null);
 });

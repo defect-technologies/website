@@ -37,7 +37,7 @@ export function quickNoteOn(notes: ReviewNote[], section: ReviewSection, kind: C
 export function quickNote(section: ReviewSection, kind: CriticKind, device: Device, path: string, id: string): ReviewNote | null {
   const quick = QUICK_NOTES.find((entry) => entry.kind === kind);
   if (!quick) return null;
-  return { id, text: quick.text, scope: "site", device, path, anchor: sectionAnchor(section, path), kind: quick.kind, target: quick.target };
+  return { id, text: quick.text, device, path, anchor: sectionAnchor(section, path), kind: quick.kind, target: quick.target };
 }
 
 /** The section a founder is looking at: the last one that starts at or above a little below the top of the screen. */

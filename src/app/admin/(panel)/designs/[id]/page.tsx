@@ -6,7 +6,7 @@ import BoardChooser from "@/components/admin/designs/BoardChooser";
 import PhoneChooser from "@/components/admin/designs/PhoneChooser";
 import { BoardPicture, Letter, OptionFacts, Reach } from "@/components/admin/designs/parts";
 import { Card, Notice, PageHeader, When } from "@/components/admin/ui";
-import { type BoardOption, REDRAWN, revisedLetter } from "@/lib/boards";
+import { type BoardOption, isRedrawn, revisedLetter, verdictOf } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
 import { boardById, revisionOf, type BoardWithLead } from "@/server/boards/store";
@@ -16,8 +16,8 @@ export const metadata: Metadata = { title: "Choose a design" };
 
 /** What was decided about the board, in a sentence: an option chosen, or all three turned down. */
 function Decision({ board }: { board: BoardWithLead }) {
-  const founder = founderName(board.chosenBy ?? "") ?? "A founder";
-  if (board.chosenLetter === REDRAWN) {
+  const founder = founderName(board.chosenBy ?? "");
+  if (isRedrawn(board.chosenLetter)) {
     return (
       <Notice tone="good">
         {founder} asked for three new designs <When date={board.chosenAt} />. They come to Designs when they are drawn.
@@ -41,8 +41,9 @@ function Decision({ board }: { board: BoardWithLead }) {
 }
 
 function Decided({ board }: { board: BoardWithLead }) {
-  // The option a founder chose, or asked to have revised.
-  const marked = revisedLetter(board.chosenLetter) ?? board.chosenLetter;
+  // The option a founder chose or asked to have revised. Three turned down are all dimmed.
+  const decided = verdictOf(board.chosenLetter);
+  const marked = decided?.verdict === "redraw" ? null : decided?.letter;
   return (
     <div className="flex flex-col gap-6">
       <Decision board={board} />

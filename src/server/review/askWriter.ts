@@ -9,6 +9,7 @@ import { env } from "../env";
 import { repairChecksForPreview } from "../runner/repairs";
 import { proposalsForPreview } from "./criticProposals";
 import { readPreview, type PreviewSource } from "./previewPages";
+import { founderName } from "@/lib/founders";
 import { activeTasteLessons } from "./taste";
 
 const MODEL = "claude-opus-5-5";
@@ -116,7 +117,7 @@ export async function writeReviewAsks(businessName: string, previewUrl: string):
   if (!apiKey) return [];
   const [source, verdict, lessons] = await Promise.all([readPreview(previewUrl), criticVerdictFor(previewUrl), activeTasteLessons()]);
   if (!source) return [];
-  const asks = await askClaude(brief(businessName, source, verdict, lessons.map((lesson) => lesson.text)), apiKey).catch((error: unknown) => {
+  const asks = await askClaude(brief(businessName, source, verdict, lessons.map((lesson) => `${founderName(lesson.createdBy)}: ${lesson.text}`)), apiKey).catch((error: unknown) => {
     console.error("[review] writing questions failed", error);
     return null;
   });

@@ -164,13 +164,13 @@ describe("proposals for a preview", () => {
 
 describe("the numbers per kind", () => {
   it("add the answers to the notes the founder wrote himself that no proposal led to", async () => {
-    const note = (id: string, kind: string, proposalId?: string) => ({ id, text: "t", scope: "site", device: "phone", path: "/", anchor: null, kind, proposalId });
+    const note = (id: string, kind: string, proposalId?: string) => ({ id, text: "t", device: "phone", path: "/", anchor: null, kind, proposalId });
     await database.insert(schema.previewReviews).values({
       businessId,
       previewUrl: PREVIEW,
       verdict: "changes",
       reviewedBy: "founder@example.com",
-      notes: [note("1", "font"), note("2", "font", "sys-1"), note("3", "palette"), { id: "4", text: "old note", scope: "site", device: "phone", path: "/", anchor: null }] as never,
+      notes: [note("1", "font"), note("2", "font", "sys-1"), note("3", "palette"), { id: "4", text: "old note", device: "phone", path: "/", anchor: null }] as never,
     });
     const tallies = await kindTallies();
     assert.deepEqual(tallies.font, { accepted: 0, rejected: 1, missed: 1 });
@@ -189,7 +189,7 @@ describe("a founder's own notes", () => {
   });
 
   it("keep the kind they already have and class only the ones without", async () => {
-    const base = { text: "t", scope: "site" as const, device: "phone" as const, path: "/", anchor: null };
+    const base = { text: "t", device: "phone" as const, path: "/", anchor: null };
     const classed = await withClasses([
       { ...base, id: "typed" },
       { ...base, id: "spoken", kind: "font", target: "system" },

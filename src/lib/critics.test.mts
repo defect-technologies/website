@@ -103,7 +103,7 @@ describe("proposals", () => {
 });
 
 describe("telling the builder where a note belongs", () => {
-  const base: ReviewNote = { id: "n", text: "Make the headings one style.", scope: "site", device: "tablet", path: "/", anchor: null };
+  const base: ReviewNote = { id: "n", text: "Make the headings one style.", device: "tablet", path: "/", anchor: null };
 
   it("says a system note changes the shared styles and applies everywhere", () => {
     const text = compileReviewNote([{ ...base, target: "system" }], "https://x.vercel.app");

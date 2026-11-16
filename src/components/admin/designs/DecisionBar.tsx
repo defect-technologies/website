@@ -17,10 +17,6 @@ export default function DecisionBar() {
     <Card className="flex flex-col gap-4 p-5 lg:sticky lg:bottom-4 lg:flex-row lg:items-end">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <FeedbackField text={note} setText={setNote} />
-        <label className="text-ink-soft flex min-h-9 w-fit cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" name="remember" className="accent-ink size-4 shrink-0" />
-          Remember this for every site
-        </label>
       </div>
       <div className="flex shrink-0 flex-col gap-2">
         <SubmitButton variant="solid" icon={<Hammer size={18} aria-hidden="true" />}>

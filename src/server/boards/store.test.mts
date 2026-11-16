@@ -121,7 +121,7 @@ test("decided boards teach the next build", async () => {
   assert.equal(memory.decided, 1);
   assert.deepEqual(memory.agreement, { matched: 0, of: 1 }, "the system picked B and the founder chose C");
   assert.ok(memory.preferences.layouts.editorial > 1 && memory.preferences.layouts["split-hero"] < 1);
-  assert.match(memory.markdown, /## Acme Heating \(chosen by Boris\)/);
+  assert.match(memory.markdown, /## Boris\n\n### Acme Heating\n/);
   assert.match(memory.markdown, /- Said: Quieter orange\./);
 });
 
@@ -201,7 +201,7 @@ async function boardFromNotedPreview(lead: { id: string }) {
   return (await store.waitingBoardFor(lead.id))!;
 }
 
-test("a founder who wants none of the three gets three new designs, with their words, and nothing is built or learned from the ones turned down", async () => {
+test("a founder who wants none of the three gets three new designs, with their words and the option they had selected, and nothing is built from them", async () => {
   made += 1;
   const [lead] = await database.insert(businesses).values({ businessName: "Redrawn Bakery", slug: `boards-${made}`, linkCode: `boards-${made}`, website: `https://boards-${made}.example`, previewUrl: "https://redrawn-1.vercel.app" } as never).returning();
   await requestPreview(lead, "brendan@g.studio", "Start a new design.");
@@ -211,18 +211,21 @@ test("a founder who wants none of the three gets three new designs, with their w
   assert.equal(await store.redrawFor(lead.id), null, "the boards still wait for a decision");
   const decidedBefore = (await store.boardsDecided()).length;
 
-  const turnedDown = await store.redrawBoards(board.id, "  All three are too loud.  ", "brendan@g.studio");
-  assert.equal(turnedDown?.chosenLetter, "redrawn");
+  assert.equal(await store.redrawBoards(board.id, "B is closest.", "brendan@g.studio", { selected: "d" as never }), null, "an option that isn't there can't be selected");
+  const turnedDown = await store.redrawBoards(board.id, "  All three are too loud. B is closest.  ", "brendan@g.studio", { selected: "b" });
+  assert.equal(turnedDown?.chosenLetter, "redrawn:b");
   assert.equal(await store.redrawBoards(board.id, "", "boris.nezlobin@gmail.com"), null, "the first decision stands");
   assert.equal(await store.chooseBoard(board.id, "a", "", "boris.nezlobin@gmail.com"), null, "and it can't be chosen from any more");
   assert.equal(await store.waitingBoardFor(lead.id), null);
-  assert.equal((await store.boardsDecided()).length, decidedBefore, "a board turned down is not a choice: it is not listed and teaches nothing");
-  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "All three are too loud.", by: "Brendan", board: board.id });
+  assert.equal((await store.boardsDecided()).length, decidedBefore, "a board turned down is not a choice: nothing is built from it");
+  const learned = (await store.decisions()).find((decision) => decision.business === "Redrawn Bakery");
+  assert.deepEqual([learned?.verdict, learned?.letter, learned?.by, learned?.feedback], ["redraw", "b", "Brendan", "All three are too loud. B is closest."], "but it teaches Brendan's taste");
+  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "All three are too loud. B is closest.", by: "Brendan", selected: "b", board: board.id });
 
   const redraw = await claimed(lead, await store.noteBehindBoards(board));
   assert.equal(redraw.job.note, "Start a new design.", "the note behind the first boards goes on");
   assert.equal(redraw.boards, true);
-  assert.deepEqual(redraw.boardsAgain, { feedback: "All three are too loud.", by: "Brendan", board: board.id }, "with the board it answers");
+  assert.deepEqual(redraw.boardsAgain, { feedback: "All three are too loud. B is closest.", by: "Brendan", selected: "b", board: board.id }, "with the board it answers");
   assert.equal(redraw.board, undefined);
   assert.equal(redraw.repair, undefined);
 
@@ -271,8 +274,8 @@ test("a founder can have one option revised with their words: the runner is told
   const board = (await store.waitingBoardFor(lead.id))!;
   const decidedBefore = (await store.boardsDecided()).length;
 
-  assert.equal(await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", "d" as never), null, "an option that isn't there can't be revised");
-  const revised = await store.redrawBoards(board.id, " Fonts too basic: answer their logo. ", "boris.nezlobin@gmail.com", "c");
+  assert.equal(await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", { base: "d" as never }), null, "an option that isn't there can't be revised");
+  const revised = await store.redrawBoards(board.id, " Fonts too basic: answer their logo. ", "boris.nezlobin@gmail.com", { base: "c" });
   assert.equal(revised?.chosenLetter, "revise:c");
   assert.equal(await store.chooseBoard(board.id, "a", "", "brendan@g.studio"), null, "the first decision stands");
   assert.equal((await store.boardsDecided()).length, decidedBefore, "a revision is not a choice: nothing is built from it");
@@ -324,15 +327,18 @@ test("boards name the lead as its build read it from the business's own site, wh
   assert.equal(same.businessName, "Keeps Its Name", "a runner that sends no name renames nothing");
 });
 
-test("every waiting design can be drawn again at once, and a decided one is left alone", async () => {
+test("every waiting design can be drawn again at once, with no founder's words and no lesson, and a decided one is left alone", async () => {
   for (const board of await store.boardsWaiting()) await store.chooseBoard(board.id, "a", "", "boris.nezlobin@gmail.com");
   const { lead: first, job: firstJob } = await leadWithRunningJob("First Waiting");
   await reportBoards(firstJob.id, BoardsBody.parse({ options: threeOptions(first.id) }));
   const { lead: second, job: secondJob } = await leadWithRunningJob("Second Waiting");
   await reportBoards(secondJob.id, BoardsBody.parse({ options: threeOptions(second.id) }));
-  const turnedDown = await store.redrawWaiting(" Drawn again with the current system. ", "boris.nezlobin@gmail.com");
-  assert.deepEqual(turnedDown.map((board) => board.businessId).sort(), [first.id, second.id].sort());
+  const replaced = await store.redrawWaiting("boris.nezlobin@gmail.com");
+  assert.deepEqual(replaced.map((board) => board.businessId).sort(), [first.id, second.id].sort());
+  assert.deepEqual([...new Set(replaced.map((board) => board.chosenLetter))], ["replaced"]);
   assert.equal(await store.countBoardsWaiting(), 0);
-  for (const lead of [first, second]) assert.deepEqual(await store.redrawFor(lead.id), { feedback: "Drawn again with the current system.", by: "Boris", board: turnedDown.find((board) => board.businessId === lead.id)!.id });
-  assert.deepEqual(await store.redrawWaiting("again", "boris.nezlobin@gmail.com"), [], "nothing waits any more");
+  for (const lead of [first, second]) assert.deepEqual(await store.redrawFor(lead.id), { feedback: "", by: "Boris", replaced: true, board: replaced.find((board) => board.businessId === lead.id)!.id });
+  const learned = (await store.decisions()).map((decision) => decision.business);
+  assert.ok(!learned.includes("First Waiting") && !learned.includes("Second Waiting"), "Redraw all judged the system, not the designs");
+  assert.deepEqual(await store.redrawWaiting("boris.nezlobin@gmail.com"), [], "nothing waits any more");
 });

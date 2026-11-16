@@ -15,7 +15,7 @@ const SETUP: Item[] = [
   { href: "/admin/setup/template", label: "Email template", icon: PencilSimpleLine },
   { href: "/admin/setup/connections", label: "Connections", icon: PlugsConnected },
   { href: "/admin/setup/spot-checks", label: "Spot checks", icon: Eye },
-  { href: "/admin/setup/taste", label: "Taste lessons", icon: Eyedropper },
+  { href: "/admin/setup/taste", label: "Taste", icon: Eyedropper },
   { href: "/admin/setup/critics", label: "Critics", icon: Detective },
   { href: "/admin/setup/prospects", label: "Prospects", icon: AddressBook },
   { href: "/admin/setup/activity", label: "Activity log", icon: ClockCounterClockwise },

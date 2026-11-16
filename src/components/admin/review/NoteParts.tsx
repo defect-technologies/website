@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, Crosshair, FrameCorners, GlobeHemisphereWest, X } from "@phosphor-icons/react";
+import { Crosshair, FrameCorners, X } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import type { NoteAnchor, NoteScope } from "@/lib/review";
+import type { NoteAnchor } from "@/lib/review";
 import KnifeStroke from "../KnifeStroke";
 
 /** A note's number on a swipe of the knife, the admin's mark for "here". */
@@ -31,23 +31,6 @@ export function NoteTarget({ anchor, path, onClear }: { anchor: NoteAnchor | nul
         </button>
       )}
     </span>
-  );
-}
-
-/** "Every site" also turns the note into a taste lesson that every later build has to follow. */
-export function ScopeToggle({ scope, onChange }: { scope: NoteScope; onChange: (scope: NoteScope) => void }) {
-  const every = scope === "every";
-  return (
-    <button
-      type="button"
-      aria-pressed={every}
-      onClick={() => onChange(every ? "site" : "every")}
-      title="Also teach this to every site the builder makes from now on"
-      className={`focus-visible:outline-ink inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-[background-color,color,scale] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 ${every ? "bg-ink text-paper" : "text-ink-soft hover:bg-paper-shade hover:text-ink"}`}
-    >
-      {every ? <Check size={16} weight="bold" aria-hidden="true" /> : <GlobeHemisphereWest size={16} aria-hidden="true" />}
-      Every site
-    </button>
   );
 }
 

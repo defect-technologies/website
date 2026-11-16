@@ -1,12 +1,12 @@
 "use client";
 
 import { Trash } from "@phosphor-icons/react";
-import { MAX_NOTE_TEXT, type NoteScope, type ReviewNote } from "@/lib/review";
-import { NoteNumber, NoteTarget, ScopeToggle } from "./NoteParts";
+import { MAX_NOTE_TEXT, type ReviewNote } from "@/lib/review";
+import { NoteNumber, NoteTarget } from "./NoteParts";
 
 type Props = {
   notes: ReviewNote[];
-  onChange: (id: string, change: Partial<Pick<ReviewNote, "text" | "scope">>) => void;
+  onChange: (id: string, change: Partial<Pick<ReviewNote, "text">>) => void;
   onRemove: (id: string) => void;
 };
 
@@ -28,8 +28,7 @@ function NoteCard({ note, number, onChange, onRemove }: { note: ReviewNote; numb
         rows={1}
         className="hover:bg-paper-shade/60 focus-visible:bg-surface focus-visible:outline-ink/20 -mx-2 field-sizing-content resize-none rounded-lg px-2 py-1 text-base text-pretty focus-visible:outline-2"
       />
-      <div className="flex items-center justify-between gap-2">
-        <ScopeToggle scope={note.scope} onChange={(scope: NoteScope) => onChange(note.id, { scope })} />
+      <div className="flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={() => onRemove(note.id)}

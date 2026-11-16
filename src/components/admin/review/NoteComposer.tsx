@@ -5,7 +5,7 @@ import type { RefObject } from "react";
 import type { BridgeState } from "@/hooks/useReviewBridge";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { Button } from "../../Button";
-import { Key, NoteTarget, ScopeToggle } from "./NoteParts";
+import { Key, NoteTarget } from "./NoteParts";
 import type { Draft } from "./reviewDraft";
 
 type Dictation = { supported: boolean; listening: boolean; interim: string; error: string; toggle: () => void };
@@ -85,7 +85,6 @@ export default function NoteComposer({ field, draft, path, bridge, pointing, dic
       <div className="flex flex-wrap items-center gap-2">
         <PointButton on={pointing} onPoint={onPoint} />
         <TalkButton dictation={dictation} />
-        <ScopeToggle scope={draft.scope} onChange={(scope) => onDraft({ ...draft, scope })} />
         <Button size="sm" variant="ghost" className="ml-auto" disabled={!draft.text.trim()} onClick={onAdd} icon={<Plus size={16} weight="bold" aria-hidden="true" />}>
           Add
         </Button>

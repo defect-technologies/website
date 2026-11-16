@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CRITIC_KINDS, CRITIC_TARGETS } from "@/lib/critics";
-import { compileReviewNote, DEVICES, MAX_NOTE_TEXT, MAX_NOTES, NOTE_SCOPES, POINTING_NOTE } from "@/lib/review";
+import { compileReviewNote, DEVICES, MAX_NOTE_TEXT, MAX_NOTES, POINTING_NOTE } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { closeFlagsOn } from "@/server/bots/flags";
@@ -31,7 +31,6 @@ const Anchor = z.object({
 const Note = z.object({
   id: z.string().max(64),
   text: z.string().trim().min(1).max(MAX_NOTE_TEXT),
-  scope: z.enum(NOTE_SCOPES),
   device: z.enum(DEVICES),
   path: z.string().max(500),
   anchor: Anchor.nullable(),
@@ -60,7 +59,7 @@ async function reviewedLead(input: z.input<typeof Review>): Promise<Checked> {
 
 const REBUILDING_MESSAGE = "This preview is already rebuilding. Your notes are still here.";
 
-/** Sends the notes to the builder as one rebuild, and keeps every "every site" note as a taste lesson. */
+/** Sends the notes to the builder as one rebuild. The review keeps them with the founder who wrote them. */
 export async function sendReviewAction(input: z.input<typeof Review>): Promise<ReviewResult> {
   const checked = await reviewedLead(input);
   if (checked.error !== null) return { ok: false, message: checked.error };
@@ -70,7 +69,6 @@ export async function sendReviewAction(input: z.input<typeof Review>): Promise<R
   const notes = await withClasses(review.notes);
   const { job, created } = await requestPreview(lead, founder.email, compileReviewNote(notes, review.previewUrl));
   if (!created) return { ok: false, message: REBUILDING_MESSAGE };
-  await addTasteLessons(review.notes.filter((note) => note.scope === "every").map((note) => note.text), founder.email, lead.id);
   await (await db()).insert(previewReviews).values({ businessId: lead.id, previewUrl: review.previewUrl, verdict: "changes", notes, jobId: job.id, reviewedBy: founder.email });
   revalidatePath("/admin", "layout");
   return { ok: true, message: `Sent ${review.notes.length} ${review.notes.length === 1 ? "note" : "notes"} to the builder.` };
@@ -93,7 +91,7 @@ export async function approveReviewAction(input: z.input<typeof Review>): Promis
 
 const Spoken = z.string().trim().min(1).max(8000);
 
-/** Splits what the founder said on the phone into separate notes, each for this site or every site. */
+/** Splits what the founder said on the phone into separate notes. */
 export async function splitSpokenNotesAction(transcript: string): Promise<SplitNote[]> {
   await requireFounder();
   const parsed = Spoken.safeParse(transcript);
@@ -138,9 +136,9 @@ export async function addTasteLessonAction(form: FormData) {
 }
 
 export async function updateTasteLessonAction(form: FormData) {
-  await requireFounder();
+  const founder = await requireFounder();
   const id = LessonId.safeParse(form.get("id"));
-  if (id.success) await updateTasteLesson(id.data, String(form.get("text") ?? ""));
+  if (id.success) await updateTasteLesson(id.data, String(form.get("text") ?? ""), founder.email);
   revalidatePath("/admin/setup/taste");
 }
 
@@ -148,14 +146,14 @@ export async function retireTasteLessonAction(form: FormData) {
   const founder = await requireFounder();
   const id = LessonId.safeParse(form.get("id"));
   if (!id.success) return;
-  await retireTasteLesson(id.data);
+  await retireTasteLesson(id.data, founder.email);
   await record(founder.email, "retired a taste lesson", { detail: id.data });
   revalidatePath("/admin/setup/taste");
 }
 
 export async function restoreTasteLessonAction(form: FormData) {
-  await requireFounder();
+  const founder = await requireFounder();
   const id = LessonId.safeParse(form.get("id"));
-  if (id.success) await restoreTasteLesson(id.data);
+  if (id.success) await restoreTasteLesson(id.data, founder.email);
   revalidatePath("/admin/setup/taste");
 }

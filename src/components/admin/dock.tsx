@@ -130,7 +130,7 @@ type TypeFieldProps = {
   /** Enter, or the button: keeps what was typed. */
   onKeep: () => void;
   keepLabel: string;
-  /** Anything that goes with the note, such as whether it is for every site. */
+  /** Anything that goes with the note. */
   children?: ReactNode;
 };
 

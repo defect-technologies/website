@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { boardLessonsMarkdown, boardPreferences, describeOption, pageTone, pickAgreement, type BoardDecision, type BoardLetter, type BoardOption } from "./boards";
+import { boardLessonsMarkdown, boardPreferences, describeOption, isRedrawn, pageTone, pickAgreement, redrawnMark, REPLACED, revisedLetter, revisingMark, verdictOf, type BoardDecision, type BoardLetter, type BoardOption } from "./boards";
 
 const LIGHT = { background: "#faf3e3", accent: "#b23c17" };
 const DARK = { background: "#101a33", accent: "#f08d3c" };
@@ -27,7 +27,7 @@ function option(letter: BoardLetter, layout: string, extra: Partial<BoardOption>
 }
 
 function decision(chosen: BoardLetter, layouts: [string, string, string], extra: Partial<BoardDecision> = {}): BoardDecision {
-  return { business: "Acme Heating", options: [option("a", layouts[0]), option("b", layouts[1]), option("c", layouts[2])], chosen, feedback: "", by: "Brendan", pick: null, ...extra };
+  return { business: "Acme Heating", options: [option("a", layouts[0]), option("b", layouts[1]), option("c", layouts[2])], verdict: "chose", letter: chosen, feedback: "", by: "Brendan", pick: null, ...extra };
 }
 
 test("a layout nobody has been shown leans the draw neither way", () => {
@@ -58,19 +58,53 @@ test("an option is described in one line of plain words", () => {
   assert.equal(describeOption(caps), '"Night call": a dark page (#101a33) with #f08d3c as the brand colour; headings in Zilla Slab, text in DM Sans; a centered-stack first screen; pill outline buttons in capitals; motif: Sunburst.');
 });
 
-test("the lessons carry each choice, what was passed over and the founder's own words, then the counts", () => {
+test("the lessons carry each founder's choices apart, with what was passed over and their own words, then their counts", () => {
   assert.equal(boardLessonsMarkdown([]), "");
   const markdown = boardLessonsMarkdown([
     decision("b", ["split-hero", "type-led", "editorial"], { business: "JW Heating & Air", by: "Boris", feedback: "  No capitals\non buttons.  " }),
     decision("a", ["split-hero", "grid-or-collage", "editorial"]),
+    decision("c", ["split-hero", "type-led", "editorial"], { business: "Old Plumbing", by: "Boris" }),
   ]);
-  assert.match(markdown, /^# What the founders chose before/);
-  assert.match(markdown, /## JW Heating & Air \(chosen by Boris\)\n\n- Chose "Direction b":/);
-  assert.equal(markdown.match(/- Passed over /g)?.length, 4);
-  assert.match(markdown, /- Said: No capitals on buttons\./);
-  assert.match(markdown, /- First screens, chosen of shown: type-led 1 of 1; split-hero 1 of 2; /);
-  assert.match(markdown, /- Pages, chosen of shown: light 2 of 6\./);
-  assert.match(markdown, /- How far the option goes \(1 close to how the business looks today, 3 far from it\), chosen of shown: (1 1 of 2; 2 1 of 2|2 1 of 2; 1 1 of 2); 3 0 of 2\./);
+  assert.match(markdown, /^# What the founders decided before/);
+  assert.match(markdown, /Where they differ, don't average them/);
+  const boris = markdown.slice(markdown.indexOf("## Boris"), markdown.indexOf("## Brendan"));
+  const brendan = markdown.slice(markdown.indexOf("## Brendan"));
+  assert.ok(markdown.indexOf("## Boris") < markdown.indexOf("## Brendan"), "the founder who decided most recently comes first");
+  assert.match(boris, /### JW Heating & Air\n\n- Chose B, "Direction b":/);
+  assert.match(boris, /### Old Plumbing/);
+  assert.match(boris, /- Said: No capitals on buttons\./);
+  assert.match(boris, /- First screens, chosen of shown: type-led 1 of 2; editorial 1 of 2; split-hero 0 of 2\./);
+  assert.match(brendan, /### Acme Heating\n\n- Chose A, /);
+  assert.ok(!brendan.includes("Old Plumbing"), "each founder's section holds only their own decisions");
+  assert.match(brendan, /- Pages, chosen of shown: light 1 of 3\./);
+  assert.equal(markdown.match(/- Passed over /g)?.length, 6);
+});
+
+test("a revision and three turned down teach the founder's taste, but count as no choice", () => {
+  const revise = decision("c", ["split-hero", "type-led", "editorial"], { verdict: "revise", feedback: "Fonts too basic." });
+  const none = decision("b", ["split-hero", "type-led", "editorial"], { verdict: "redraw", business: "Cypher Tattoo", feedback: "B feels the most sophisticated, but its serif is too plain." });
+  const markdown = boardLessonsMarkdown([none, revise]);
+  assert.match(markdown, /- Wanted none of the three and asked for three new designs:\n  - A, /);
+  assert.match(markdown, /- Had B selected while writing, so words naming no option are about it\./);
+  assert.match(markdown, /- Said: B feels the most sophisticated, but its serif is too plain\./);
+  assert.match(markdown, /- Liked C, "Direction c":.* Asked for it to be revised/);
+  assert.ok(!markdown.includes("Counts over every design"), "nothing was built, so there is nothing to count");
+  assert.deepEqual(boardPreferences([none, revise]), { layouts: {}, headings: {} });
+  assert.deepEqual(pickAgreement([{ ...revise, pick: { letter: "c", reason: "" } }]), { matched: 0, of: 0 });
+});
+
+test("a decision is read back from how the board records it, and Redraw all teaches nothing", () => {
+  assert.deepEqual(verdictOf("b"), { verdict: "chose", letter: "b" });
+  assert.deepEqual(verdictOf(revisingMark("c")), { verdict: "revise", letter: "c" });
+  assert.deepEqual(verdictOf(redrawnMark("a")), { verdict: "redraw", letter: "a" });
+  assert.deepEqual(verdictOf(redrawnMark(null)), { verdict: "redraw", letter: null });
+  assert.equal(verdictOf(REPLACED), null);
+  assert.equal(verdictOf(null), null);
+  assert.equal(verdictOf("revise:x"), null);
+  assert.equal(isRedrawn(REPLACED), true);
+  assert.equal(isRedrawn("redrawn:b"), true);
+  assert.equal(isRedrawn("revise:b"), false);
+  assert.equal(revisedLetter("revise:b"), "b");
 });
 
 test("agreement counts only boards the system made a pick for", () => {

@@ -5,13 +5,13 @@ import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { Button } from "../../Button";
 
-/** What should change in the chosen design, typed or said. It is the form's `feedback` field. */
+/** What the founder thinks of the three designs, typed or said, naming them by letter. It is the form's `feedback` field. */
 export default function FeedbackField({ text, setText }: { text: string; setText: (update: (current: string) => string) => void }) {
   const dictation = useDictation((phrase) => setText((current) => appendPhrase(current, phrase)));
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       <label htmlFor="board-feedback" className="text-sm font-medium">
-        What should change in the one you choose?
+        What should change?
       </label>
       <div className="flex items-end gap-2">
         <textarea
@@ -19,6 +19,7 @@ export default function FeedbackField({ text, setText }: { text: string; setText
           name="feedback"
           rows={2}
           maxLength={MAX_NOTE_TEXT}
+          placeholder="B is the closest, but its serif is too plain for this shop."
           value={dictation.listening ? `${text} ${dictation.interim}`.trim() : text}
           readOnly={dictation.listening}
           onChange={(event) => setText(() => event.target.value)}

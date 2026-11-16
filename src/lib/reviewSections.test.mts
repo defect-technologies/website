@@ -20,7 +20,6 @@ test("a one-tap note is about its section, at the width the founder looks at, an
   assert.deepEqual(note, {
     id: "id-1",
     text: "Too much text. Cut it to what a visitor needs to decide.",
-    scope: "site",
     device: "phone",
     path: "/services",
     anchor: { path: "/services", selector: "main > section:nth-of-type(2)", tag: "section", text: "What we cover" },
