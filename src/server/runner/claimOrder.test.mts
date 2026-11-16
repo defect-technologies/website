@@ -150,6 +150,24 @@ test("a revision of a lead whose kit-only update was queued before it is drawn f
   assert.equal(claim?.job.note, NEW_DESIGN_NOTE, "it carries the note behind the boards, not the kit update's");
 });
 
+test("three new designs with a selected option, and Redraw all, are drawn past the cap like any redraw", async () => {
+  await updateRunnerSettings({ dailyCap: 0, mostDesignsWaiting: 1 }, "one@example.com");
+  const store = await import("../boards/store");
+  const selected = await redesignedLead();
+  await requestPreview(selected.owner, "boris.nezlobin@gmail.com", NEW_DESIGN_NOTE);
+  await store.redrawBoards(selected.board.id, "B feels the most sophisticated, but its serif is too plain.", "boris.nezlobin@gmail.com", { selected: "b" });
+  const first = await ask();
+  assert.equal(first?.lead.id, selected.owner.id);
+  assert.deepEqual(first?.boardsAgain, { feedback: "B feels the most sophisticated, but its serif is too plain.", by: "Boris", selected: "b", board: selected.board.id });
+
+  const replaced = await redesignedLead();
+  await requestPreview(replaced.owner, "boris.nezlobin@gmail.com", NEW_DESIGN_NOTE);
+  await store.redrawWaiting("boris.nezlobin@gmail.com");
+  const second = await ask();
+  assert.equal(second?.lead.id, replaced.owner.id, "Redraw all's jobs are not held back by the daily cap");
+  assert.deepEqual(second?.boardsAgain, { feedback: "", by: "Boris", replaced: true, board: replaced.board.id });
+});
+
 test("a founder's decision takes over a kit-only update queued for the same lead, and a lead with boards is never queued one again", async () => {
   const { owner } = await redesignedLead();
   const queued = await requestPreview(owner, "admin", POINTING_NOTE);

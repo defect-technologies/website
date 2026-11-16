@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray, sql } from "drizzle-orm";
+import { REDRAWN, REDRAWN_PREFIX, REPLACED, REVISE_PREFIX } from "@/lib/boards";
 import { ACTIVE_JOB_STATUSES, BOARDS_STEP, isKitUpdate, type JobKind, type PreviewJobStatus, SKIPPED_STEP } from "@/lib/previewJobs";
 import { POINTING_NOTE } from "@/lib/review";
 import { record } from "../activity";
@@ -151,7 +152,10 @@ const newestBoardDecided = (decision: ReturnType<typeof sql>) =>
     and not exists (select 1 from ${designBoards} newer where newer.business_id = decided.business_id and newer.created_at > decided.created_at))`;
 
 const choiceWaits = newestBoardDecided(sql`decided.chosen_letter in ('a', 'b', 'c') and decided.built_job_id is null`);
-const redrawWaits = newestBoardDecided(sql`(decided.chosen_letter = 'redrawn' or decided.chosen_letter like 'revise:%')`);
+/** Every way a board is drawn again (src/lib/boards.ts): three new, with or without a selected option, Redraw all, or a revision. */
+const redrawWaits = newestBoardDecided(
+  sql`(decided.chosen_letter in (${REDRAWN}, ${REPLACED}) or starts_with(decided.chosen_letter, ${REDRAWN_PREFIX}) or starts_with(decided.chosen_letter, ${REVISE_PREFIX}))`,
+);
 
 function queuedWorkIs(work: QueuedWork) {
   const kitUpdate = sql`starts_with(${previewJobs.note}, ${POINTING_NOTE})`;

@@ -15,8 +15,8 @@ export type BoardLetter = (typeof BOARD_LETTERS)[number];
  */
 export const REDRAWN = "redrawn";
 export const REPLACED = "replaced";
-const REVISE_PREFIX = "revise:";
-const REDRAWN_PREFIX = `${REDRAWN}:`;
+export const REVISE_PREFIX = "revise:";
+export const REDRAWN_PREFIX = `${REDRAWN}:`;
 
 export const revisingMark = (letter: BoardLetter) => `${REVISE_PREFIX}${letter}`;
 export const redrawnMark = (selected: BoardLetter | null) => (selected ? `${REDRAWN_PREFIX}${selected}` : REDRAWN);
