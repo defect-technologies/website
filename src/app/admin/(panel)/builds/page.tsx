@@ -1,5 +1,5 @@
 import { requireFounder } from "@/server/auth/session";
-import { ArrowCounterClockwise, HourglassMedium, Moon, Play, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, ArrowLineUp, HourglassMedium, Moon, Play, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import BuildHistory, { SiteLink } from "@/components/admin/BuildHistory";
 import BuildProgress, { clockTime, minutesText } from "@/components/admin/BuildProgress";
@@ -13,7 +13,7 @@ import { runnerDay } from "@/server/overview";
 import { buildHistory } from "@/server/runner/history";
 import { runnerStatus, type CurrentBuild, type JobRow, type QueuedBuild } from "@/server/runner/status";
 import { resumeRunnerAction } from "../setup/bots/actions";
-import { settleAbandonedJobAction } from "../sites/actions";
+import { runNextAction, settleAbandonedJobAction } from "../sites/actions";
 
 export const metadata: Metadata = { title: "Builds" };
 
@@ -54,7 +54,7 @@ function Queue({ jobs, now }: { jobs: QueuedBuild[]; now: number }) {
       <Card>
         <ol className="divide-ink/8 divide-y">
           {jobs.map((job, index) => (
-            <li key={job.id} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-baseline gap-x-3 px-5 py-3">
+            <li key={job.id} className="grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 px-5 py-3">
               <span className="text-ink-faint tabular-nums">{index + 1}</span>
               <span className="min-w-0">
                 <SiteLink job={job} />
@@ -63,11 +63,22 @@ function Queue({ jobs, now }: { jobs: QueuedBuild[]; now: number }) {
                 </span>
               </span>
               <span className="text-ink-soft text-sm tabular-nums">starts ~{clockTime(job.startsAt, now)}</span>
+              {index > 0 ? <RunNext job={job} /> : <span aria-hidden="true" className="size-10" />}
             </li>
           ))}
         </ol>
       </Card>
     </Section>
+  );
+}
+
+/** Takes a queued build next. An icon button: the queue's rows are dense, and its name says what it does. */
+function RunNext({ job }: { job: QueuedBuild }) {
+  return (
+    <form action={runNextAction}>
+      <input type="hidden" name="id" value={job.id} />
+      <SubmitButton size="icon" variant="ghost" icon={<ArrowLineUp size={18} weight="bold" aria-hidden="true" />} aria-label={`Build ${job.businessName} next`} title="Build next" />
+    </form>
   );
 }
 

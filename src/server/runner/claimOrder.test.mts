@@ -17,7 +17,7 @@ after(closeDatabase);
 const { eq } = await import("drizzle-orm");
 const { db } = await import("../db/client");
 const { businesses, designBoards, previewJobs } = await import("../db/schema");
-const { requestPreview } = await import("./jobs");
+const { requestPreview, runNext } = await import("./jobs");
 const { claimNext } = await import("./api");
 const { updateRunnerSettings } = await import("./settings");
 const { POINTING_NOTE } = await import("@/lib/review");
@@ -168,4 +168,13 @@ test("a founder's decision takes over a kit-only update queued for the same lead
   await database.insert(previewJobs).values({ businessId: plain.id, requestedBy: "auto-queue", status: "done", previewUrl: plain.previewUrl, startedAt: new Date("2026-10-12T00:00:00Z") });
   const item = (lead: typeof owner) => ({ id: lead.id, businessName: lead.businessName, website: lead.website, previewUrl: lead.previewUrl, stage: lead.stage, previewBuiltAt: null, niche: "", area: "" });
   assert.equal(await queuePointingUpdates([item(owner), item(plain)]), 1, "only the lead without boards gets the update");
+});
+
+test("a founder can have a queued build taken next, and one that already started stays where it is", async () => {
+  const leads = [await builtLead(), await builtLead(), await builtLead()];
+  const jobs = [];
+  for (const each of leads) jobs.push((await requestPreview(each, "boris.nezlobin@gmail.com", "Make the hours bigger.")).job);
+  assert.equal(await runNext(jobs[2].id), true);
+  assert.deepEqual([(await ask())?.lead.id, (await ask())?.lead.id, (await ask())?.lead.id], [leads[2].id, leads[0].id, leads[1].id]);
+  assert.equal(await runNext(jobs[1].id), false, "it isn't queued any more");
 });

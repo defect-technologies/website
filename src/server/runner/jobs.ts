@@ -204,6 +204,22 @@ export async function jobById(id: string): Promise<PreviewJob | null> {
   return job ?? null;
 }
 
+/**
+ * Moves a queued job to the front of its queue: the runner takes the oldest queued job of a kind first, so it is
+ * dated just before the oldest one. Putting a job back (settleAbandonedJobAction) dates it now, to the back. False
+ * when the job isn't queued any more.
+ */
+export async function runNext(id: string): Promise<boolean> {
+  const [oldest] = await (await db()).select({ at: previewJobs.createdAt }).from(previewJobs).where(eq(previewJobs.status, "queued")).orderBy(asc(previewJobs.createdAt)).limit(1);
+  if (!oldest) return false;
+  const moved = await (await db())
+    .update(previewJobs)
+    .set({ createdAt: new Date(oldest.at.getTime() - 1000) })
+    .where(and(eq(previewJobs.id, id), eq(previewJobs.status, "queued")))
+    .returning({ id: previewJobs.id });
+  return moved.length > 0;
+}
+
 export async function updateJob(id: string, fields: Partial<PreviewJob>) {
   const [job] = await (await db()).update(previewJobs).set(fields).where(eq(previewJobs.id, id)).returning();
   return job;

@@ -10,7 +10,7 @@ import { BRAND_FILE_TYPES, MAX_BRAND_FILE_BYTES } from "@/lib/brandFiles";
 import { isUploadFor, removeBrandFile, saveBrandFile } from "@/server/leads/brandFiles";
 import { businessById, updateBusiness } from "@/server/leads/businesses";
 import { importLeads } from "@/server/leads/import";
-import { isActive, jobById, launchBlocker, requestPreview, updateJob } from "@/server/runner/jobs";
+import { isActive, jobById, launchBlocker, requestPreview, runNext, updateJob } from "@/server/runner/jobs";
 import { closeFlagsOn } from "@/server/bots/flags";
 
 export type FormResult = { ok: boolean; message: string };
@@ -129,6 +129,16 @@ export async function removeBrandFileAction(leadId: string, form: FormData) {
 }
 
 const JobChoice = z.object({ id: z.uuid(), intent: z.enum(["requeue", "fail"]) });
+
+/** A founder wants a queued build taken next, ahead of everything else in the queue. */
+export async function runNextAction(form: FormData) {
+  const founder = await requireFounder();
+  const id = z.uuid().safeParse(form.get("id"));
+  if (!id.success) return;
+  const job = await jobById(id.data);
+  if (job && (await runNext(job.id))) await record(founder.email, "moved a build to the front of the queue", { businessId: job.businessId });
+  revalidatePath("/admin", "layout");
+}
 
 /** A job the runner abandoned: put it back at the end of the queue (it resumes where it stopped), or give up on it. */
 export async function settleAbandonedJobAction(form: FormData) {
