@@ -217,12 +217,12 @@ test("a founder who wants none of the three gets three new designs, with their w
   assert.equal(await store.chooseBoard(board.id, "a", "", "boris.nezlobin@gmail.com"), null, "and it can't be chosen from any more");
   assert.equal(await store.waitingBoardFor(lead.id), null);
   assert.equal((await store.boardsDecided()).length, decidedBefore, "a board turned down is not a choice: it is not listed and teaches nothing");
-  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "All three are too loud.", by: "Brendan" });
+  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "All three are too loud.", by: "Brendan", board: board.id });
 
   const redraw = await claimed(lead, await store.noteBehindBoards(board));
   assert.equal(redraw.job.note, "Start a new design.", "the note behind the first boards goes on");
   assert.equal(redraw.boards, true);
-  assert.deepEqual(redraw.boardsAgain, { feedback: "All three are too loud.", by: "Brendan" });
+  assert.deepEqual(redraw.boardsAgain, { feedback: "All three are too loud.", by: "Brendan", board: board.id }, "with the board it answers");
   assert.equal(redraw.board, undefined);
   assert.equal(redraw.repair, undefined);
 
@@ -244,7 +244,7 @@ test("boards are drawn again when a founder asks, also for a lead whose note wou
   const redraw = await claimed(lead, await store.noteBehindBoards(board));
   await updateRunnerSettings({ designBoards: true }, "brendan@g.studio");
   assert.equal(redraw.boards, true);
-  assert.deepEqual(redraw.boardsAgain, { feedback: "", by: "Brendan" });
+  assert.deepEqual(redraw.boardsAgain, { feedback: "", by: "Brendan", board: board.id });
   assert.equal(redraw.repair, undefined, "a founder asked for designs, not for a change to the preview");
   await finish(redraw.job.id);
 });
@@ -276,11 +276,11 @@ test("a founder can have one option revised with their words: the runner is told
   assert.equal(revised?.chosenLetter, "revise:c");
   assert.equal(await store.chooseBoard(board.id, "a", "", "brendan@g.studio"), null, "the first decision stands");
   assert.equal((await store.boardsDecided()).length, decidedBefore, "a revision is not a choice: nothing is built from it");
-  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "Fonts too basic: answer their logo.", by: "Boris", base: "c" });
+  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "Fonts too basic: answer their logo.", by: "Boris", base: "c", board: board.id });
 
   const revision = await claimed(lead, await store.noteBehindBoards(board));
   assert.equal(revision.boards, true);
-  assert.deepEqual(revision.boardsAgain, { feedback: "Fonts too basic: answer their logo.", by: "Boris", base: "c" });
+  assert.deepEqual(revision.boardsAgain, { feedback: "Fonts too basic: answer their logo.", by: "Boris", base: "c", board: board.id });
   assert.equal(revision.board, undefined, "nothing is built");
 
   await reportBoards(revision.job.id, BoardsBody.parse({ options: threeOptions(lead.id) }));

@@ -146,7 +146,7 @@ test("a revision of a lead whose kit-only update was queued before it is drawn f
   await store.redrawBoards(board.id, "Fonts too basic.", "boris.nezlobin@gmail.com", "c");
   const claim = await ask();
   assert.equal(claim?.lead.id, owner.id, "Boris's revision, not the older update for another lead");
-  assert.deepEqual(claim?.boardsAgain, { feedback: "Fonts too basic.", by: "Boris", base: "c" });
+  assert.deepEqual(claim?.boardsAgain, { feedback: "Fonts too basic.", by: "Boris", base: "c", board: board.id });
   assert.equal(claim?.job.note, NEW_DESIGN_NOTE, "it carries the note behind the boards, not the kit update's");
 });
 

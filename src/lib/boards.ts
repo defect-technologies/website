@@ -33,6 +33,8 @@ export interface BoardRedraw {
   feedback: string;
   by: string;
   base?: BoardLetter;
+  /** The decided board this answers: the new boards record it, so a job cut off after drawing them doesn't draw them twice. */
+  board: string;
 }
 
 /**

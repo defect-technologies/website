@@ -121,7 +121,7 @@ export async function redrawFor(businessId: string): Promise<BoardRedraw | null>
   const [newest] = await (await db()).select().from(designBoards).where(eq(designBoards.businessId, businessId)).orderBy(desc(designBoards.createdAt)).limit(1);
   const base = revisedLetter(newest?.chosenLetter ?? null);
   if (!newest || (newest.chosenLetter !== REDRAWN && !base)) return null;
-  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? "") ?? "", ...(base ? { base } : {}) };
+  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? "") ?? "", ...(base ? { base } : {}), board: newest.id };
 }
 
 /** The board a lead had before this one, when a founder asked for these as revisions of one of its options. */
