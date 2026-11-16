@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import EmptyState from "@/components/admin/EmptyState";
 import { BoardPicture, Letter } from "@/components/admin/designs/parts";
+import RedrawAll from "@/components/admin/designs/RedrawAll";
 import { Card, PageHeader, Section, When } from "@/components/admin/ui";
 import { pickAgreement } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
 import { boardsDecided, boardsWaiting, decisionOf, type BoardWithLead } from "@/server/boards/store";
+import { redrawAllWaitingAction } from "./actions";
 
 export const metadata: Metadata = { title: "Designs" };
 
@@ -71,7 +73,7 @@ export default async function DesignsPage() {
   return (
     <>
       <PageHeader title="Designs" />
-      <Section title="Waiting for a choice" count={waiting.length}>
+      <Section title="Waiting for a choice" count={waiting.length} action={waiting.length > 1 ? <RedrawAll action={redrawAllWaitingAction} count={waiting.length} /> : undefined}>
         {waiting.length ? (
           <ul className="grid gap-5 xl:grid-cols-2">
             {waiting.map((board) => (

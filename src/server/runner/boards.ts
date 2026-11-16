@@ -9,6 +9,7 @@ import { isBoardPicture, MAX_PICTURE_BYTES, pictureName, storeBoardPicture } fro
 import { decisions, newestBoards, saveBoards } from "../boards/store";
 import type { PreviewJob } from "../db/schema";
 import { isActive, jobById, leadForJob, updateJob } from "./jobs";
+import { BuildName, withBuildName } from "./naming";
 import { tellFounders } from "./tellFounders";
 
 const ACTOR = "bot:runner";
@@ -42,6 +43,7 @@ const Option = z.object({
 
 export const BoardsBody = z.object({
   options: z.array(Option).length(BOARD_LETTERS.length),
+  business: BuildName,
   pick: z.object({ letter: z.enum(BOARD_LETTERS), reason: short(400).default("") }).nullable().default(null),
 });
 
@@ -71,7 +73,7 @@ export async function reportBoards(id: string, body: z.infer<typeof BoardsBody>)
   if (new Set(body.options.map((option) => option.letter)).size !== body.options.length) throw new BotError(400, "Every option needs its own letter.");
   const strangers = body.options.flatMap((option) => Object.values(option.pictures)).filter((url) => !isBoardPicture(url, job.businessId));
   if (strangers.length) throw new BotError(400, "Every picture has to be one this job uploaded with PUT /api/runner/:job/boards/:picture.");
-  const lead = await leadForJob(job);
+  const lead = await withBuildName(await leadForJob(job), body.business);
   const board = await saveBoards({ businessId: lead.id, jobId: job.id, options: body.options, pick: body.pick });
   await updateJob(job.id, { status: "done", step: BOARDS_STEP, finishedAt: new Date() });
   await record(ACTOR, "sent three design boards", { businessId: lead.id, detail: body.options.map((option) => `${option.letter.toUpperCase()}: ${option.name}`).join("; ") });

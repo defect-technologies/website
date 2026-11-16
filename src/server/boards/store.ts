@@ -114,6 +114,18 @@ export async function redrawBoards(id: string, feedback: string, by: string, bas
 }
 
 /**
+ * Turns down every board that waits, as "Draw 3 new" does one, so the runner draws each lead's designs again with the
+ * system it has now. Returns the boards it turned down; one a founder decided meanwhile is left alone.
+ */
+export async function redrawWaiting(feedback: string, by: string): Promise<DesignBoard[]> {
+  return (await db())
+    .update(designBoards)
+    .set({ chosenLetter: REDRAWN, feedback: feedback.trim(), chosenBy: by, chosenAt: new Date() })
+    .where(isNull(designBoards.chosenAt))
+    .returning();
+}
+
+/**
  * What the runner draws a lead's boards again from: set while the lead's newest board is one a founder turned down.
  * Once the new boards arrive they are the newest, and this is null again.
  */

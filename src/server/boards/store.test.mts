@@ -311,3 +311,28 @@ test("an option may carry its whole page on a desktop and a phone, and how it is
   assert.ok(memory.compositions.includes(`- Composed Tattoo, A: ${composition("a")}`));
   await store.chooseBoard(board.id, "a", "", "brendan@g.studio");
 });
+
+test("boards name the lead as its build read it from the business's own site, when the lead finder guessed something else", async () => {
+  const { lead, job } = await leadWithRunningJob("Los Angeles, CA");
+  await reportBoards(job.id, BoardsBody.parse({ options: threeOptions(lead.id), business: " Life Art Creations Tattoo " }));
+  const [renamed] = await database.select().from(businesses).where(eq(businesses.id, lead.id));
+  assert.equal(renamed.businessName, "Life Art Creations Tattoo");
+  assert.equal((await store.waitingBoardFor(lead.id)) !== null, true);
+  const { lead: kept, job: second } = await leadWithRunningJob("Keeps Its Name");
+  await reportBoards(second.id, BoardsBody.parse({ options: threeOptions(kept.id) }));
+  const [same] = await database.select().from(businesses).where(eq(businesses.id, kept.id));
+  assert.equal(same.businessName, "Keeps Its Name", "a runner that sends no name renames nothing");
+});
+
+test("every waiting design can be drawn again at once, and a decided one is left alone", async () => {
+  for (const board of await store.boardsWaiting()) await store.chooseBoard(board.id, "a", "", "boris.nezlobin@gmail.com");
+  const { lead: first, job: firstJob } = await leadWithRunningJob("First Waiting");
+  await reportBoards(firstJob.id, BoardsBody.parse({ options: threeOptions(first.id) }));
+  const { lead: second, job: secondJob } = await leadWithRunningJob("Second Waiting");
+  await reportBoards(secondJob.id, BoardsBody.parse({ options: threeOptions(second.id) }));
+  const turnedDown = await store.redrawWaiting(" Drawn again with the current system. ", "boris.nezlobin@gmail.com");
+  assert.deepEqual(turnedDown.map((board) => board.businessId).sort(), [first.id, second.id].sort());
+  assert.equal(await store.countBoardsWaiting(), 0);
+  for (const lead of [first, second]) assert.deepEqual(await store.redrawFor(lead.id), { feedback: "Drawn again with the current system.", by: "Boris", board: turnedDown.find((board) => board.businessId === lead.id)!.id });
+  assert.deepEqual(await store.redrawWaiting("again", "boris.nezlobin@gmail.com"), [], "nothing waits any more");
+});

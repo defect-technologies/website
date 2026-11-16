@@ -7,7 +7,7 @@ import { BOARD_LETTERS } from "@/lib/boards";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { chooseBoard, noteBehindBoards, redrawBoards } from "@/server/boards/store";
+import { chooseBoard, noteBehindBoards, redrawBoards, redrawWaiting } from "@/server/boards/store";
 import { businessById } from "@/server/leads/businesses";
 import { addTasteLessons } from "@/server/review/taste";
 import { requestPreview } from "@/server/runner/jobs";
@@ -79,4 +79,23 @@ export async function redrawBoardsAction(formData: FormData) {
   }
   revalidatePath("/admin", "layout");
   redirect(TURN_PATH);
+}
+
+/** What the option writer is told when every waiting design is drawn again: why, not that the founders disliked each. */
+const REDRAW_ALL_NOTE =
+  "Drawn again with the current system. These were made before each page was checked against DESIGN.md (capitals, letter-spacing, overlaps, tall photos) and before fonts were matched to the logo's own lettering.";
+
+/**
+ * A founder wants every design that waits drawn again with the system the runner has now: each is turned down as
+ * "Draw 3 new" would and gets a job for three new ones. The runner takes those before any design it draws itself.
+ */
+export async function redrawAllWaitingAction() {
+  const founder = await requireFounder();
+  const boards = await redrawWaiting(REDRAW_ALL_NOTE, founder.email);
+  for (const board of boards) {
+    const lead = await businessById(board.businessId);
+    if (lead) await requestPreview(lead, founder.email, await noteBehindBoards(board));
+  }
+  if (boards.length) await record(founder.email, "asked for every waiting design to be drawn again", { detail: `${boards.length} designs` });
+  revalidatePath("/admin", "layout");
 }

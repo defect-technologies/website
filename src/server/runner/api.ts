@@ -23,6 +23,7 @@ import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
 import { updateBusiness } from "../leads/businesses";
+import { BuildName, withBuildName } from "./naming";
 import { maybePickForSpotCheck } from "../spotChecks";
 import { autoQueueNext, buildsToday, claimJob, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
@@ -225,6 +226,7 @@ export async function reportProgress(id: string, body: z.infer<typeof ProgressBo
 
 export const DoneBody = z.object({
   status: z.enum(["done", "failed", "waiting_for_usage"]),
+  business: BuildName,
   previewUrl: z.url({ protocol: /^https$/ }).optional(),
   verifyPassed: z.boolean().optional(),
   worstCls: z.number().min(0).optional(),
@@ -429,7 +431,7 @@ const FINISHERS: Record<Done["status"], (job: PreviewJob, lead: Business, body: 
 /** POST /api/runner/:job/done */
 export async function reportDone(id: string, body: Done) {
   const job = await claimedJob(id);
-  await FINISHERS[body.status](job, await leadForJob(job), body);
+  await FINISHERS[body.status](job, await withBuildName(await leadForJob(job), body.business), body);
   return { ok: true, status: body.status === "waiting_for_usage" ? "queued" : body.status };
 }
 
