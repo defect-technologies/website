@@ -162,6 +162,13 @@
       "when": 1794542965607,
       "tag": "0022_mailbox_disconnect",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794826118076,
+      "tag": "0023_replaced_redraws",
+      "breakpoints": true
     }
   ]
 }
