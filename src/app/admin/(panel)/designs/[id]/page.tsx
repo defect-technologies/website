@@ -6,7 +6,7 @@ import BoardChooser from "@/components/admin/designs/BoardChooser";
 import PhoneChooser from "@/components/admin/designs/PhoneChooser";
 import { BoardPicture, Letter, OptionFacts, Reach } from "@/components/admin/designs/parts";
 import { Card, Notice, PageHeader, When } from "@/components/admin/ui";
-import { type BoardOption, isRedrawn, revisedLetter, verdictOf } from "@/lib/boards";
+import { type BoardOption, CLEARED, isRedrawn, revisedLetter, verdictOf } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
 import { boardById, revisionOf, type BoardWithLead } from "@/server/boards/store";
@@ -17,6 +17,13 @@ export const metadata: Metadata = { title: "Choose a design" };
 /** What was decided about the board, in a sentence: an option chosen, or all three turned down. */
 function Decision({ board }: { board: BoardWithLead }) {
   const founder = founderName(board.chosenBy ?? "");
+  if (board.chosenLetter === CLEARED) {
+    return (
+      <Notice tone="good">
+        {founder} cleared these designs <When date={board.chosenAt} />. If this business is built later, it gets new ones.
+      </Notice>
+    );
+  }
   if (isRedrawn(board.chosenLetter)) {
     return (
       <Notice tone="good">

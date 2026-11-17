@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import EmptyState from "@/components/admin/EmptyState";
 import { BoardPicture, Letter } from "@/components/admin/designs/parts";
-import RedrawAll from "@/components/admin/designs/RedrawAll";
+import { ArrowsClockwise, Broom } from "@phosphor-icons/react/dist/ssr";
+import ConfirmAll from "@/components/admin/designs/ConfirmAll";
 import { Card, PageHeader, Section, When } from "@/components/admin/ui";
 import { pickAgreement } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { requireFounder } from "@/server/auth/session";
 import { boardsDecided, boardsWaiting, decisionOf, type BoardWithLead } from "@/server/boards/store";
-import { redrawAllWaitingAction } from "./actions";
+import { clearAllWaitingAction, redrawAllWaitingAction } from "./actions";
 
 export const metadata: Metadata = { title: "Designs" };
 
@@ -67,13 +68,23 @@ function Agreement({ decided }: { decided: BoardWithLead[] }) {
 }
 
 /** Every lead's three designs: the ones that wait for a founder first, then what was chosen. */
+/** Every waiting design drawn again with the runner's current system, or taken off this page with nothing drawn. */
+function WaitingActions({ count }: { count: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <ConfirmAll action={clearAllWaitingAction} icon={<Broom size={18} weight="bold" aria-hidden="true" />} label={`Clear all ${count}`} confirm={`Clear all ${count} without new designs`} />
+      <ConfirmAll action={redrawAllWaitingAction} icon={<ArrowsClockwise size={18} weight="bold" aria-hidden="true" />} label={`Redraw all ${count}`} confirm={`Replace all ${count} with new designs`} />
+    </div>
+  );
+}
+
 export default async function DesignsPage() {
   await requireFounder();
   const [waiting, decided] = await Promise.all([boardsWaiting(), boardsDecided()]);
   return (
     <>
       <PageHeader title="Designs" />
-      <Section title="Waiting for a choice" count={waiting.length} action={waiting.length > 1 ? <RedrawAll action={redrawAllWaitingAction} count={waiting.length} /> : undefined}>
+      <Section title="Waiting for a choice" count={waiting.length} action={waiting.length > 1 ? <WaitingActions count={waiting.length} /> : undefined}>
         {waiting.length ? (
           <ul className="grid gap-5 xl:grid-cols-2">
             {waiting.map((board) => (

@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
-import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, isRedrawn, redrawnMark, REPLACED, revisedLetter, revisingMark, verdictOf } from "@/lib/boards";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, notInArray, or } from "drizzle-orm";
+import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, CLEARED, isRedrawn, redrawnMark, REPLACED, revisedLetter, revisingMark, UNJUDGED, verdictOf } from "@/lib/boards";
 import { founderName } from "@/lib/founders";
 import { founderNote } from "@/lib/previewJobs";
 import { db } from "../db/client";
@@ -75,7 +75,7 @@ async function boardsJudged(limit: number): Promise<BoardWithLead[]> {
     .select(WITH_LEAD)
     .from(designBoards)
     .innerJoin(businesses, eq(businesses.id, designBoards.businessId))
-    .where(and(isNotNull(designBoards.chosenAt), ne(designBoards.chosenLetter, REPLACED)))
+    .where(and(isNotNull(designBoards.chosenAt), notInArray(designBoards.chosenLetter, UNJUDGED)))
     .orderBy(desc(designBoards.chosenAt))
     .limit(limit);
   return rows.map(withLead);
@@ -137,9 +137,21 @@ export async function redrawBoards(id: string, feedback: string, by: string, aga
  * decided meanwhile is left alone.
  */
 export async function redrawWaiting(by: string): Promise<DesignBoard[]> {
+  return decideWaiting(REPLACED, by);
+}
+
+/**
+ * Takes every waiting board off the Designs page and draws nothing in its place. No founder judged these designs, so
+ * nothing is learned from them. A cleared lead built later draws new boards, never the cleared ones on the runner's disk.
+ */
+export async function clearWaiting(by: string): Promise<DesignBoard[]> {
+  return decideWaiting(CLEARED, by);
+}
+
+async function decideWaiting(mark: string, by: string): Promise<DesignBoard[]> {
   return (await db())
     .update(designBoards)
-    .set({ chosenLetter: REPLACED, feedback: "", chosenBy: by, chosenAt: new Date() })
+    .set({ chosenLetter: mark, feedback: "", chosenBy: by, chosenAt: new Date() })
     .where(isNull(designBoards.chosenAt))
     .returning();
 }
@@ -150,11 +162,12 @@ export async function redrawWaiting(by: string): Promise<DesignBoard[]> {
  */
 export async function redrawFor(businessId: string): Promise<BoardRedraw | null> {
   const [newest] = await (await db()).select().from(designBoards).where(eq(designBoards.businessId, businessId)).orderBy(desc(designBoards.createdAt)).limit(1);
-  if (!newest || !(isRedrawn(newest.chosenLetter) || revisedLetter(newest.chosenLetter))) return null;
+  const fresh = newest?.chosenLetter === REPLACED || newest?.chosenLetter === CLEARED;
+  if (!newest || !(fresh || isRedrawn(newest.chosenLetter) || revisedLetter(newest.chosenLetter))) return null;
   const decided = verdictOf(newest.chosenLetter);
   const letter = decided?.letter;
   const named = !letter ? {} : decided.verdict === "revise" ? { base: letter } : { selected: letter };
-  const replaced = newest.chosenLetter === REPLACED ? { replaced: true as const } : {};
+  const replaced = fresh ? { replaced: true as const } : {};
   return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? ""), ...named, ...replaced, board: newest.id };
 }
 

@@ -342,3 +342,14 @@ test("every waiting design can be drawn again at once, with no founder's words a
   assert.ok(!learned.includes("First Waiting") && !learned.includes("Second Waiting"), "Redraw all judged the system, not the designs");
   assert.deepEqual(await store.redrawWaiting("boris.nezlobin@gmail.com"), [], "nothing waits any more");
 });
+
+test("Clear all takes every waiting design off the page, queues nothing, teaches nothing, and a cleared lead built later draws new boards", async () => {
+  for (const board of await store.boardsWaiting()) await store.chooseBoard(board.id, "a", "", "boris.nezlobin@gmail.com");
+  const { lead, job } = await leadWithRunningJob("Cleared Waiting");
+  await reportBoards(job.id, BoardsBody.parse({ options: threeOptions(lead.id) }));
+  const cleared = await store.clearWaiting("boris.nezlobin@gmail.com");
+  assert.deepEqual(cleared.map((board) => board.chosenLetter), ["cleared"]);
+  assert.equal(await store.countBoardsWaiting(), 0);
+  assert.deepEqual(await store.redrawFor(lead.id), { feedback: "", by: "Boris", replaced: true, board: cleared[0].id }, "a later job draws fresh boards, never the cleared ones on the runner's disk");
+  assert.ok(!(await store.decisions()).some((decision) => decision.business === "Cleared Waiting"), "nobody judged these designs");
+});

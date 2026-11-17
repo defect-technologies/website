@@ -10,11 +10,15 @@ export type BoardLetter = (typeof BOARD_LETTERS)[number];
 /**
  * How a decided board's design_boards.chosen_letter records what a founder decided, so no migration was needed: a
  * letter when they chose that option, "revise:c" when they liked c and asked for it revised with their words, "redrawn"
- * (or "redrawn:b", with the option they had selected while writing) when they wanted none of the three, and "replaced"
- * when Redraw all drew them again because the system changed. Nothing is built from a revision or a redraw.
+ * (or "redrawn:b", with the option they had selected while writing) when they wanted none of the three, "replaced"
+ * when Redraw all drew them again because the system changed, and "cleared" when Clear all took them off the Designs
+ * page without drawing anything. Nothing is built from a revision, a redraw or a clear.
  */
 export const REDRAWN = "redrawn";
 export const REPLACED = "replaced";
+export const CLEARED = "cleared";
+/** Decisions about the system, not the designs: no founder judged them, so they teach no taste. */
+export const UNJUDGED = [REPLACED, CLEARED];
 export const REVISE_PREFIX = "revise:";
 export const REDRAWN_PREFIX = `${REDRAWN}:`;
 

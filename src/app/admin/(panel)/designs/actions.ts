@@ -7,7 +7,7 @@ import { BOARD_LETTERS } from "@/lib/boards";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { chooseBoard, noteBehindBoards, redrawBoards, redrawWaiting } from "@/server/boards/store";
+import { chooseBoard, clearWaiting, noteBehindBoards, redrawBoards, redrawWaiting } from "@/server/boards/store";
 import { businessById } from "@/server/leads/businesses";
 import { requestPreview } from "@/server/runner/jobs";
 import { TURN_PATH } from "@/lib/turn";
@@ -90,5 +90,16 @@ export async function redrawAllWaitingAction() {
     if (lead) await requestPreview(lead, founder.email, await noteBehindBoards(board));
   }
   if (boards.length) await record(founder.email, "asked for every waiting design to be drawn again", { detail: `${boards.length} designs` });
+  revalidatePath("/admin", "layout");
+}
+
+/**
+ * A founder wants every waiting design gone without new ones: each is cleared and nothing is queued, so the runner
+ * draws designs again only as Setup > Bots allows. Nothing is learned from them.
+ */
+export async function clearAllWaitingAction() {
+  const founder = await requireFounder();
+  const boards = await clearWaiting(founder.email);
+  if (boards.length) await record(founder.email, "cleared every waiting design", { detail: `${boards.length} designs` });
   revalidatePath("/admin", "layout");
 }

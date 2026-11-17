@@ -1,6 +1,6 @@
 import "server-only";
-import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
-import { REPLACED, verdictOf } from "@/lib/boards";
+import { and, desc, eq, isNotNull, ne, notInArray } from "drizzle-orm";
+import { UNJUDGED, verdictOf } from "@/lib/boards";
 import type { ReviewNote } from "@/lib/review";
 import { db } from "../db/client";
 import { businesses, designBoards, previewReviews, spotChecks } from "../db/schema";
@@ -25,7 +25,7 @@ async function boardNotes(email: string): Promise<FounderNote[]> {
     .select({ id: designBoards.id, text: designBoards.feedback, at: designBoards.chosenAt, chosenLetter: designBoards.chosenLetter, business: businesses.businessName })
     .from(designBoards)
     .innerJoin(businesses, eq(businesses.id, designBoards.businessId))
-    .where(and(eq(designBoards.chosenBy, email), isNotNull(designBoards.chosenAt), ne(designBoards.chosenLetter, REPLACED), ne(designBoards.feedback, "")))
+    .where(and(eq(designBoards.chosenBy, email), isNotNull(designBoards.chosenAt), notInArray(designBoards.chosenLetter, UNJUDGED), ne(designBoards.feedback, "")))
     .orderBy(desc(designBoards.chosenAt))
     .limit(NOTES_READ);
   return rows.map((row) => ({ id: `board:${row.id}`, text: row.text, at: row.at ?? new Date(0), business: row.business, about: boardAbout(row.chosenLetter), href: `/admin/designs/${row.id}` }));

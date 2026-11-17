@@ -1,19 +1,17 @@
 "use client";
 
-import { ArrowsClockwise } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "../../Button";
 import SubmitButton from "../SubmitButton";
 
-/** Every waiting design drawn again with the runner's current system, after one confirming tap. */
-export default function RedrawAll({ action, count }: { action: () => Promise<void>; count: number }) {
+/** An action on every waiting design, taken after one confirming tap: the first tap names it, the second does it. */
+export default function ConfirmAll({ action, icon, label, confirm }: { action: () => Promise<void>; icon: ReactNode; label: string; confirm: string }) {
   const [confirming, setConfirming] = useState(false);
-  const icon = <ArrowsClockwise size={18} weight="bold" aria-hidden="true" />;
 
   if (!confirming) {
     return (
       <Button variant="ghost" size="sm" icon={icon} onClick={() => setConfirming(true)}>
-        Redraw all {count}
+        {label}
       </Button>
     );
   }
@@ -24,7 +22,7 @@ export default function RedrawAll({ action, count }: { action: () => Promise<voi
         Keep them
       </Button>
       <SubmitButton variant="danger" size="sm" icon={icon} autoFocus>
-        Replace all {count} with new designs
+        {confirm}
       </SubmitButton>
     </form>
   );

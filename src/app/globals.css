@@ -87,3 +87,11 @@ body {
 @utility cursor-knife {
   cursor: var(--cursor-knife);
 }
+
+/* Everything a visitor can press shows the pointer: Tailwind v4 leaves buttons on the default arrow. :where keeps it
+   below any cursor a component sets itself. */
+@layer base {
+  :where(a[href], button:not(:disabled), [role="button"], [role="tab"], [role="link"], summary, label[for], select, input:is([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="reset"], [type="file"])) {
+    cursor: pointer;
+  }
+}
