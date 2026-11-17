@@ -22,5 +22,6 @@ test("a finished build with no finish time falls on the day it was requested", (
 
 test("a hide value names only real outcomes, in a fixed order", () => {
   assert.deepEqual(hiddenOutcomes("skipped,nonsense,failed"), ["failed", "skipped"]);
-  assert.deepEqual(hiddenOutcomes(undefined), []);
+  assert.deepEqual(hiddenOutcomes(undefined), ["boards"], "sent boards are hidden until a founder shows them");
+  assert.deepEqual(hiddenOutcomes(""), [], "an empty value shows every outcome");
 });

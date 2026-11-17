@@ -53,8 +53,12 @@ export function buildOutcome(job: { status: PreviewJobStatus; step?: string | nu
   return job.kind === "launch" ? "launched" : "built";
 }
 
-/** The outcomes a `?hide=failed,skipped` value names. Anything else in it is ignored. */
+/** What the Builds list hides until a founder shows it: sent boards are waiting on the Designs page, not on a build. */
+export const HIDDEN_BY_DEFAULT: readonly BuildOutcome[] = ["boards"];
+
+/** The outcomes a `?hide=failed,skipped` value names, the default with no value, none with an empty one. Anything else in it is ignored. */
 export function hiddenOutcomes(value: string | undefined): BuildOutcome[] {
+  if (value === undefined) return [...HIDDEN_BY_DEFAULT];
   const named = new Set((value ?? "").split(","));
   return BUILD_OUTCOMES.filter((outcome) => named.has(outcome));
 }

@@ -7,7 +7,7 @@ import EmptyState from "@/components/admin/EmptyState";
 import Pager from "@/components/admin/Pager";
 import { Card, Section, StatusMark, type StatusTone } from "@/components/admin/ui";
 import { jobsByDay } from "@/lib/buildStatus";
-import { BUILD_OUTCOME_LABEL, BUILD_OUTCOMES, buildOutcome, type BuildOutcome } from "@/lib/previewJobs";
+import { BUILD_OUTCOME_LABEL, BUILD_OUTCOMES, buildOutcome, HIDDEN_BY_DEFAULT, type BuildOutcome } from "@/lib/previewJobs";
 import type { BuildHistory as History } from "@/server/runner/history";
 import type { JobRow } from "@/server/runner/status";
 
@@ -33,7 +33,8 @@ export function SiteLink({ job }: { job: JobRow }) {
 
 function historyHref(hidden: BuildOutcome[], page = 1): string {
   const query = new URLSearchParams();
-  if (hidden.length > 0) query.set("hide", hidden.join(","));
+  const isDefault = hidden.length === HIDDEN_BY_DEFAULT.length && hidden.every((outcome) => HIDDEN_BY_DEFAULT.includes(outcome));
+  if (!isDefault) query.set("hide", hidden.join(","));
   if (page > 1) query.set("page", String(page));
   const text = query.toString().replaceAll("%2C", ",");
   return `/admin/builds${text ? `?${text}` : ""}`;
