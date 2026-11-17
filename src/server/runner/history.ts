@@ -1,6 +1,6 @@
 import "server-only";
 import { count, inArray, notInArray, sql } from "drizzle-orm";
-import { BUILD_OUTCOMES, FINISHED_JOB_STATUSES, SKIPPED_STEP, type BuildOutcome } from "@/lib/previewJobs";
+import { BOARDS_STEP, BUILD_OUTCOMES, FINISHED_JOB_STATUSES, SKIPPED_STEP, type BuildOutcome } from "@/lib/previewJobs";
 import { db } from "../db/client";
 import { previewJobs } from "../db/schema";
 import { finishedJobs, type JobRow } from "./status";
@@ -21,6 +21,7 @@ export type BuildHistory = {
 /** buildOutcome from lib/previewJobs, as SQL, so hiding an outcome happens in the query and pages stay full. */
 const OUTCOME = sql<BuildOutcome>`case
   when ${previewJobs.status} = 'failed' and ${previewJobs.step} = ${SKIPPED_STEP} then 'skipped'
+  when ${previewJobs.status} = 'done' and ${previewJobs.step} = ${BOARDS_STEP} then 'boards'
   when ${previewJobs.status} = 'failed' then 'failed'
   when ${previewJobs.status} = 'waiting_for_usage' then 'paused'
   when ${previewJobs.kind} = 'launch' then 'launched'

@@ -36,7 +36,7 @@ test("hiding an outcome takes it out of the rows and the page count, and the que
   const { db } = await import("../db/client");
   const { businesses, previewJobs } = await import("../db/schema");
   const { buildHistory } = await import("./history");
-  const { buildOutcome, SKIPPED_STEP } = await import("../../lib/previewJobs");
+  const { BOARDS_STEP, buildOutcome, SKIPPED_STEP } = await import("../../lib/previewJobs");
   const database = await db();
   const stamp = Date.now();
   const [lead] = await database.insert(businesses).values({ businessName: "Outcome test", slug: `outcome-${stamp}`, linkCode: `outcome-${stamp}`, stage: "new" } as never).returning({ id: businesses.id });
@@ -49,11 +49,12 @@ test("hiding an outcome takes it out of the rows and the page count, and the que
     { ...base, status: "failed", step: "Building" },
     { ...base, status: "failed", step: SKIPPED_STEP },
     { ...base, status: "waiting_for_usage" },
+    { ...base, status: "done", step: BOARDS_STEP },
   ]);
 
   const everything = await buildHistory(1);
-  for (const outcome of ["built", "launched", "failed", "skipped", "paused"] as const) assert.equal(everything.counts[outcome], before[outcome] + 1, outcome);
-  assert.deepEqual(everything.jobs.slice(0, 5).map(buildOutcome).sort(), ["built", "failed", "launched", "paused", "skipped"]);
+  for (const outcome of ["built", "launched", "boards", "failed", "skipped", "paused"] as const) assert.equal(everything.counts[outcome], before[outcome] + 1, outcome);
+  assert.deepEqual(everything.jobs.slice(0, 6).map(buildOutcome).sort(), ["boards", "built", "failed", "launched", "paused", "skipped"]);
   const total = Object.values(everything.counts).reduce((sum, value) => sum + value, 0);
   assert.equal(everything.shown, total);
 
@@ -62,7 +63,11 @@ test("hiding an outcome takes it out of the rows and the page count, and the que
   assert.ok(hidden.jobs.every((job) => !["failed", "skipped"].includes(buildOutcome(job))));
   assert.deepEqual(hidden.counts, everything.counts);
 
-  assert.equal((await buildHistory(1, ["built", "launched", "failed", "skipped", "paused"])).jobs.length, 0);
+  const withoutBoards = await buildHistory(1, ["boards"]);
+  assert.equal(withoutBoards.shown, total - everything.counts.boards);
+  assert.ok(withoutBoards.jobs.every((job) => buildOutcome(job) !== "boards"), "sent boards are hidden by the query, not only labelled");
+
+  assert.equal((await buildHistory(1, ["built", "launched", "boards", "failed", "skipped", "paused"])).jobs.length, 0);
 });
 
 after(async () => {
