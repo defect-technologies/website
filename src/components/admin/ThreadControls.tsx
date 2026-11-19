@@ -62,7 +62,7 @@ export function OptOutButton({ businessId, domain, suggested }: { businessId: st
     );
   }
   return (
-    <div role="group" aria-label="Confirm opt-out" className="bg-bad/10 flex flex-wrap items-center gap-2 rounded-full py-1 pr-1 pl-4">
+    <div role="group" aria-label="Confirm opt-out" className="bg-bad/10 flex flex-wrap items-center gap-2 rounded-control py-1 pr-1 pl-4">
       <span className="text-bad text-sm">Nobody at {domain || "this address"} will be emailed again.</span>
       <Button size="sm" variant="danger" disabled={pending} onClick={() => startTransition(() => optOutAction(businessId))}>
         Opt out

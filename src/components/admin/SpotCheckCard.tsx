@@ -19,7 +19,7 @@ function RatingField({ name, label, hint }: { name: string; label: string; hint:
         {[1, 2, 3, 4, 5].map((value) => (
           <label
             key={value}
-            className="border-ink/15 hover:border-ink/40 has-[:checked]:bg-ink has-[:checked]:text-paper has-[:checked]:border-ink has-[:focus-visible]:outline-ink grid size-10 cursor-pointer place-items-center rounded-full border text-base font-medium tabular-nums transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+            className="ring-ink/15 hover:ring-ink/40 has-[:checked]:bg-ink has-[:checked]:text-paper has-[:checked]:ring-ink has-[:focus-visible]:outline-ink grid size-10 cursor-pointer place-items-center rounded-control ring-1 ring-inset text-base font-medium tabular-nums transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
           >
             <input type="radio" name={name} value={value} required className="sr-only" />
             {value}

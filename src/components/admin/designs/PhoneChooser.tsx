@@ -134,14 +134,14 @@ function decisionFor(slide: Slide, options: BoardOption[], hasNote: boolean) {
 function TopBar({ businessName, slides, slide, onShow, close }: { businessName: string; slides: Segment<Slide>[]; slide: Slide; onShow: (next: Slide) => void; close: Props["close"] }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-      <div className="bg-paper/95 text-ink shadow-lifted pointer-events-auto flex min-h-11 min-w-0 items-center rounded-full pr-4 backdrop-blur">
-        <Link href={close.href} className="focus-visible:outline-ink grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2">
+      <div className="bg-paper/95 text-ink shadow-lifted pointer-events-auto flex min-h-11 min-w-0 items-center rounded-control pr-4 backdrop-blur">
+        <Link href={close.href} className="focus-visible:outline-ink grid size-11 shrink-0 place-items-center rounded-control focus-visible:outline-2">
           <X size={18} aria-hidden="true" />
           <span className="sr-only">{close.label}</span>
         </Link>
         <h1 className="min-w-0 truncate text-sm font-semibold">{businessName}</h1>
       </div>
-      <div className="shadow-lifted pointer-events-auto shrink-0 rounded-full">
+      <div className="shadow-lifted pointer-events-auto shrink-0 rounded-control">
         <Segmented label="Design in view" options={slides} value={slide} onChange={onShow} />
       </div>
     </div>

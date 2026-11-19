@@ -197,7 +197,7 @@ export function BusiestTimes({ week }: { week: WeekGrid }) {
 /** Last 7, 30 or 90 days, as links so the page stays a plain server render. */
 export function RangePicker({ days, site }: { days: RangeDays; site?: string }) {
   return (
-    <nav aria-label="Time period" className="bg-paper-shade flex rounded-full p-1">
+    <nav aria-label="Time period" className="bg-paper-shade flex rounded-control p-1">
       {RANGES.map((range) => {
         const current = range === days;
         const query = new URLSearchParams({ ...(site ? { site } : {}), days: String(range) });
@@ -206,7 +206,7 @@ export function RangePicker({ days, site }: { days: RangeDays; site?: string }) 
             key={range}
             href={`/portal?${query}`}
             aria-current={current ? "page" : undefined}
-            className={`flex min-h-9 items-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:text-ink"}`}
+            className={`flex min-h-9 items-center rounded-control-inset px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:text-ink"}`}
           >
             {range} days
           </Link>

@@ -26,7 +26,7 @@ export function NoteTarget({ anchor, path, onClear }: { anchor: NoteAnchor | nul
         <span className="text-ink-faint"> on {anchor?.path ?? path}</span>
       </span>
       {onClear && (
-        <button type="button" onClick={onClear} aria-label="Stop pointing at this element" className="text-ink-faint hover:text-ink hover:bg-paper-shade focus-visible:outline-ink -my-1 grid size-7 shrink-0 place-items-center rounded-full focus-visible:outline-2">
+        <button type="button" onClick={onClear} aria-label="Stop pointing at this element" className="text-ink-faint hover:text-ink hover:bg-paper-shade focus-visible:outline-ink -my-1 grid size-7 shrink-0 place-items-center rounded-control focus-visible:outline-2">
           <X size={14} weight="bold" aria-hidden="true" />
         </button>
       )}

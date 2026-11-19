@@ -20,7 +20,7 @@ export default function ImportForm() {
           type="file"
           accept=".csv,text/csv"
           required
-          className="text-ink-soft file:bg-paper-shade file:text-ink max-w-full text-sm file:mr-3 file:min-h-9 file:rounded-full file:border-0 file:px-3.5 file:text-sm file:font-medium"
+          className="text-ink-soft file:bg-paper-shade file:text-ink max-w-full text-sm file:mr-3 file:min-h-9 file:rounded-control file:border-0 file:px-3.5 file:text-sm file:font-medium"
         />
         <SubmitButton size="sm" variant="solid" icon={<UploadSimple size={16} weight="bold" aria-hidden="true" />}>
           Import leads.csv

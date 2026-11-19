@@ -157,7 +157,7 @@ export function StatusMark({ icon: MarkIcon, tone = "quiet", label, detail }: { 
 export function InfoTip({ children, className = "" }: { children: string; className?: string }) {
   return (
     <span className={`group/tip relative inline-flex align-middle ${className}`}>
-      <span tabIndex={0} className="text-ink-faint hover:text-ink focus-visible:outline-ink inline-flex size-6 items-center justify-center rounded-full focus-visible:outline-2">
+      <span tabIndex={0} className="text-ink-faint hover:text-ink focus-visible:outline-ink inline-flex size-6 items-center justify-center rounded-control focus-visible:outline-2">
         <Info size={16} aria-hidden="true" />
         <span className="sr-only">{children}</span>
       </span>

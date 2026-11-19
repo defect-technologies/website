@@ -14,8 +14,8 @@ type Props = {
   onNotes: () => void;
 };
 
-const PILL = "bg-paper/95 text-ink shadow-lifted backdrop-blur pointer-events-auto flex min-h-11 items-center rounded-full";
-const ROUND = "grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-ink";
+const PILL = "bg-paper/95 text-ink shadow-lifted backdrop-blur pointer-events-auto flex min-h-11 items-center rounded-control";
+const ROUND = "grid size-11 shrink-0 place-items-center rounded-control focus-visible:outline-2 focus-visible:outline-ink";
 
 /** Floats over the full-screen preview on a phone: which business, where in the queue, the notes, and the next one. */
 export default function PhoneTopBar({ item, position, total, nextId, notes, notesOpen, onNotes }: Props) {

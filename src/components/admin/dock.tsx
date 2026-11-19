@@ -39,7 +39,7 @@ export function DockAction({ icon, label, pending, onPress }: ActionProps) {
       onClick={onPress}
       disabled={pending}
       aria-busy={pending}
-      className="bg-ink text-paper shadow-lifted inline-flex min-h-14 min-w-28 items-center justify-center gap-2 rounded-full px-4 text-base font-medium transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-45"
+      className="bg-ink text-paper shadow-lifted inline-flex min-h-14 min-w-28 items-center justify-center gap-2 rounded-control px-4 text-base font-medium transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-45"
     >
       {pending ? <CircleNotch size={20} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon}
       {label}
@@ -102,7 +102,7 @@ export function DockMic({ talk, disabled = false, label }: { talk: Talk; disable
       onClick={talk.onToggle}
       disabled={disabled}
       aria-pressed={talk.listening}
-      className={`bg-ink text-paper shadow-lifted grid size-16 place-items-center rounded-full transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink disabled:opacity-45 ${talk.listening ? "animate-listening motion-reduce:animate-none" : ""}`}
+      className={`bg-ink text-paper shadow-lifted grid size-16 place-items-center rounded-control transition-[scale,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink disabled:opacity-45 ${talk.listening ? "animate-listening motion-reduce:animate-none" : ""}`}
     >
       {talk.listening ? <Stop size={26} weight="fill" aria-hidden="true" /> : <Microphone size={28} weight="fill" aria-hidden="true" />}
       <span className="sr-only">{talk.listening ? "Done talking" : label}</span>
@@ -111,7 +111,7 @@ export function DockMic({ talk, disabled = false, label }: { talk: Talk; disable
 }
 
 const SIDE_BUTTON =
-  "shadow-lifted flex min-h-14 min-w-14 flex-col items-center justify-center gap-0.5 rounded-full px-3 text-xs font-medium backdrop-blur transition-[color,background-color] duration-150 focus-visible:outline-2 focus-visible:outline-ink";
+  "shadow-lifted flex min-h-14 min-w-14 flex-col items-center justify-center gap-0.5 rounded-control px-3 text-xs font-medium backdrop-blur transition-[color,background-color] duration-150 focus-visible:outline-2 focus-visible:outline-ink";
 
 export function DockSideButton({ label, on, onClick, children }: { label: string; on: boolean; onClick: () => void; children: ReactNode }) {
   return (
@@ -159,7 +159,7 @@ export function DockTypeField({ id, label, text, onChange, onKeep, keepLabel, ch
           placeholder="What should change?"
           className="bg-surface border-ink/15 placeholder:text-ink-faint focus-visible:border-ink min-w-0 flex-1 resize-none rounded-lg border px-3 py-2 text-base focus-visible:outline-none"
         />
-        <button type="button" onClick={keep} disabled={!text.trim()} className="bg-ink text-paper grid size-11 shrink-0 place-items-center rounded-full disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
+        <button type="button" onClick={keep} disabled={!text.trim()} className="bg-ink text-paper grid size-11 shrink-0 place-items-center rounded-control disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
           <Plus size={18} weight="bold" aria-hidden="true" />
           <span className="sr-only">{keepLabel}</span>
         </button>

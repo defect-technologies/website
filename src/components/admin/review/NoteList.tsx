@@ -33,7 +33,7 @@ function NoteCard({ note, number, onChange, onRemove }: { note: ReviewNote; numb
           type="button"
           onClick={() => onRemove(note.id)}
           aria-label={`Remove note ${number}`}
-          className="text-ink-faint hover:text-bad hover:bg-bad/8 focus-visible:outline-ink grid size-9 place-items-center rounded-full transition-colors duration-150 focus-visible:outline-2"
+          className="text-ink-faint hover:text-bad hover:bg-bad/8 focus-visible:outline-ink grid size-9 place-items-center rounded-control transition-colors duration-150 focus-visible:outline-2"
         >
           <Trash size={18} aria-hidden="true" />
         </button>

@@ -18,7 +18,7 @@ function SitePicker({ context, path }: { context: PortalContext; path: string })
             key={site.slug}
             href={`${path}?site=${encodeURIComponent(site.slug)}`}
             aria-current={current ? "page" : undefined}
-            className={`min-h-9 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-ink text-paper" : "bg-paper-shade text-ink-soft hover:text-ink"}`}
+            className={`min-h-9 rounded-control px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-ink text-paper" : "bg-paper-shade text-ink-soft hover:text-ink"}`}
           >
             {siteName(site.businessName, site.url)}
           </Link>

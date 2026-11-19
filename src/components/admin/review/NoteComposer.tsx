@@ -22,7 +22,7 @@ type Props = {
   onAdd: () => void;
 };
 
-const TOOL = "focus-visible:outline-ink inline-flex min-h-10 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-45 disabled:pointer-events-none";
+const TOOL = "focus-visible:outline-ink inline-flex min-h-10 items-center gap-2 rounded-control px-3.5 text-sm font-medium transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-45 disabled:pointer-events-none";
 const TOOL_ON = "bg-ink text-paper shadow-[0_0_0_3px_rgb(226_66_27/0.35)]";
 const TOOL_OFF = "bg-paper-shade text-ink hover:bg-paper-shade/70";
 

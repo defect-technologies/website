@@ -227,7 +227,7 @@ function StatusFilter({ counts, selected, query }: { counts: Map<LeadStatus, num
               <Link
                 href={statusHref(status, query)}
                 aria-current={current ? "page" : undefined}
-                className={`flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-ink text-paper font-semibold" : "text-ink-soft hover:bg-paper-shade"}`}
+                className={`flex min-h-9 items-center gap-1.5 rounded-control px-3.5 text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${current ? "bg-ink text-paper font-semibold" : "text-ink-soft hover:bg-paper-shade"}`}
               >
                 {status ? LEAD_STATUS_LABEL[status] : "All"}
                 <span className={`tabular-nums ${current ? "text-paper/70" : "text-ink-faint"}`}>{status ? counts.get(status) : total}</span>

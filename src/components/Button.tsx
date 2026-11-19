@@ -5,7 +5,7 @@ type Variant = "solid" | "soft" | "ghost" | "danger";
 type Size = "md" | "sm" | "icon";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[scale,background-color,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:pointer-events-none disabled:opacity-45";
+  "inline-flex items-center justify-center gap-2 rounded-control font-medium whitespace-nowrap transition-[scale,background-color,opacity] duration-150 ease-knife active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:pointer-events-none disabled:opacity-45";
 
 const SIZES: Record<Size, string> = {
   md: "min-h-11 px-5 text-base",

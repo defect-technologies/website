@@ -108,7 +108,7 @@ function AddressBar({ previewUrl, path, device, onDevice }: { previewUrl: string
         target="_blank"
         rel="noreferrer"
         title="Open this page in a new tab"
-        className="bg-surface shadow-card text-ink-soft hover:text-ink flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-full px-4 text-sm"
+        className="bg-surface shadow-card text-ink-soft hover:text-ink flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-control px-4 text-sm"
       >
         <span className="min-w-0 flex-1 truncate">
           {hostOf(previewUrl)}

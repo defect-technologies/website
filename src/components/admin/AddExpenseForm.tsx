@@ -18,11 +18,11 @@ function Segmented({ legend, name, options, selected }: { legend: string; name: 
   return (
     <fieldset className="flex flex-col">
       <legend className="mb-1.5 text-sm font-medium">{legend}</legend>
-      <div className="bg-paper-shade flex rounded-full p-1">
+      <div className="bg-paper-shade flex rounded-control p-1">
         {options.map((option) => (
           <label
             key={option.value}
-            className="text-ink-soft has-checked:bg-surface has-checked:text-ink has-checked:shadow-card has-focus-visible:outline-ink flex min-h-9 flex-1 cursor-pointer items-center justify-center rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 has-focus-visible:outline-2"
+            className="text-ink-soft has-checked:bg-surface has-checked:text-ink has-checked:shadow-card has-focus-visible:outline-ink flex min-h-9 flex-1 cursor-pointer items-center justify-center rounded-control-inset px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 has-focus-visible:outline-2"
           >
             <input type="radio" name={name} value={option.value} defaultChecked={option.value === selected} required className="sr-only" />
             {option.label}

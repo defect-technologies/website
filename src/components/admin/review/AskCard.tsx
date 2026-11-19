@@ -37,7 +37,7 @@ function Progress({ state, flow }: { state: AsksState; flow: AskFlow }) {
   );
 }
 
-const CHOICE = "inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-[background-color,scale] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+const CHOICE = "inline-flex min-h-10 items-center gap-1.5 rounded-control px-3.5 text-sm font-medium transition-[background-color,scale] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 function Writing() {
   return (

@@ -8,8 +8,8 @@ import type { SectionSteps } from "./useSectionSteps";
 
 type Props = { steps: SectionSteps; notes: ReviewNote[]; onQuickNote: (kind: CriticKind) => void; className?: string };
 
-const STEP = "bg-paper-shade text-ink hover:bg-paper-shade/70 focus-visible:outline-ink grid size-10 shrink-0 place-items-center rounded-full transition-[background-color,scale,opacity] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-30";
-const CHIP = "focus-visible:outline-ink inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-[background-color,color,scale] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2";
+const STEP = "bg-paper-shade text-ink hover:bg-paper-shade/70 focus-visible:outline-ink grid size-10 shrink-0 place-items-center rounded-control transition-[background-color,scale,opacity] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-30";
+const CHIP = "focus-visible:outline-ink inline-flex min-h-10 items-center gap-1.5 rounded-control px-3.5 text-sm font-medium transition-[background-color,color,scale] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2";
 
 /**
  * One section of the preview at a time, while pointing: step to the one before or after, and add any of the six usual
