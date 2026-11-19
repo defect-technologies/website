@@ -19,8 +19,9 @@ export default function PoolCard({ board, place, claim }: { board: BoardWithLead
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col">
           <h2 className="text-xl font-semibold">{board.businessName}</h2>
-          <span className="text-ink-soft text-sm">
-            {place && `${place}, `}waiting <When date={board.createdAt} />
+          {place && <span className="text-ink-soft text-sm">{place}</span>}
+          <span className="text-ink-faint text-sm">
+            Waiting since <When date={board.createdAt} />
           </span>
         </div>
         <form action={claim}>

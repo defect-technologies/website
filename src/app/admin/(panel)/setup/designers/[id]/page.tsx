@@ -1,5 +1,4 @@
 import { requireFounder } from "@/server/auth/session";
-import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ButtonLink } from "@/components/Button";
@@ -32,7 +31,7 @@ export default async function DesignerPage({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader title={designer.name}>
-        <ButtonLink href="/admin/setup/designers" variant="ghost" icon={<ArrowLeft size={18} aria-hidden="true" />}>
+        <ButtonLink href="/admin/setup/designers" variant="ghost">
           All designers
         </ButtonLink>
       </PageHeader>

@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { isRedrawn, revisedLetter, verdictOf } from "@/lib/boards";
 import { type BoardState, monthlyFeeCents, type WorkFacts, type WorkStatus, workStatus } from "@/lib/designerWork";
 import { ACTIVE_JOB_STATUSES, isSkipped } from "@/lib/previewJobs";
@@ -61,9 +61,12 @@ async function newestBoards(ids: string[]): Promise<Map<string, DesignBoard>> {
   return newestPer(await (await db()).select().from(designBoards).where(inArray(designBoards.businessId, ids)).orderBy(desc(designBoards.createdAt)));
 }
 
-async function newestJobs(ids: string[]): Promise<Map<string, PreviewJob>> {
-  if (!ids.length) return new Map();
-  return newestPer(await (await db()).select().from(previewJobs).where(inArray(previewJobs.businessId, ids)).orderBy(desc(previewJobs.createdAt)));
+/** Each business's newest finished preview job, and the businesses with one queued or running. */
+async function jobsOf(ids: string[]): Promise<{ newestFinished: Map<string, PreviewJob>; active: Set<string> }> {
+  if (!ids.length) return { newestFinished: new Map(), active: new Set() };
+  const jobs = await (await db()).select().from(previewJobs).where(and(inArray(previewJobs.businessId, ids), eq(previewJobs.kind, "preview"))).orderBy(desc(previewJobs.createdAt));
+  const isActive = (job: PreviewJob) => (ACTIVE_JOB_STATUSES as readonly string[]).includes(job.status);
+  return { newestFinished: newestPer(jobs.filter((job) => !isActive(job))), active: new Set(jobs.filter(isActive).map((job) => job.businessId)) };
 }
 
 export function boardState(board: Pick<DesignBoard, "chosenAt" | "chosenLetter"> | undefined): BoardState {
@@ -73,13 +76,16 @@ export function boardState(board: Pick<DesignBoard, "chosenAt" | "chosenLetter">
   return verdictOf(board.chosenLetter)?.verdict === "chose" ? "chosen" : "none";
 }
 
-function factsOf(row: ClaimedRow, board: DesignBoard | undefined, job: PreviewJob | undefined, reviewing: Set<string>): WorkFacts {
+type Known = { boards: Map<string, DesignBoard>; jobs: Awaited<ReturnType<typeof jobsOf>>; reviewing: Set<string> };
+
+function factsOf(row: ClaimedRow, known: Known): WorkFacts {
+  const finished = known.jobs.newestFinished.get(row.id);
   return {
     ...row,
-    board: boardState(board),
-    building: Boolean(job && (ACTIVE_JOB_STATUSES as readonly string[]).includes(job.status)),
-    failed: job?.status === "failed" && !isSkipped(job),
-    awaitingReview: reviewing.has(row.id),
+    board: boardState(known.boards.get(row.id)),
+    building: known.jobs.active.has(row.id),
+    failed: finished?.status === "failed" && !isSkipped(finished),
+    awaitingReview: known.reviewing.has(row.id),
   };
 }
 
@@ -87,10 +93,10 @@ function factsOf(row: ClaimedRow, board: DesignBoard | undefined, job: PreviewJo
 export async function designerBusinesses(designerId: string, now = Date.now()): Promise<DesignerBusiness[]> {
   const rows = await claimedRows(designerId);
   const ids = rows.map((row) => row.id);
-  const [boards, jobs, reviewing, { followUpAfterDays }] = await Promise.all([newestBoards(ids), newestJobs(ids), reviewQueue(ids.length, ids), outreachSettings()]);
-  const waitingReview = new Set(reviewing.map((item) => item.id));
+  const [boards, jobs, reviewing, { followUpAfterDays }] = await Promise.all([newestBoards(ids), jobsOf(ids), reviewQueue(ids.length, ids), outreachSettings()]);
+  const known: Known = { boards, jobs, reviewing: new Set(reviewing.map((item) => item.id)) };
   return rows.map(({ plan, priceArm, ...row }) => {
-    const status = workStatus(factsOf({ plan, priceArm, ...row }, boards.get(row.id), jobs.get(row.id), waitingReview), followUpAfterDays, now);
+    const status = workStatus(factsOf({ plan, priceArm, ...row }, known), followUpAfterDays, now);
     return { ...row, status, earnedCents: status === "client" ? monthlyFeeCents(plan, priceArm) : 0, boardId: boards.get(row.id)?.id ?? null };
   });
 }
@@ -123,5 +129,6 @@ export async function designerTurns(designerId: string): Promise<Turn[]> {
 export async function placesOf(ids: string[]): Promise<Map<string, string>> {
   if (!ids.length) return new Map();
   const rows = await (await db()).select({ id: businesses.id, niche: businesses.niche, area: businesses.area }).from(businesses).where(inArray(businesses.id, ids));
-  return new Map(rows.map((row) => [row.id, [row.niche, row.area].filter(Boolean).join(" in ")]));
+  const place = (niche: string, area: string) => [niche, area].filter(Boolean).join(" in ");
+  return new Map(rows.map((row) => [row.id, place(row.niche, row.area).replace(/^./, (first) => first.toUpperCase())]));
 }

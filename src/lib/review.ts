@@ -55,7 +55,7 @@ export function compileReviewNote(notes: ReviewNote[], previewUrl: string): stri
     const targetSentence = note.target ? ` ${TARGET_SENTENCE[note.target]}` : "";
     return `${index + 1}. ${whereLine(note)}: ${note.text.trim()}${targetSentence}`;
   });
-  const head = `A founder reviewed the preview at ${previewUrl} and wants these changes. Make every one of them; where a note names an element, change that element and anything else on the site with the same problem.`;
+  const head = `A founder or designer reviewed the preview at ${previewUrl} and wants these changes. Make every one of them; where a note names an element, change that element and anything else on the site with the same problem.`;
   return [head, "", ...lines].join("\n").slice(0, MAX_COMPILED_NOTE);
 }
 

@@ -40,7 +40,7 @@ export function RecordPaymentForm({ designerId, today, owedCents }: { designerId
       <Outcome state={state} />
       <Card key={state.done ?? "first"} className="flex flex-col gap-4 p-5">
         <input type="hidden" name="designerId" value={designerId} />
-        <div className="grid items-end gap-4 sm:grid-cols-[9.5rem_8rem_minmax(0,1fr)]">
+        <div className="grid items-end gap-4 sm:grid-cols-[9.5rem_8rem]">
           <TextField label="Date sent" name="paidOn" type="date" required defaultValue={today} max={today} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor="payment-amount" className="text-sm font-medium">
@@ -50,11 +50,11 @@ export function RecordPaymentForm({ designerId, today, owedCents }: { designerId
               <span aria-hidden="true" className="text-ink-faint pointer-events-none absolute inset-y-0 left-3 flex items-center">
                 $
               </span>
-              <input id="payment-amount" name="amount" inputMode="decimal" required defaultValue={suggested} placeholder="59.00" autoComplete="off" className={`${controlClass} pl-7 text-right tabular-nums`} />
+              <input id="payment-amount" name="amount" inputMode="decimal" required defaultValue={suggested} autoComplete="off" className={`${controlClass} pl-7 text-right tabular-nums`} />
             </div>
           </div>
-          <TextField label="Note (optional)" name="note" maxLength={300} autoComplete="off" />
         </div>
+        <TextField label="Note (optional)" name="note" maxLength={300} autoComplete="off" />
         <SubmitButton variant="solid" className="w-fit" icon={<Wallet size={18} aria-hidden="true" />}>
           Record payment
         </SubmitButton>

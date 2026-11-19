@@ -157,3 +157,12 @@ test("a designer's businesses carry their status and earnings, never the owner's
   assert.deepEqual([ledger.earnedCents, ledger.paidCents, ledger.owedCents], [5900, 2000, 3900]);
   assert.equal(ledger.payments[0].recordedBy, "brendan@g.studio");
 });
+
+test("a business with any build queued is building, even when a newer job only drew its designs", async () => {
+  const { lead, board } = await waitingBoard("Queued Before Boards");
+  await claimBoard(board.id, maya.id);
+  await database.insert(previewJobs).values({ businessId: lead.id, requestedBy: "bot:outreach", status: "queued", createdAt: new Date(Date.now() - 60_000) });
+  await database.update(designBoards).set({ chosenLetter: "b", chosenAt: new Date(), chosenBy: MAYA }).where(eq(designBoards.id, board.id));
+  const row = (await designerBusinesses(maya.id)).find((business) => business.id === lead.id);
+  assert.equal(row?.status, "building");
+});
