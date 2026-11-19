@@ -9,7 +9,8 @@ import ShowMore from "./ShowMore";
 import SubmitButton from "./SubmitButton";
 import { StageChip, When } from "./ui";
 
-export type PreviewLead = Pick<Business, "id" | "slug" | "businessName" | "previewUrl" | "stage">;
+/** `designerId` is the designer the business belongs to, when one took it. */
+export type PreviewLead = Pick<Business, "id" | "slug" | "businessName" | "previewUrl" | "stage"> & { designerId: string | null };
 type PreviewSite = { key: string; name: string; versions: PreviewDeployment[]; owner: PreviewLead | undefined };
 
 /** The preview filters on Leads > Previews, as their URL values. */
@@ -31,7 +32,10 @@ export const BUILT_WITHIN: [string, string][] = [
   ["30", "Past month"],
 ];
 
-export type PreviewFilters = { q: string; status: string; days: string };
+/** `designer` is a designer's ID, NO_DESIGNER for businesses no designer took, or empty for any. */
+export type PreviewFilters = { q: string; status: string; days: string; designer: string };
+
+export const NO_DESIGNER = "none";
 
 const STATUS_STAGES: Record<string, Stage[]> = {
   unsent: ["new", "preview_built"],
@@ -206,8 +210,15 @@ export function groupBySite(previews: PreviewDeployment[], leads: PreviewLead[])
     .sort((a, b) => b.versions[0].createdAt.getTime() - a.versions[0].createdAt.getTime());
 }
 
-function matches(site: PreviewSite, { q, status, days }: PreviewFilters) {
+function byDesigner(site: PreviewSite, designer: string) {
+  if (!designer) return true;
+  const owner = site.owner?.designerId ?? null;
+  return designer === NO_DESIGNER ? !owner : owner === designer;
+}
+
+function matches(site: PreviewSite, { q, status, days, designer }: PreviewFilters) {
   const latest = site.versions[0];
+  if (!byDesigner(site, designer)) return false;
   if (q && !`${site.name} ${site.owner?.slug ?? site.key}`.toLowerCase().includes(q.toLowerCase())) return false;
   if (days && Date.now() - latest.createdAt.getTime() > Number(days) * 86_400_000) return false;
   if (status === "no-lead") return !site.owner;
@@ -220,7 +231,7 @@ export default function PreviewList({ previews, leads, filters }: { previews: Pr
   if (previews.length === 0) return <p className="text-ink-soft text-sm">No previews deployed.</p>;
   const sites = groupBySite(previews, leads);
   const shown = sites.filter((site) => matches(site, filters));
-  const filtered = Boolean(filters.q || filters.status || filters.days);
+  const filtered = Boolean(filters.q || filters.status || filters.days || filters.designer);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">

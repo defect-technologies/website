@@ -2,12 +2,14 @@ import { requireFounder } from "@/server/auth/session";
 import { FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import EmptyState from "@/components/admin/EmptyState";
+import FilterBar from "@/components/admin/FilterBar";
 import { TextField } from "@/components/admin/fields";
 import ShowMore from "@/components/admin/ShowMore";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { Card, PageHeader, When } from "@/components/admin/ui";
 import { founderName } from "@/lib/founders";
 import { SPOT_CHECK_ASPECTS } from "@/lib/spotChecks";
+import { allDesigners } from "@/server/designers/people";
 import { reviewedSpotChecks, spotCheckAverages, spotCheckSettings, type SpotCheckAverages, type SpotCheckRow } from "@/server/spotChecks";
 import { saveSpotCheckSettingsAction } from "./actions";
 
@@ -80,15 +82,25 @@ function SettingsForm({ share }: { share: number }) {
   );
 }
 
-export default async function SpotChecksPage() {
+/** Picks whose businesses' results show: everyone's, or one designer's. Shown once there is a designer. */
+function DesignerFilter({ designers, value }: { designers: [string, string][]; value: string }) {
+  if (designers.length < 2) return null;
+  return <FilterBar action="/admin/setup/spot-checks" selects={[{ name: "designer", label: "Designer", value, options: designers }]} clearHref={value ? "/admin/setup/spot-checks" : undefined} />;
+}
+
+export default async function SpotChecksPage({ searchParams }: { searchParams: Promise<{ designer?: string }> }) {
   await requireFounder();
-  const [reviewed, averages, settings] = await Promise.all([reviewedSpotChecks(), spotCheckAverages(), spotCheckSettings()]);
+  const designers: [string, string][] = [["", "Every designer"], ...(await allDesigners()).map((designer): [string, string] => [designer.id, designer.name])];
+  const asked = (await searchParams).designer ?? "";
+  const designer = designers.some(([id]) => id && id === asked) ? asked : "";
+  const [reviewed, averages, settings] = await Promise.all([reviewedSpotChecks(100, designer || undefined), spotCheckAverages(30, designer || undefined), spotCheckSettings()]);
 
   return (
     <>
       <PageHeader title="Spot checks">
         <SettingsForm share={settings.share} />
       </PageHeader>
+      <DesignerFilter designers={designers} value={designer} />
       <Averages averages={averages} />
       {reviewed.length === 0 ? (
         <EmptyState title="No ratings yet" />

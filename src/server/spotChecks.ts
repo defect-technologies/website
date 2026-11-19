@@ -1,9 +1,9 @@
 import "server-only";
-import { and, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { DEFAULT_SPOT_CHECK_SETTINGS, type SpotCheckSettings } from "@/lib/spotChecks";
 import { record } from "./activity";
 import { db } from "./db/client";
-import { businesses, settings, spotChecks, type Business, type SpotCheck } from "./db/schema";
+import { businesses, designerClaims, settings, spotChecks, type Business, type SpotCheck } from "./db/schema";
 
 const SETTINGS_KEY = "spot_checks";
 
@@ -52,20 +52,24 @@ export async function openSpotChecks(): Promise<SpotCheckRow[]> {
 
 
 /** Rated spot checks, newest first. */
-export async function reviewedSpotChecks(limit = 100): Promise<SpotCheckRow[]> {
+/** Spot checks of the businesses one designer took: the founders read their work by it. */
+const ofDesigner = (designerId: string | undefined) =>
+  designerId ? inArray(spotChecks.businessId, sql`(select ${designerClaims.businessId} from ${designerClaims} where ${designerClaims.designerId} = ${designerId})`) : undefined;
+
+export async function reviewedSpotChecks(limit = 100, designerId?: string): Promise<SpotCheckRow[]> {
   return (await db())
     .select(withBusiness)
     .from(spotChecks)
     .innerJoin(businesses, eq(spotChecks.businessId, businesses.id))
-    .where(eq(spotChecks.status, "done"))
+    .where(and(eq(spotChecks.status, "done"), ofDesigner(designerId)))
     .orderBy(desc(spotChecks.reviewedAt))
     .limit(limit);
 }
 
 export type SpotCheckAverages = { checks: number; copy: number | null; typography: number | null; layout: number | null };
 
-/** Average ratings over the last `days` days. */
-export async function spotCheckAverages(days = 30): Promise<SpotCheckAverages> {
+/** Average ratings over the last `days` days, of every business or one designer's. */
+export async function spotCheckAverages(days = 30, designerId?: string): Promise<SpotCheckAverages> {
   const since = new Date(Date.now() - days * 86_400_000);
   const [row] = await (await db())
     .select({
@@ -75,7 +79,7 @@ export async function spotCheckAverages(days = 30): Promise<SpotCheckAverages> {
       layout: sql<number | null>`avg(${spotChecks.layoutRating})::float`,
     })
     .from(spotChecks)
-    .where(and(eq(spotChecks.status, "done"), isNotNull(spotChecks.reviewedAt), gte(spotChecks.reviewedAt, since)));
+    .where(and(eq(spotChecks.status, "done"), isNotNull(spotChecks.reviewedAt), gte(spotChecks.reviewedAt, since), ofDesigner(designerId)));
   return { checks: row?.checks ?? 0, copy: row?.copy ?? null, typography: row?.typography ?? null, layout: row?.layout ?? null };
 }
 
