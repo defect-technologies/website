@@ -176,6 +176,13 @@
       "when": 1795046007023,
       "tag": "0024_designers",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795066676039,
+      "tag": "0025_client_cancellations",
+      "breakpoints": true
     }
   ]
 }

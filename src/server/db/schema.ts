@@ -64,6 +64,8 @@ export const businesses = pgTable(
     plan: text("plan").notNull().default(""),
     stripeCustomerId: text("stripe_customer_id"),
     stripeSubscriptionId: text("stripe_subscription_id"),
+    /** When the client cancelled their plan, from the Stripe sync. Null while the plan runs, or again once they resume it. */
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     ownerEmail: text("owner_email").notNull().default(""),
     siteUrl: text("site_url").notNull().default(""),
     vercelProjectId: text("vercel_project_id").notNull().default(""),

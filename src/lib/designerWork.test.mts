@@ -1,11 +1,12 @@
 /**
- * Where a designer's business stands, and what they earn from it.
+ * Where a designer's design stands, and what they earn from it.
  *
  *   npm test
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { monthlyFeeCents, noReply, owedCents, type WorkFacts, workStatus } from "./designerWork";
+import { cancelledAt } from "./cancellation";
+import { monthlyFeeCents, noReply, owedCents, paidEarnings, type WorkFacts, workStatus } from "./designerWork";
 
 const DAY = 86_400_000;
 const NOW = Date.parse("2026-11-18T12:00:00Z");
@@ -13,7 +14,7 @@ const daysAgo = (days: number) => new Date(NOW - days * DAY);
 const WAIT = 4;
 
 function facts(extra: Partial<WorkFacts> = {}): WorkFacts {
-  return { stage: "new", source: "lead_finder", paidAt: null, firstSentAt: null, followUpSentAt: null, repliedAt: null, clickedAt: null, previewUrl: "", board: "none", building: false, failed: false, awaitingReview: false, ...extra };
+  return { stage: "new", source: "lead_finder", paidAt: null, cancelledAt: null, firstSentAt: null, followUpSentAt: null, repliedAt: null, clickedAt: null, previewUrl: "", board: "none", building: false, failed: false, awaitingReview: false, ...extra };
 }
 
 const status = (extra: Partial<WorkFacts>) => workStatus(facts(extra), WAIT, NOW);
@@ -62,4 +63,30 @@ test("owed is everything earned less every payment, and can run ahead", () => {
   assert.equal(owedCents([{ cents: 5900 }, { cents: 7900 }], [{ amountCents: 5900 }]), 7900);
   assert.equal(owedCents([], [{ amountCents: 1000 }]), -1000);
   assert.equal(owedCents([], []), 0);
+});
+
+test("a client who cancels reads as signed up, then cancelled", () => {
+  assert.equal(status({ stage: "paid", paidAt: daysAgo(30), firstSentAt: daysAgo(40), cancelledAt: daysAgo(2) }), "cancelled");
+  assert.equal(status({ stage: "live", paidAt: daysAgo(30), firstSentAt: daysAgo(40) }), "client");
+});
+
+test("payments settle the oldest sign-ups first, and only whole ones", () => {
+  const earned = [
+    { businessId: "new", paidAt: daysAgo(1), cents: 7900 },
+    { businessId: "old", paidAt: daysAgo(20), cents: 5900 },
+    { businessId: "middle", paidAt: daysAgo(10), cents: 7900 },
+  ];
+  assert.deepEqual([...paidEarnings(earned, [])], []);
+  assert.deepEqual([...paidEarnings(earned, [{ amountCents: 5900 }])], ["old"]);
+  assert.deepEqual([...paidEarnings(earned, [{ amountCents: 5900 }, { amountCents: 5000 }])], ["old"], "half of the next one leaves it owed");
+  assert.deepEqual([...paidEarnings(earned, [{ amountCents: 21700 }])].sort(), ["middle", "new", "old"]);
+});
+
+test("a Stripe plan is cancelled once the client asks, and running again once they resume", () => {
+  const now = new Date(NOW);
+  const running = { status: "active", cancel_at_period_end: false, cancel_at: null, canceled_at: null };
+  assert.equal(cancelledAt(running, now), null);
+  assert.deepEqual(cancelledAt({ ...running, cancel_at_period_end: true, canceled_at: NOW / 1000 - 3600 }, now), new Date(NOW - 3_600_000), "ending at the period's end counts from when they asked");
+  assert.deepEqual(cancelledAt({ ...running, status: "canceled" }, now), now, "without Stripe's time, the sync's time");
+  assert.equal(cancelledAt({ ...running, canceled_at: NOW / 1000 - 3600 }, now), null, "resumed: an old canceled_at alone is not a cancellation");
 });

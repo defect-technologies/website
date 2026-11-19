@@ -18,7 +18,7 @@ export function OwedFigure({ ledger }: { ledger: Ledger }) {
       </div>
       <KeyValue
         rows={[
-          ["Earned", `${formatCents(ledger.earnedCents)} from ${ledger.earned.length} ${ledger.earned.length === 1 ? "client" : "clients"}`],
+          ["Earned", `${formatCents(ledger.earnedCents)} from ${ledger.earned.length} ${ledger.earned.length === 1 ? "sign-up" : "sign-ups"}`],
           ["Paid", formatCents(ledger.paidCents)],
         ]}
       />
@@ -26,7 +26,7 @@ export function OwedFigure({ ledger }: { ledger: Ledger }) {
   );
 }
 
-/** One month of each client's fee, for each business of theirs that became a client. */
+/** One month of each client's fee, for each design of theirs a business signed up for, and whether it was paid out. */
 export function EarnedList({ earned, hrefFor }: { earned: Earning[]; hrefFor?: (earning: Earning) => string }) {
   if (!earned.length) return null;
   return (
@@ -44,10 +44,13 @@ export function EarnedList({ earned, hrefFor }: { earned: Earning[]; hrefFor?: (
                   <span className="truncate font-medium">{earning.businessName}</span>
                 )}
                 <span className="text-ink-faint text-sm">
-                  Became a client <When date={earning.paidAt} />
+                  Signed up <When date={earning.paidAt} />
                 </span>
               </span>
-              <span className="text-good font-semibold tabular-nums">{formatCents(earning.cents)}</span>
+              <span className="flex flex-col items-end tabular-nums">
+                <span className={`font-semibold ${earning.settled ? "text-ink-soft" : "text-good"}`}>{formatCents(earning.cents)}</span>
+                <span className="text-ink-faint text-sm">{earning.settled ? "Paid" : "Owed"}</span>
+              </span>
             </li>
           ))}
         </ul>

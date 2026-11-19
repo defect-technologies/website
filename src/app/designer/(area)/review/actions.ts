@@ -9,7 +9,7 @@ import type { SplitNote } from "@/server/review/noteWriter";
 import { jobById } from "@/server/runner/jobs";
 import { addPointing, answerProposal, approveReview, asksFor, businessFrom, type ProposalAnswerInput, proposalAnswerIn, type ReviewInput, type ReviewResult, sendReview, splitSpoken } from "@/server/review/verdicts";
 
-const NOT_YOURS: ReviewResult = { ok: false, message: "This business isn't one of yours." };
+const NOT_YOURS: ReviewResult = { ok: false, message: "This design isn't one of yours." };
 
 /** The signed-in designer and the business, when the business is one they claimed. */
 async function ownLead(businessId: unknown): Promise<{ email: string; lead: Business } | null> {

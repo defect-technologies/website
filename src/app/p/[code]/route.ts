@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
+import { isSignedInToDefect } from "@/server/auth/insider";
 import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
 import { env } from "@/server/env";
@@ -7,16 +8,17 @@ import { advanceStage } from "@/server/leads/businesses";
 
 /**
  * The link in every outreach email. It counts the click, then sends the owner
- * on to their preview. Clicks before the email went out (a founder testing it)
- * don't count. Some mail filters open links on arrival, so a click shortly
- * after sending can be a scanner rather than the owner.
+ * on to their preview. Clicks before the email went out, and clicks from anyone
+ * signed in as a founder or designer, are ours and don't count. Some mail filters
+ * open links on arrival, so a click shortly after sending can be a scanner rather
+ * than the owner.
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const database = await db();
   const [business] = await database.select().from(businesses).where(eq(businesses.linkCode, code));
   if (!business?.previewUrl) return NextResponse.redirect(new URL("/", env.siteUrl()));
-  if (business.firstSentAt) {
+  if (business.firstSentAt && !(await isSignedInToDefect())) {
     await database
       .update(businesses)
       .set({ clickCount: sql`${businesses.clickCount} + 1`, clickedAt: business.clickedAt ?? new Date() })

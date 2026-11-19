@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { isRedrawn, revisedLetter, verdictOf } from "@/lib/boards";
-import { type BoardState, monthlyFeeCents, type WorkFacts, type WorkStatus, workStatus } from "@/lib/designerWork";
+import { type BoardState, monthlyFeeCents, SIGNED_UP, UNFINISHED, type WorkFacts, type WorkStatus, workStatus } from "@/lib/designerWork";
 import { ACTIVE_JOB_STATUSES, isSkipped } from "@/lib/previewJobs";
 import type { Turn, TurnPaths } from "@/lib/turn";
 import { boardsWaiting, type BoardWithLead } from "../boards/store";
@@ -30,6 +30,7 @@ const SAFE_COLUMNS = {
   clickCount: businesses.clickCount,
   repliedAt: businesses.repliedAt,
   paidAt: businesses.paidAt,
+  cancelledAt: businesses.cancelledAt,
   plan: businesses.plan,
   priceArm: businesses.priceArm,
   claimedAt: designerClaims.claimedAt,
@@ -37,7 +38,7 @@ const SAFE_COLUMNS = {
 
 export type DesignerBusiness = Omit<ClaimedRow, "plan" | "priceArm"> & {
   status: WorkStatus;
-  /** One month of the client's fee, in cents, once the business is a paying client. Zero until then. */
+  /** One month of the client's fee, in cents, once the business signed up for the design. Zero until then. */
   earnedCents: number;
   /** The newest board, for a link to it. */
   boardId: string | null;
@@ -97,7 +98,7 @@ export async function designerBusinesses(designerId: string, now = Date.now()): 
   const known: Known = { boards, jobs, reviewing: new Set(reviewing.map((item) => item.id)) };
   return rows.map(({ plan, priceArm, ...row }) => {
     const status = workStatus(factsOf({ plan, priceArm, ...row }, known), followUpAfterDays, now);
-    return { ...row, status, earnedCents: status === "client" ? monthlyFeeCents(plan, priceArm) : 0, boardId: boards.get(row.id)?.id ?? null };
+    return { ...row, status, earnedCents: SIGNED_UP.includes(status) ? monthlyFeeCents(plan, priceArm) : 0, boardId: boards.get(row.id)?.id ?? null };
   });
 }
 
@@ -131,4 +132,12 @@ export async function placesOf(ids: string[]): Promise<Map<string, string>> {
   const rows = await (await db()).select({ id: businesses.id, niche: businesses.niche, area: businesses.area }).from(businesses).where(inArray(businesses.id, ids));
   const place = (niche: string, area: string) => [niche, area].filter(Boolean).join(" in ");
   return new Map(rows.map((row) => [row.id, place(row.niche, row.area).replace(/^./, (first) => first.toUpperCase())]));
+}
+
+/** Gives back to the pool every design of a leaving designer they had not finished. Returns how many went back. */
+export async function releaseUnfinished(designerId: string): Promise<number> {
+  const unfinished = (await designerBusinesses(designerId)).filter((business) => UNFINISHED.includes(business.status)).map((business) => business.id);
+  if (!unfinished.length) return 0;
+  await (await db()).delete(designerClaims).where(and(eq(designerClaims.designerId, designerId), inArray(designerClaims.businessId, unfinished)));
+  return unfinished.length;
 }

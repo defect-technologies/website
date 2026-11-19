@@ -7,6 +7,7 @@ import { record } from "@/server/activity";
 import { isFounder, requireFounder } from "@/server/auth/session";
 import { recordPayment } from "@/server/designers/pay";
 import { addDesigner, designerById, setDesignerActive } from "@/server/designers/people";
+import { releaseUnfinished } from "@/server/designers/work";
 
 export type FormState = { problems: string[]; done?: string };
 
@@ -29,14 +30,20 @@ export async function addDesignerAction(_previous: FormState, form: FormData): P
   return { problems: [], done: `${parsed.data.name} can sign in now.` };
 }
 
-/** Deactivates a designer, which signs them out, or lets one back in. Their businesses stay theirs either way. */
+/**
+ * Deactivates a designer, which signs them out and gives their unfinished designs back to the pool, or lets one back
+ * in. Designs they finished stay theirs, so a business that signs up later still earns them their share.
+ */
 export async function setDesignerActiveAction(form: FormData) {
   const founder = await requireFounder();
   const id = z.uuid().safeParse(form.get("id"));
   if (!id.success) return;
   const active = form.get("active") === "true";
   const designer = await setDesignerActive(id.data, active, founder.email);
-  if (designer) await record(founder.email, active ? "let a designer back in" : "deactivated a designer", { detail: `${designer.name}, ${designer.email}` });
+  if (!designer) return refresh();
+  const released = active ? 0 : await releaseUnfinished(designer.id);
+  const returned = released ? `, ${released} unfinished ${released === 1 ? "design" : "designs"} back to the pool` : "";
+  await record(founder.email, active ? "let a designer back in" : "deactivated a designer", { detail: `${designer.name}, ${designer.email}${returned}` });
   refresh();
 }
 

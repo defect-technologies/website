@@ -23,7 +23,7 @@ async function NothingWaits() {
         )
       }
     >
-      {open > 0 ? `${open} ${open === 1 ? "business waits" : "businesses wait"} for a designer.` : "No business waits for a designer right now. New designs arrive as the runner draws them."}
+      {open > 0 ? `${open} ${open === 1 ? "design waits" : "designs wait"} for a designer.` : "No design waits for a designer right now. New designs arrive as the runner draws them."}
     </EmptyState>
   );
 }

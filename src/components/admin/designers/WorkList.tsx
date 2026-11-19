@@ -1,4 +1,4 @@
-import { ChatCircle, CheckCircle, ClockCountdown, CursorClick, Eye, Hammer, Handshake, MinusCircle, PaintBrush, PaperPlaneTilt, Swatches, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { CalendarX, ChatCircle, CheckCircle, ClockCountdown, CursorClick, Eye, Hammer, Handshake, MinusCircle, PaintBrush, PaperPlaneTilt, Swatches, WarningCircle, XCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { Card, Section, StatusMark, type StatusTone, When } from "@/components/admin/ui";
@@ -19,6 +19,7 @@ const MARK: Record<WorkStatus, { icon: Icon; tone: StatusTone }> = {
   no_reply: { icon: ClockCountdown, tone: "quiet" },
   said_no: { icon: XCircle, tone: "quiet" },
   client: { icon: Handshake, tone: "good" },
+  cancelled: { icon: CalendarX, tone: "quiet" },
   set_aside: { icon: MinusCircle, tone: "quiet" },
 };
 
@@ -26,13 +27,24 @@ export function WorkStatusMark({ status }: { status: WorkStatus }) {
   return <StatusMark icon={MARK[status].icon} tone={MARK[status].tone} label={WORK_STATUS_LABEL[status]} />;
 }
 
-/** How often the owner opened the preview from our emails, once they have. */
+/** One month of the client's fee, and whether the founders have paid it to the designer yet. */
+function Commission({ cents, settled }: { cents: number; settled: boolean }) {
+  if (!cents) return null;
+  return (
+    <span className="flex flex-col items-end">
+      <span className={`font-semibold ${settled ? "text-ink-soft" : "text-good"}`}>{formatCents(cents)}</span>
+      <span className="text-ink-faint text-sm">{settled ? "Paid to you" : "Owed to you"}</span>
+    </span>
+  );
+}
+
+/** How often the business opened the preview from our emails, once they have. Our own clicks never count. */
 function Opens({ count }: { count: number }) {
   if (!count) return null;
   return <span className="text-ink-soft text-sm tabular-nums">Opened {count === 1 ? "once" : `${count} times`}</span>;
 }
 
-function Row({ business, href }: { business: DesignerBusiness; href: string | null }) {
+function Row({ business, href, settled }: { business: DesignerBusiness; href: string | null; settled: boolean }) {
   const name = <span className="truncate font-medium">{business.businessName}</span>;
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_14rem_7rem]">
@@ -52,7 +64,9 @@ function Row({ business, href }: { business: DesignerBusiness; href: string | nu
         <WorkStatusMark status={business.status} />
         <Opens count={business.clickCount} />
       </span>
-      <span className="text-right tabular-nums max-sm:col-start-2 max-sm:row-start-1">{business.earnedCents > 0 ? <span className="text-good font-semibold">{formatCents(business.earnedCents)}</span> : null}</span>
+      <span className="text-right tabular-nums max-sm:col-start-2 max-sm:row-start-1">
+        <Commission cents={business.earnedCents} settled={settled} />
+      </span>
     </li>
   );
 }
@@ -60,14 +74,14 @@ function Row({ business, href }: { business: DesignerBusiness; href: string | nu
 const PHASES: { title: string; statuses: WorkStatus[] }[] = [
   { title: "Waiting for you", statuses: ["your_choice", "your_review"] },
   { title: "In progress", statuses: ["designing", "building", "build_failed", "ready_to_send"] },
-  { title: "Sent to the business", statuses: ["sent", "clicked", "replied", "no_reply", "said_no", "client", "set_aside"] },
+  { title: "Sent to the business", statuses: ["sent", "clicked", "replied", "no_reply", "said_no", "client", "cancelled", "set_aside"] },
 ];
 
 /**
- * Every business a designer took, grouped by where it is: waiting on them, still being made, or sent. `hrefFor` says
- * where a row opens, or null when it opens nothing.
+ * Every design a designer took, grouped by where it is: waiting on them, still being made, or sent. `hrefFor` says
+ * where a row opens, or null when it opens nothing. `settled` holds the businesses whose commission was paid.
  */
-export default function WorkList({ businesses, hrefFor }: { businesses: DesignerBusiness[]; hrefFor: (business: DesignerBusiness) => string | null }) {
+export default function WorkList({ businesses, hrefFor, settled }: { businesses: DesignerBusiness[]; hrefFor: (business: DesignerBusiness) => string | null; settled: Set<string> }) {
   return (
     <>
       {PHASES.map((phase) => {
@@ -78,7 +92,7 @@ export default function WorkList({ businesses, hrefFor }: { businesses: Designer
             <Card>
               <ul className="divide-ink/8 divide-y">
                 {rows.map((business) => (
-                  <Row key={business.id} business={business} href={hrefFor(business)} />
+                  <Row key={business.id} business={business} href={hrefFor(business)} settled={settled.has(business.id)} />
                 ))}
               </ul>
             </Card>

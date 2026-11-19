@@ -10,8 +10,8 @@ export default function DesignerNav({ counts }: { counts: { turn: number; pool: 
   const pathname = usePathname();
   const items: NavItem[] = [
     { href: DESIGNER_HOME, label: "Your turn", icon: HandPointing, count: counts.turn },
-    { href: "/designer/pool", label: "Take a business", icon: Swatches, count: counts.pool },
-    { href: "/designer/history", label: "Your businesses", icon: ListChecks },
+    { href: "/designer/pool", label: "Take a design", icon: Swatches, count: counts.pool },
+    { href: "/designer/history", label: "Your designs", icon: ListChecks },
     { href: "/designer/pay", label: "Pay", icon: Wallet },
   ];
   return (

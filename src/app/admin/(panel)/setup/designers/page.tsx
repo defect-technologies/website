@@ -58,7 +58,7 @@ function DesignerRow({ summary }: { summary: Summary }) {
           <span className="text-ink-faint truncate text-sm">{active ? designer.email : `Deactivated, ${designer.email}`}</span>
         </span>
         <span className="text-ink-soft flex flex-col items-end text-sm tabular-nums">
-          <span>{plural(summary.businesses, "business", "businesses")}, {plural(summary.clients, "client", "clients")}</span>
+          <span>{plural(summary.businesses, "design", "designs")}, {plural(summary.clients, "sign-up", "sign-ups")}</span>
           {summary.waiting > 0 && <span className="text-ink font-medium">{summary.waiting} waiting on them</span>}
         </span>
         <span className={`w-24 text-right font-semibold tabular-nums ${summary.owedCents > 0 ? "text-ink" : "text-ink-faint"}`} title="Owed">
@@ -92,7 +92,7 @@ export default async function DesignersPage() {
             </ul>
           </Card>
         ) : (
-          <EmptyState title="No designers yet">A designer signs in with Google, takes businesses whose designs wait, chooses their design and reviews the build. They earn one month of the fee for each that becomes a client.</EmptyState>
+          <EmptyState title="No designers yet">A designer signs in with Google, takes waiting designs, chooses one and reviews the build. They earn one month of the fee for each design a business signs up for.</EmptyState>
         )}
       </Section>
     </>

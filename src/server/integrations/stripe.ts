@@ -28,7 +28,7 @@ type CheckoutSession = {
   customer_details: { email: string | null } | null;
 };
 
-function stripe<T>(path: string) {
+export function stripe<T>(path: string) {
   return getJson<T>(`${API}${path}`, { Authorization: `Bearer ${env.stripeKey()}` });
 }
 

@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Designer" };
 
 const ACTIVITY_SHOWN = 50;
 
-/** One designer's work for the founders: their businesses, decisions with their words, reviews, pay and activity. */
+/** One designer's work for the founders: their designs, decisions with their words, reviews, pay and activity. */
 export default async function DesignerPage({ params }: { params: Promise<{ id: string }> }) {
   await requireFounder();
   const designer = await designerById((await params).id);
@@ -37,7 +37,7 @@ export default async function DesignerPage({ params }: { params: Promise<{ id: s
       </PageHeader>
       {designer.deactivatedAt && (
         <Notice tone="warn">
-          {founderName(designer.deactivatedBy)} deactivated {designer.name} <When date={designer.deactivatedAt} />. They can&rsquo;t sign in, and their businesses stay theirs.
+          {founderName(designer.deactivatedBy)} deactivated {designer.name} <When date={designer.deactivatedAt} />. They can&rsquo;t sign in. Designs they hadn&rsquo;t finished went back to the pool, and the ones they finished still earn them their share.
         </Notice>
       )}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
@@ -45,9 +45,9 @@ export default async function DesignerPage({ params }: { params: Promise<{ id: s
         <RecordPaymentForm designerId={designer.id} today={todayInPacific()} owedCents={ledger.owedCents} />
       </div>
       {businesses.length ? (
-        <WorkList businesses={businesses} hrefFor={(business) => `/admin/sites/${business.id}`} />
+        <WorkList businesses={businesses} hrefFor={(business) => `/admin/sites/${business.id}`} settled={ledger.settled} />
       ) : (
-        <EmptyState title={`${designer.name} hasn't taken a business yet`}>Businesses they take from the waiting designs show here, with where each stands.</EmptyState>
+        <EmptyState title={`${designer.name} hasn't taken a design yet`}>Designs they take from the pool show here, with where each stands.</EmptyState>
       )}
       <DecisionList decisions={decisions} />
       <BuildVerdictList verdicts={verdicts} />

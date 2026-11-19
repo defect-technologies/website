@@ -8,10 +8,10 @@ import { pool } from "@/server/designers/claims";
 import { placesOf } from "@/server/designers/work";
 import { claimAction } from "../actions";
 
-export const metadata: Metadata = { title: "Take a business" };
+export const metadata: Metadata = { title: "Take a design" };
 
 const MISSED: Record<string, string> = {
-  taken: "Another designer took that business first. Pick another one.",
+  taken: "Another designer took that design first. Pick another one.",
   gone: "Those designs were decided or cleared before you took them. Pick another one.",
 };
 
@@ -26,7 +26,7 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
   const places = await placesOf(open.map((board) => board.businessId));
   return (
     <>
-      <PageHeader title="Take a business" />
+      <PageHeader title="Take a design" />
       {missed && <Notice tone="warn">{missed}</Notice>}
       {open.length ? (
         <ul className="grid gap-5 xl:grid-cols-2">
@@ -35,7 +35,7 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
           ))}
         </ul>
       ) : (
-        <EmptyState title="No business waits for a designer">New designs land here as the runner draws them. Each business goes to the first designer who takes it.</EmptyState>
+        <EmptyState title="No design waits for a designer">New designs land here as the runner draws them. Each one goes to the first designer who takes it.</EmptyState>
       )}
     </>
   );

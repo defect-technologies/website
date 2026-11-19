@@ -40,13 +40,14 @@ const { db } = await import("../db/client");
 const { businesses, designBoards, previewJobs } = await import("../db/schema");
 const { addDesigner, activeDesignerByEmail, setDesignerActive } = await import("./people");
 const { claimBoard, pool } = await import("./claims");
-const { designerBusinesses } = await import("./work");
+const { designerBusinesses, releaseUnfinished } = await import("./work");
 const { ledgerOf, recordPayment } = await import("./pay");
 const { startDesignerSession, requireDesigner } = await import("../auth/designerSession");
 const { requireFounder, startSession } = await import("../auth/session");
 const { decisions } = await import("../boards/store");
 const designerActions = await import("@/app/designer/(area)/actions");
 const reviewActions = await import("@/app/designer/(area)/review/actions");
+const trackedLink = await import("@/app/p/[code]/route");
 const database = await db();
 
 const MAYA = "maya@example.com";
@@ -137,7 +138,7 @@ test("a designer's review actions refuse a business that isn't theirs", async ()
   await claimBoard(theirs.board.id, leo.id);
   await signInAs(MAYA);
   const input = { businessId: theirs.lead.id, previewUrl: "https://shop.vercel.app", notes: [] };
-  assert.deepEqual(await reviewActions.approveDesignerReviewAction(input), { ok: false, message: "This business isn't one of yours." });
+  assert.deepEqual(await reviewActions.approveDesignerReviewAction(input), { ok: false, message: "This design isn't one of yours." });
   assert.deepEqual(await reviewActions.designerAsksAction(theirs.lead.id), { previewUrl: "", asks: [] });
 });
 
@@ -165,4 +166,48 @@ test("a business with any build queued is building, even when a newer job only d
   await database.update(designBoards).set({ chosenLetter: "b", chosenAt: new Date(), chosenBy: MAYA }).where(eq(designBoards.id, board.id));
   const row = (await designerBusinesses(maya.id)).find((business) => business.id === lead.id);
   assert.equal(row?.status, "building");
+});
+
+test("a leaving designer's unfinished designs go back to the pool, and the finished ones stay theirs", async () => {
+  const kai = await designer("kai@example.com", "Kai");
+  const unfinished = await waitingBoard("Half Done Deli");
+  const finished = await waitingBoard("Sent Salon");
+  await claimBoard(unfinished.board.id, kai.id);
+  await claimBoard(finished.board.id, kai.id);
+  await database.update(designBoards).set({ chosenLetter: "a", chosenAt: new Date(), chosenBy: "kai@example.com" }).where(eq(designBoards.id, finished.board.id));
+  await database.update(businesses).set({ stage: "sent", previewUrl: "https://salon.vercel.app", firstSentAt: new Date() }).where(eq(businesses.id, finished.lead.id));
+
+  assert.equal(await releaseUnfinished(kai.id), 1);
+  assert.ok((await pool()).some((waiting) => waiting.id === unfinished.board.id), "the deli's designs wait for another designer");
+  assert.deepEqual((await designerBusinesses(kai.id)).map((row) => row.businessName), ["Sent Salon"]);
+});
+
+test("a payment marks the oldest sign-up paid and leaves a newer one owed", async () => {
+  const ana = await designer("ana@example.com", "Ana");
+  for (const [name, daysAgo] of [["Old Optician", 20], ["New Nursery", 1]] as const) {
+    const { lead, board } = await waitingBoard(name);
+    await claimBoard(board.id, ana.id);
+    await database.update(designBoards).set({ chosenLetter: "a", chosenAt: new Date(), chosenBy: "ana@example.com" }).where(eq(designBoards.id, board.id));
+    await database.update(businesses).set({ stage: "paid", paidAt: new Date(Date.now() - daysAgo * 86_400_000), plan: "$79/month", firstSentAt: new Date(Date.now() - 30 * 86_400_000) }).where(eq(businesses.id, lead.id));
+  }
+  await recordPayment({ designerId: ana.id, amountCents: 7900, paidOn: "2026-11-17", note: "", recordedBy: "boris.nezlobin@gmail.com" });
+  const ledger = await ledgerOf(ana.id);
+  assert.deepEqual(ledger.earned.map((earning) => [earning.businessName, earning.settled]), [["New Nursery", false], ["Old Optician", true]]);
+  assert.equal(ledger.owedCents, 7900);
+});
+
+test("the tracked link counts the business's opens, never a founder's or a designer's", async () => {
+  const { lead } = await waitingBoard("Opened Optics");
+  await database.update(businesses).set({ previewUrl: "https://optics.vercel.app", firstSentAt: new Date(), stage: "sent" }).where(eq(businesses.id, lead.id));
+  const open = () => trackedLink.GET(new Request("https://defect.tech/p/x") as never, { params: Promise.resolve({ code: lead.linkCode }) });
+  const opens = async () => (await database.select().from(businesses).where(eq(businesses.id, lead.id)))[0].clickCount;
+
+  await startSession({ email: "boris.nezlobin@gmail.com", name: "Boris" });
+  await open();
+  await signInAs(MAYA);
+  await open();
+  assert.equal(await opens(), 0, "our own clicks");
+  cookieJar.clear();
+  await open();
+  assert.equal(await opens(), 1, "the business's click");
 });
