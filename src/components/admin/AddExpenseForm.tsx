@@ -6,7 +6,7 @@ import { addExpenseAction, type AddExpenseResult } from "@/app/admin/(panel)/mon
 import { FREQUENCIES, FREQUENCY_LABEL } from "@/lib/recurrence";
 import SubmitButton from "./SubmitButton";
 import { controlClass, TextField } from "./fields";
-import { Card, Notice } from "./ui";
+import { Card, Problems } from "./ui";
 
 export type FounderOption = { email: string; name: string };
 type Option = { value: string; label: string };
@@ -30,19 +30,6 @@ function Segmented({ legend, name, options, selected }: { legend: string; name: 
         ))}
       </div>
     </fieldset>
-  );
-}
-
-function Problems({ problems }: { problems: string[] }) {
-  if (problems.length === 0) return null;
-  return (
-    <Notice tone="bad">
-      <ul className={problems.length > 1 ? "list-disc pl-5" : ""}>
-        {problems.map((problem) => (
-          <li key={problem}>{problem}</li>
-        ))}
-      </ul>
-    </Notice>
   );
 }
 

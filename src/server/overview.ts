@@ -53,11 +53,13 @@ export async function sheetRows(): Promise<{ all: LeadRow[]; leads: LeadRow[]; c
 
 export type ActivityRow = Activity & { businessName: string | null };
 
-export async function recentActivity(limit = 300): Promise<ActivityRow[]> {
+/** The newest entries in the activity log, or with `actor` only what that person did. */
+export async function recentActivity(limit = 300, actor?: string): Promise<ActivityRow[]> {
   const rows = await (await db())
     .select({ entry: activity, businessName: businesses.businessName })
     .from(activity)
     .leftJoin(businesses, eq(activity.businessId, businesses.id))
+    .where(actor ? eq(activity.actor, actor) : undefined)
     .orderBy(desc(activity.at))
     .limit(limit);
   return rows.map(({ entry, businessName }) => ({ ...entry, businessName }));

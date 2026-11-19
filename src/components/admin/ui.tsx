@@ -83,6 +83,20 @@ export function Notice({ tone, children, className = "" }: { tone: Tone; childre
   );
 }
 
+/** What stops a form from saving, as one notice above it. */
+export function Problems({ problems }: { problems: string[] }) {
+  if (problems.length === 0) return null;
+  return (
+    <Notice tone="bad">
+      <ul className={problems.length > 1 ? "list-disc pl-5" : ""}>
+        {problems.map((problem) => (
+          <li key={problem}>{problem}</li>
+        ))}
+      </ul>
+    </Notice>
+  );
+}
+
 export function KeyValue({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm">
