@@ -121,7 +121,10 @@ export interface BoardPick {
   reason: string;
 }
 
-/** A board a founder has decided, and which founder: each founder's taste is kept apart, since the two can differ. */
+/** Who decided a board. A designer decides in the founders' place, and their taste counts for less than a founder's. */
+export type DeciderRole = "founder" | "designer";
+
+/** A board someone has decided, and who: each person's taste is kept apart, since it can differ. */
 export interface BoardDecision {
   business: string;
   options: BoardOption[];
@@ -130,6 +133,7 @@ export interface BoardDecision {
   letter: BoardLetter | null;
   feedback: string;
   by: string;
+  role: DeciderRole;
   pick: BoardPick | null;
 }
 
@@ -151,6 +155,8 @@ const CHANCE = 1 / BOARD_LETTERS.length;
 /** A page counts as dark below this relative luminance. */
 const DARK_PAGE = 0.35;
 export const LESSON_SITES = 20;
+/** A designer's section shows fewer of their decisions than a founder's, so the founders' taste is most of what is read. */
+export const DESIGNER_LESSON_SITES = 8;
 export const AGREEMENT_SITES = 20;
 
 interface Tally {
@@ -158,13 +164,23 @@ interface Tally {
   chosen: number;
 }
 
-function tally(decisions: BoardDecision[], valueOf: (option: BoardOption) => string): Map<string, Tally> {
+/**
+ * How much one decision counts toward the next draw's leanings. A designer chooses in the founders' place, and their
+ * choice counts a third of a founder's, so three designers agreeing are needed to lean the draw as far as one founder.
+ */
+export const DECISION_WEIGHT: Record<DeciderRole, number> = { founder: 1, designer: 1 / 3 };
+
+const counted = () => 1;
+const weighted = (decision: BoardDecision) => DECISION_WEIGHT[decision.role];
+
+function tally(decisions: BoardDecision[], valueOf: (option: BoardOption) => string, weightOf: (decision: BoardDecision) => number = counted): Map<string, Tally> {
   const counts = new Map<string, Tally>();
   for (const decision of decisions) {
+    const weight = weightOf(decision);
     for (const option of decision.options) {
       const entry = counts.get(valueOf(option)) ?? { shown: 0, chosen: 0 };
-      entry.shown += 1;
-      if (option.letter === decision.letter) entry.chosen += 1;
+      entry.shown += weight;
+      if (option.letter === decision.letter) entry.chosen += weight;
       counts.set(valueOf(option), entry);
     }
   }
@@ -178,13 +194,13 @@ function leaning({ shown, chosen }: Tally): number {
 }
 
 /**
- * What the founders' choices so far tell the next draw. Both founders' choices count: the three options are drawn for
- * whichever of them chooses.
+ * What the choices so far tell the next draw. Both founders' choices count fully: the three options are drawn for
+ * whichever of them chooses. A designer's choice counts too, at DECISION_WEIGHT.designer of a founder's.
  */
 export function boardPreferences(decisions: BoardDecision[]): BoardPreferences {
   const chosen = choices(decisions);
   const leanings = (counts: Map<string, Tally>) => Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b)).map(([value, tallied]) => [value, leaning(tallied)]));
-  return { layouts: leanings(tally(chosen, (option) => option.layout)), headings: leanings(tally(chosen, (option) => option.fonts.heading)) };
+  return { layouts: leanings(tally(chosen, (option) => option.layout, weighted)), headings: leanings(tally(chosen, (option) => option.fonts.heading, weighted)) };
 }
 
 function luminance(colour: string): number {
@@ -246,23 +262,40 @@ function countLines(decisions: BoardDecision[]): string[] {
   ];
 }
 
-/** One founder's section: their most recent decisions with their own words, newest first, then their counts. */
-function founderSection(by: string, decisions: BoardDecision[]): string[] {
-  return [`## ${by}`, "", ...decisions.slice(0, LESSON_SITES).flatMap(decisionLines), ...countLines(decisions)];
+/** One person's section: their most recent decisions with their own words, newest first, then their counts. */
+function deciderSection(by: string, decisions: BoardDecision[], shown: number): string[] {
+  return [`## ${by}`, "", ...decisions.slice(0, shown).flatMap(decisionLines), ...countLines(decisions)];
+}
+
+const FOUNDER_INTRO = [
+  "What each founder decided about earlier designs, newest first, and what they said. Learn each founder's taste from it: lean toward what they build and away from what they pass over or turn down, and never repeat something they said they don't want. Each business is different, so take the taste, not the design.",
+  "",
+  "The two founders' taste is kept apart because it can differ. Where they agree, hold to it firmly. Where they differ, don't average them: let one option answer one founder's taste and another option the other's.",
+];
+
+const DESIGNER_INTRO = [
+  "# What the designers decided before",
+  "",
+  "Student designers choose designs in the founders' place. Their decisions follow, each designer's apart. Learn from them too, but a founder's taste outranks a designer's: where a designer chose something a founder passed over or said they don't want, follow the founder.",
+  "",
+];
+
+function designerLines(decisions: BoardDecision[]): string[] {
+  const theirs = decisions.filter((decision) => decision.role === "designer");
+  if (!theirs.length) return [];
+  return [...DESIGNER_INTRO, ...byFounder(theirs).flatMap(([by, own]) => deciderSection(by, own, DESIGNER_LESSON_SITES))];
 }
 
 /**
  * What the next option writer reads (lead/board-lessons.md): each founder's most recent decisions with their own
- * words, kept apart because their taste can differ, then their counts. Empty when nothing has been decided yet.
+ * words, kept apart because their taste can differ, then their counts. The designers' come after, fewer of them and
+ * marked as outranked by the founders'. Empty when nothing has been decided yet.
  */
 export function boardLessonsMarkdown(decisions: BoardDecision[]): string {
   if (!decisions.length) return "";
-  const intro = [
-    "What each founder decided about earlier designs, newest first, and what they said. Learn each founder's taste from it: lean toward what they build and away from what they pass over or turn down, and never repeat something they said they don't want. Each business is different, so take the taste, not the design.",
-    "",
-    "The two founders' taste is kept apart because it can differ. Where they agree, hold to it firmly. Where they differ, don't average them: let one option answer one founder's taste and another option the other's.",
-  ];
-  return ["# What the founders decided before", "", ...intro, "", ...byFounder(decisions).flatMap(([by, theirs]) => founderSection(by, theirs))].join("\n");
+  const founders = decisions.filter((decision) => decision.role === "founder");
+  const founderLines = byFounder(founders).flatMap(([by, theirs]) => deciderSection(by, theirs, LESSON_SITES));
+  return ["# What the founders decided before", "", ...FOUNDER_INTRO, "", ...founderLines, ...designerLines(decisions)].join("\n");
 }
 
 /** How often the system's own pick was the option the founder chose, over the most recent boards that had a pick. */

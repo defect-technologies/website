@@ -27,7 +27,7 @@ function option(letter: BoardLetter, layout: string, extra: Partial<BoardOption>
 }
 
 function decision(chosen: BoardLetter, layouts: [string, string, string], extra: Partial<BoardDecision> = {}): BoardDecision {
-  return { business: "Acme Heating", options: [option("a", layouts[0]), option("b", layouts[1]), option("c", layouts[2])], verdict: "chose", letter: chosen, feedback: "", by: "Brendan", pick: null, ...extra };
+  return { business: "Acme Heating", options: [option("a", layouts[0]), option("b", layouts[1]), option("c", layouts[2])], verdict: "chose", letter: chosen, feedback: "", by: "Brendan", role: "founder", pick: null, ...extra };
 }
 
 test("a layout nobody has been shown leans the draw neither way", () => {
@@ -127,4 +127,26 @@ test("the heading faces the founders choose lean the next draw's type the same w
   const decisions = [1, 2, 3].map(() => ({ ...decision("c", ["split-hero", "type-led", "editorial"]), options: faces("Source Serif 4", "Tinos", "Pirata One") }));
   const { headings } = boardPreferences(decisions);
   assert.ok(headings["Pirata One"] > 1.5 && headings["Source Serif 4"] < 0.7);
+});
+
+test("a designer's choice leans the draw a third as far as a founder's", () => {
+  const layouts = ["split-hero", "type-led", "editorial"] as [string, string, string];
+  const founder = boardPreferences([decision("a", layouts)]).layouts["split-hero"];
+  const designer = boardPreferences([decision("a", layouts, { by: "Maya", role: "designer" })]).layouts["split-hero"];
+  assert.ok(designer > 1 && designer < founder, `a designer's ${designer} leans less than a founder's ${founder}`);
+  const threeDesigners = boardPreferences([1, 2, 3].map(() => decision("a", layouts, { by: "Maya", role: "designer" }))).layouts["split-hero"];
+  assert.equal(threeDesigners, founder, "three designers' choices weigh one founder's");
+  const disagree = boardPreferences([decision("a", layouts), decision("b", layouts, { by: "Maya", role: "designer" })]).layouts;
+  assert.ok(disagree["split-hero"] > disagree["type-led"], "where a founder and a designer disagree, the founder's choice leans further");
+});
+
+test("the lessons put the founders' decisions first and the designers' after, fewer and outranked", () => {
+  const layouts = ["split-hero", "type-led", "editorial"] as [string, string, string];
+  const designerDecisions = Array.from({ length: 12 }, (_, index) => decision("c", layouts, { business: `Shop ${index}`, by: "Maya", role: "designer", feedback: "Bolder type." }));
+  const markdown = boardLessonsMarkdown([...designerDecisions, decision("a", layouts, { business: "Acme Heating", by: "Boris" })]);
+  const designers = markdown.indexOf("# What the designers decided before");
+  assert.ok(markdown.indexOf("## Boris") < designers && designers < markdown.indexOf("## Maya"), "founders first, even when a designer decided more recently");
+  assert.match(markdown, /a founder's taste outranks a designer's/);
+  assert.equal(markdown.match(/### Shop /g)?.length, 8, "a designer's section shows fewer of their decisions");
+  assert.equal(boardLessonsMarkdown([decision("a", layouts)]).includes("designers decided"), false, "no designer section when no designer decided");
 });

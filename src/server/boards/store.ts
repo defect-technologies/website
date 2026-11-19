@@ -1,10 +1,10 @@
 import "server-only";
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, notInArray, or } from "drizzle-orm";
 import { BOARD_LETTERS, type BoardDecision, type BoardLetter, type BoardOption, type BoardPick, type BoardRedraw, CLEARED, isRedrawn, redrawnMark, REPLACED, revisedLetter, revisingMark, UNJUDGED, verdictOf } from "@/lib/boards";
-import { founderName } from "@/lib/founders";
 import { founderNote } from "@/lib/previewJobs";
 import { db } from "../db/client";
 import { businesses, designBoards, previewJobs, type DesignBoard } from "../db/schema";
+import { type Decider, deciders } from "../designers/people";
 
 /** How many decided boards the next draw and the next option writer learn from. */
 const DECISIONS_KEPT = 200;
@@ -81,16 +81,23 @@ async function boardsJudged(limit: number): Promise<BoardWithLead[]> {
   return rows.map(withLead);
 }
 
-/** A decided board as the learning code reads it (src/lib/boards.ts), with the founder who decided it. */
-export function decisionOf(board: BoardWithLead): BoardDecision | null {
+/** A decided board as the learning code reads it (src/lib/boards.ts), with who decided it: a founder or a designer. */
+export function decisionOf(board: BoardWithLead, deciderOf: (email: string) => Decider): BoardDecision | null {
   const decided = verdictOf(board.chosenLetter);
   if (!decided) return null;
-  return { business: board.businessName, options: board.options, ...decided, feedback: board.feedback, by: founderName(board.chosenBy ?? ""), pick: board.pick ?? null };
+  const decider = deciderOf(board.chosenBy ?? "");
+  return { business: board.businessName, options: board.options, ...decided, feedback: board.feedback, by: decider.name, role: decider.role, pick: board.pick ?? null };
 }
 
-/** Every founder's decisions, the newest first: what the next draw and option writer learn each founder's taste from. */
+/** Decided boards as the learning code reads them. */
+export async function decisionsOf(boards: BoardWithLead[]): Promise<BoardDecision[]> {
+  const deciderOf = await deciders();
+  return boards.map((board) => decisionOf(board, deciderOf)).filter((decision): decision is BoardDecision => decision !== null);
+}
+
+/** Every founder's and designer's decisions, the newest first: what the next draw and option writer learn taste from. */
 export async function decisions(limit = DECISIONS_KEPT): Promise<BoardDecision[]> {
-  return (await boardsJudged(limit)).map(decisionOf).filter((decision): decision is BoardDecision => decision !== null);
+  return decisionsOf(await boardsJudged(limit));
 }
 
 /** Records a founder's choice. Null when the board is gone, has no such option or was already chosen from: the first choice stands. */
@@ -168,7 +175,7 @@ export async function redrawFor(businessId: string): Promise<BoardRedraw | null>
   const letter = decided?.letter;
   const named = !letter ? {} : decided.verdict === "revise" ? { base: letter } : { selected: letter };
   const replaced = fresh ? { replaced: true as const } : {};
-  return { feedback: newest.feedback, by: founderName(newest.chosenBy ?? ""), ...named, ...replaced, board: newest.id };
+  return { feedback: newest.feedback, by: (await deciders())(newest.chosenBy ?? "").name, ...named, ...replaced, board: newest.id };
 }
 
 /** The board a lead had before this one, when a founder asked for these as revisions of one of its options. */
@@ -186,20 +193,31 @@ export async function revisionOf(board: Pick<DesignBoard, "businessId" | "create
 
 export type BoardChoice = { letter: BoardLetter; feedback: string; by: string };
 
-/**
- * The choice a build job carries to the runner: the lead's newest decided board, when no other job has built from it.
- * The first job to claim it is the one that builds it, and it gets the same choice again if it is cut off and resumed.
- */
-export async function choiceForJob(businessId: string, jobId: string): Promise<BoardChoice | null> {
+/** The lead's newest decided board that no other job has built from: what a build job for it is held to. */
+async function unbuiltDecision(businessId: string, jobId: string): Promise<DesignBoard | null> {
   const [board] = await (await db())
     .select()
     .from(designBoards)
     .where(and(eq(designBoards.businessId, businessId), isNotNull(designBoards.chosenAt), or(isNull(designBoards.builtJobId), eq(designBoards.builtJobId, jobId))))
     .orderBy(desc(designBoards.chosenAt))
     .limit(1);
+  return board ?? null;
+}
+
+/** Whether a build job for this lead would build a chosen option, without taking the choice for it. */
+export async function choiceWaitsFor(businessId: string, jobId: string): Promise<boolean> {
+  return isLetter((await unbuiltDecision(businessId, jobId))?.chosenLetter ?? null);
+}
+
+/**
+ * The choice a build job carries to the runner: the lead's newest decided board, when no other job has built from it.
+ * The first job to claim it is the one that builds it, and it gets the same choice again if it is cut off and resumed.
+ */
+export async function choiceForJob(businessId: string, jobId: string): Promise<BoardChoice | null> {
+  const board = await unbuiltDecision(businessId, jobId);
   if (!board || !isLetter(board.chosenLetter)) return null;
   if (!board.builtJobId) await (await db()).update(designBoards).set({ builtJobId: jobId }).where(eq(designBoards.id, board.id));
-  return { letter: board.chosenLetter, feedback: board.feedback, by: founderName(board.chosenBy ?? "") };
+  return { letter: board.chosenLetter, feedback: board.feedback, by: (await deciders())(board.chosenBy ?? "").name };
 }
 
 /** The lead's newest boards, decided or not. */

@@ -5,22 +5,27 @@ import { BoardPicture, Letter } from "@/components/admin/designs/parts";
 import { ArrowsClockwise, Broom } from "@phosphor-icons/react/dist/ssr";
 import ConfirmAll from "@/components/admin/designs/ConfirmAll";
 import { Card, PageHeader, Section, When } from "@/components/admin/ui";
-import { pickAgreement } from "@/lib/boards";
-import { founderName } from "@/lib/founders";
+import { type BoardDecision, pickAgreement } from "@/lib/boards";
 import { requireFounder } from "@/server/auth/session";
-import { boardsDecided, boardsWaiting, decisionOf, type BoardWithLead } from "@/server/boards/store";
+import { boardsDecided, boardsWaiting, decisionsOf, type BoardWithLead } from "@/server/boards/store";
+import { claimNames } from "@/server/designers/claims";
+import { deciders } from "@/server/designers/people";
 import { clearAllWaitingAction, redrawAllWaitingAction } from "./actions";
 
 export const metadata: Metadata = { title: "Designs" };
 
 const RECENT = 12;
 
-function Waiting({ board }: { board: BoardWithLead }) {
+/** A waiting board, with the designer whose business it is when one took it: the first decision stands, theirs or a founder's. */
+function Waiting({ board, designer }: { board: BoardWithLead; designer: string | undefined }) {
   return (
     <li>
       <Link href={`/admin/designs/${board.id}`} className="bg-surface shadow-card hover:shadow-card focus-visible:outline-ink ease-knife flex flex-col gap-4 rounded-2xl p-4 transition-[scale] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.99]">
         <span className="flex items-baseline justify-between gap-3">
-          <span className="text-xl font-semibold">{board.businessName}</span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-xl font-semibold">{board.businessName}</span>
+            {designer && <span className="text-ink-soft text-sm">{designer}&rsquo;s to choose</span>}
+          </span>
           <span className="text-ink-faint shrink-0 text-sm">
             <When date={board.createdAt} />
           </span>
@@ -38,7 +43,7 @@ function Waiting({ board }: { board: BoardWithLead }) {
   );
 }
 
-function Chosen({ board }: { board: BoardWithLead }) {
+function Chosen({ board, by }: { board: BoardWithLead; by: string }) {
   const option = board.options.find((entry) => entry.letter === board.chosenLetter);
   return (
     <li>
@@ -49,7 +54,7 @@ function Chosen({ board }: { board: BoardWithLead }) {
           <span className="text-ink-soft truncate text-sm">{option?.name}</span>
         </span>
         <span className="text-ink-faint shrink-0 text-sm">
-          {founderName(board.chosenBy ?? "")}, <When date={board.chosenAt} />
+          {by}, <When date={board.chosenAt} />
         </span>
       </Link>
     </li>
@@ -57,8 +62,8 @@ function Chosen({ board }: { board: BoardWithLead }) {
 }
 
 /** A sentence only once the system has made picks: how often its own guess was the option a founder chose. */
-function Agreement({ decided }: { decided: BoardWithLead[] }) {
-  const { matched, of } = pickAgreement(decided.map(decisionOf).filter((decision) => decision !== null));
+function Agreement({ decided }: { decided: BoardDecision[] }) {
+  const { matched, of } = pickAgreement(decided);
   if (!of) return null;
   return (
     <p className="text-ink-soft max-w-prose text-pretty">
@@ -81,6 +86,7 @@ function WaitingActions({ count }: { count: number }) {
 export default async function DesignsPage() {
   await requireFounder();
   const [waiting, decided] = await Promise.all([boardsWaiting(), boardsDecided()]);
+  const [claimed, deciderOf] = await Promise.all([claimNames(waiting.map((board) => board.businessId)), deciders()]);
   return (
     <>
       <PageHeader title="Designs" />
@@ -88,7 +94,7 @@ export default async function DesignsPage() {
         {waiting.length ? (
           <ul className="grid gap-5 xl:grid-cols-2">
             {waiting.map((board) => (
-              <Waiting key={board.id} board={board} />
+              <Waiting key={board.id} board={board} designer={claimed.get(board.businessId)} />
             ))}
           </ul>
         ) : (
@@ -97,11 +103,11 @@ export default async function DesignsPage() {
       </Section>
       {decided.length > 0 && (
         <Section title="Chosen" count={decided.length}>
-          <Agreement decided={decided} />
+          <Agreement decided={await decisionsOf(decided)} />
           <Card>
             <ul className="divide-ink/8 divide-y">
               {decided.slice(0, RECENT).map((board) => (
-                <Chosen key={board.id} board={board} />
+                <Chosen key={board.id} board={board} by={deciderOf(board.chosenBy ?? "").name} />
               ))}
             </ul>
           </Card>
