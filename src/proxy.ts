@@ -6,12 +6,16 @@ type Area = { prefix: string; cookie: string; publicPaths: string[]; signIn: str
 /** A browser fetches a web app manifest without the session's cookie, and it names only the app and its icons. */
 const ADMIN_MANIFEST = "/admin/manifest.webmanifest";
 
-const AREAS: Area[] = [{ prefix: "/admin", cookie: "defect_admin", publicPaths: ["/admin/sign-in", ADMIN_MANIFEST], signIn: "/admin/sign-in" }];
+const AREAS: Area[] = [
+  { prefix: "/admin", cookie: "defect_admin", publicPaths: ["/admin/sign-in", ADMIN_MANIFEST], signIn: "/admin/sign-in" },
+  /** Student designers sign in on the same page, with their own session cookie. */
+  { prefix: "/designer", cookie: "defect_designer", publicPaths: [], signIn: "/admin/sign-in" },
+];
 
 /**
  * An early, cheap check: no session cookie, no page. It does not verify the
  * cookie. The real check (a verified token for an allowed founder) is
- * requireFounder, which each admin page, action, and route calls itself,
+ * requireFounder (requireDesigner for /designer), which each page, action, and route calls itself,
  * because a layout does not run again on client navigation.
  */
 export function proxy(request: NextRequest) {
@@ -27,5 +31,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/edit/:path*", "/edit", "/portal/:path*", "/portal"],
+  matcher: ["/admin/:path*", "/designer/:path*", "/designer", "/edit/:path*", "/edit", "/portal/:path*", "/portal"],
 };

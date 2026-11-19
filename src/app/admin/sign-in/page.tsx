@@ -5,6 +5,7 @@ import { buttonClasses } from "@/components/Button";
 import KnifeStroke from "@/components/admin/KnifeStroke";
 import { Notice } from "@/components/admin/ui";
 import { messageFor } from "@/lib/messageFor";
+import { currentDesigner, DESIGNER_HOME } from "@/server/auth/designerSession";
 import { currentFounder } from "@/server/auth/session";
 import { devShortcutsEnabled } from "@/server/env";
 
@@ -13,11 +14,12 @@ export const metadata: Metadata = { title: "Sign in" };
 const ERRORS: Record<string, string> = {
   "not-configured": "Google sign-in isn't set up yet. Add GOOGLE_SIGNIN_CLIENT_ID and GOOGLE_SIGNIN_CLIENT_SECRET in Vercel.",
   failed: "Google didn't finish signing you in. Try again.",
-  "not-a-founder": "That Google account isn't one of the two allowed in. Sign in with your own account, or add it to ADMIN_EMAILS.",
+  "not-allowed": "That Google account isn't a founder's or an active designer's. Sign in with the account a founder added, or ask them to add it.",
 };
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await currentFounder()) redirect("/admin");
+  if (await currentDesigner()) redirect(DESIGNER_HOME);
   const { error } = await searchParams;
   const problem = messageFor(ERRORS, error);
 
