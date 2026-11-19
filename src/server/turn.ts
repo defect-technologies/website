@@ -1,6 +1,6 @@
 import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { type Turn, turnsInOrder, type WaitingDesign, type WaitingSite } from "@/lib/turn";
+import { type Turn, type TurnPaths, turnsInOrder, type WaitingDesign, type WaitingSite } from "@/lib/turn";
 import { boardsWaiting, type BoardWithLead } from "./boards/store";
 import { db } from "./db/client";
 import { businesses, previewJobs } from "./db/schema";
@@ -36,10 +36,15 @@ export async function waitingBesides(businessId: string): Promise<number> {
   return sites.filter((site) => site.id !== businessId).length + boards.filter((board) => board.businessId !== businessId).length;
 }
 
+/** Waiting previews and boards as turns, in the order to take them, opening where `paths` says. */
+export async function turnsOf(previews: ReviewItem[], boards: BoardWithLead[], paths?: TurnPaths): Promise<Turn[]> {
+  const repaired = await repairedAmong(previews.map((lead) => lead.id));
+  const sites = previews.map(waitingSite);
+  return turnsInOrder(sites.filter((site) => repaired.has(site.id)), boards.map(waitingDesign), sites, paths);
+}
+
 /** Everything that waits for a founder's taste, in the order to take it. */
 export async function turns(): Promise<Turn[]> {
   const [previews, boards] = await Promise.all([reviewQueue(), boardsWaiting()]);
-  const repaired = await repairedAmong(previews.map((lead) => lead.id));
-  const sites = previews.map(waitingSite);
-  return turnsInOrder(sites.filter((site) => repaired.has(site.id)), boards.map(waitingDesign), sites);
+  return turnsOf(previews, boards);
 }

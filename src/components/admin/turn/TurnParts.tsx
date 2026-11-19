@@ -11,8 +11,8 @@ const ACTION: Record<TurnKind, string> = { repair: "Check the repairs", design: 
 /** What kind of look the item needs, as an icon and a few words. */
 export function TurnMark({ turn }: { turn: Turn }) {
   if (turn.kind === "repair") return <StatusMark icon={Wrench} tone="ink" label="Back from a repair" detail="The builder made your notes' changes. Each note shows a before and an after." />;
-  if (turn.kind === "design") return <StatusMark icon={Swatches} label="Three designs" detail="The site is built once a founder chooses one." />;
-  if (turn.held) return <StatusMark icon={HandPalm} tone="warn" label="Held" detail="The outside reviewer wanted changes, so it waits for a founder before outreach." />;
+  if (turn.kind === "design") return <StatusMark icon={Swatches} label="Three designs" detail="The site is built once one of them is chosen." />;
+  if (turn.held) return <StatusMark icon={HandPalm} tone="warn" label="Held" detail="The outside reviewer wanted changes, so it waits for a review before outreach." />;
   return <StatusMark icon={Eye} label="Not looked at yet" />;
 }
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { splitSpokenNotesAction } from "@/app/admin/(panel)/review/studioActions";
 import type { Device, ReviewNote } from "@/lib/review";
 import { useCloseOnTouchElsewhere } from "../dock";
 import { type Draft, EMPTY_DRAFT, noteFromDraft } from "./reviewDraft";
+import { useStudio } from "./StudioContext";
 
 type Dictation = { listening: boolean; interim: string; toggle: () => void; stop: () => void };
 
@@ -28,6 +28,7 @@ type Options = {
  */
 export function usePhoneReview({ draft, setDraft, dictation, add, device, path, confirming, setConfirming, submit, ask }: Options) {
   const [splitting, setSplitting] = useState(false);
+  const { splitSpoken } = useStudio().actions;
   useCloseOnTouchElsewhere(confirming, () => setConfirming(false));
 
   const finishTalking = async () => {
@@ -35,7 +36,7 @@ export function usePhoneReview({ draft, setDraft, dictation, add, device, path, 
     dictation.stop();
     if (!spoken) return;
     setSplitting(true);
-    const notes = await splitSpokenNotesAction(spoken);
+    const notes = await splitSpoken(spoken);
     setSplitting(false);
     for (const note of notes) add(noteFromDraft({ ...draft, text: note.text }, device, path, { kind: note.kind, target: note.target }));
     setDraft({ ...EMPTY_DRAFT });

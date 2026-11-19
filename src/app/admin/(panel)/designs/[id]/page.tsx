@@ -1,140 +1,19 @@
-import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ButtonLink } from "@/components/Button";
-import BoardChooser from "@/components/admin/designs/BoardChooser";
-import PhoneChooser from "@/components/admin/designs/PhoneChooser";
-import { BoardPicture, Letter, OptionFacts, Reach } from "@/components/admin/designs/parts";
-import { Card, Notice, PageHeader, When } from "@/components/admin/ui";
-import { type BoardOption, CLEARED, isRedrawn, revisedLetter, verdictOf } from "@/lib/boards";
-import { founderName } from "@/lib/founders";
+import type { BoardActions } from "@/components/admin/designs/boardActions";
+import DesignScreen from "@/components/admin/designs/DesignScreen";
 import { requireFounder } from "@/server/auth/session";
-import { boardById, revisionOf, type BoardWithLead } from "@/server/boards/store";
-import { businessById } from "@/server/leads/businesses";
+import { boardById } from "@/server/boards/store";
+import { chooseBoardAction, redrawBoardsAction, reviseBoardAction } from "../actions";
 
 export const metadata: Metadata = { title: "Choose a design" };
 
-/** What was decided about the board, in a sentence: an option chosen, or all three turned down. */
-function Decision({ board }: { board: BoardWithLead }) {
-  const founder = founderName(board.chosenBy ?? "");
-  if (board.chosenLetter === CLEARED) {
-    return (
-      <Notice tone="good">
-        {founder} cleared these designs <When date={board.chosenAt} />. If this business is built later, it gets new ones.
-      </Notice>
-    );
-  }
-  if (isRedrawn(board.chosenLetter)) {
-    return (
-      <Notice tone="good">
-        {founder} asked for three new designs <When date={board.chosenAt} />. They come to Designs when they are drawn.
-      </Notice>
-    );
-  }
-  const revised = board.options.find((option) => option.letter === revisedLetter(board.chosenLetter));
-  if (revised) {
-    return (
-      <Notice tone="good">
-        {founder} asked for {revised.letter.toUpperCase()}, {revised.name}, to be revised <When date={board.chosenAt} />. Its three revisions come to Designs when they are drawn.
-      </Notice>
-    );
-  }
-  const chosen = board.options.find((option) => option.letter === board.chosenLetter);
-  return (
-    <Notice tone="good">
-      {founder} chose {chosen ? `${chosen.letter.toUpperCase()}, ${chosen.name}` : "a design"} <When date={board.chosenAt} />. The site is built from it.
-    </Notice>
-  );
-}
-
-function Decided({ board }: { board: BoardWithLead }) {
-  // The option a founder chose or asked to have revised. Three turned down are all dimmed.
-  const decided = verdictOf(board.chosenLetter);
-  const marked = decided?.verdict === "redraw" ? null : decided?.letter;
-  return (
-    <div className="flex flex-col gap-6">
-      <Decision board={board} />
-      {board.feedback && (
-        <Card className="flex flex-col gap-2 p-5">
-          <h2 className="text-lg font-semibold">What they asked to change</h2>
-          <p className="max-w-prose text-pretty whitespace-pre-line">{board.feedback}</p>
-        </Card>
-      )}
-      <ul className="grid gap-5 lg:grid-cols-3">
-        {board.options.map((option: BoardOption) => (
-          <li key={option.letter} className={`bg-surface shadow-card flex flex-col gap-4 rounded-2xl p-3 ${option.letter === marked ? "ring-good ring-2" : "opacity-70"}`}>
-            <a href={option.pictures.board} target="_blank" rel="noreferrer" className="focus-visible:outline-ink rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2">
-              <BoardPicture src={option.pictures.desktop} alt={`The first screen of option ${option.letter.toUpperCase()}, ${option.name}. Opens its whole board.`} className="aspect-[16/10] rounded-lg object-cover object-top" />
-            </a>
-            <div className="flex flex-col gap-3 px-2 pb-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-3">
-                  <Letter letter={option.letter} chosen={option.letter === marked} />
-                  <span className="truncate text-xl font-semibold">{option.name}</span>
-                </span>
-                <Reach boldness={option.boldness} />
-              </div>
-              <OptionFacts option={option} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** For three revisions of an earlier option: which option they revise, and what the founder asked for. */
-function RevisionNote({ revision }: { revision: Awaited<ReturnType<typeof revisionOf>> }) {
-  if (!revision) return null;
-  return (
-    <Card className="flex flex-col gap-1 p-5">
-      <h2 className="text-lg font-semibold">
-        Revisions of {revision.option.letter.toUpperCase()}, {revision.option.name}
-      </h2>
-      <p className="text-ink-soft max-w-prose text-pretty whitespace-pre-line">{revision.feedback}</p>
-    </Card>
-  );
-}
+const FOUNDER_BOARD_ACTIONS: BoardActions = { choose: chooseBoardAction, revise: reviseBoardAction, redraw: redrawBoardsAction };
 
 /** Three designs for one lead, before its site is built: compare them, choose one and say what should change. */
 export default async function DesignPage({ params }: { params: Promise<{ id: string }> }) {
   await requireFounder();
   const board = await boardById((await params).id);
   if (!board) notFound();
-  const lead = await businessById(board.businessId);
-  const header = (
-    <PageHeader title={board.businessName}>
-      {lead?.website && (
-        <ButtonLink href={lead.website} target="_blank" rel="noreferrer" variant="soft" icon={<ArrowSquareOut size={18} aria-hidden="true" />}>
-          Their site today
-        </ButtonLink>
-      )}
-    </PageHeader>
-  );
-  if (board.chosenAt) {
-    return (
-      <>
-        {header}
-        <Decided board={board} />
-      </>
-    );
-  }
-  const revision = await revisionOf(board);
-  // A phone gets the chooser made for a thumb; a wide screen gets the three options side by side.
-  return (
-    <>
-      <PhoneChooser
-        boardId={board.id}
-        businessName={board.businessName}
-        website={lead?.website ?? ""}
-        options={board.options}
-        revision={revision ? { letter: revision.option.letter, name: revision.option.name, feedback: revision.feedback } : null}
-      />
-      <div className="flex flex-col gap-8 max-lg:hidden">
-        {header}
-        <RevisionNote revision={revision} />
-        <BoardChooser boardId={board.id} options={board.options} />
-      </div>
-    </>
-  );
+  return <DesignScreen board={board} actions={FOUNDER_BOARD_ACTIONS} close={{ href: "/admin/designs", label: "Close and go back to Designs" }} />;
 }

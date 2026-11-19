@@ -1,6 +1,6 @@
 import { CaretRight } from "@phosphor-icons/react/dist/ssr";
-import { chooseBoardAction } from "@/app/admin/(panel)/designs/actions";
 import type { BoardOption } from "@/lib/boards";
+import type { BoardActions } from "./boardActions";
 import DecisionBar from "./DecisionBar";
 import WholePages from "./WholePages";
 import { BoardPicture, FirstScreens, Letter, OptionFacts, Reach } from "./parts";
@@ -45,9 +45,9 @@ function FullBoard({ option, open }: { option: BoardOption; open: boolean }) {
  * changed, typed or said. One form: choosing builds the site, revising draws three takes on the chosen one with the
  * founder's words, and the last button asks for three new designs.
  */
-export default function BoardChooser({ boardId, options }: { boardId: string; options: BoardOption[] }) {
+export default function BoardChooser({ boardId, options, actions }: { boardId: string; options: BoardOption[]; actions: BoardActions }) {
   return (
-    <form action={chooseBoardAction} className="flex flex-col gap-8">
+    <form action={actions.choose} className="flex flex-col gap-8">
       <input type="hidden" name="id" value={boardId} />
       <fieldset className="grid gap-5 lg:grid-cols-3">
         <legend className="sr-only">Choose one design</legend>
@@ -61,7 +61,7 @@ export default function BoardChooser({ boardId, options }: { boardId: string; op
           <FullBoard key={option.letter} option={option} open={index === 0} />
         ))}
       </div>
-      <DecisionBar />
+      <DecisionBar revise={actions.revise} redraw={actions.redraw} />
     </form>
   );
 }

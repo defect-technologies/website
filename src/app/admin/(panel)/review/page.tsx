@@ -3,12 +3,19 @@ import { CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import { ButtonLink } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
-import ReviewStudio from "@/components/admin/review/ReviewStudio";
+import QueuedStudio from "@/components/admin/review/QueuedStudio";
+import type { StudioActions, StudioPaths } from "@/components/admin/review/StudioContext";
+import { TURN_PATH } from "@/lib/turn";
 import { pointingUpdatesUnderway, queuePointingUpdates } from "@/server/review/pointingUpdates";
 import { reviewQueue } from "@/server/review/queue";
 import { runnerSettings } from "@/server/runner/settings";
+import { addPointingAction, answerProposalAction, approveReviewAction, reviewAsksAction, sendReviewAction, splitSpokenNotesAction } from "./studioActions";
 
 export const metadata: Metadata = { title: "Review" };
+
+const FOUNDER_STUDIO: StudioActions = { send: sendReviewAction, approve: approveReviewAction, addPointing: addPointingAction, splitSpoken: splitSpokenNotesAction, asks: reviewAsksAction, answerProposal: answerProposalAction };
+
+const FOUNDER_PATHS: StudioPaths = { close: "/admin", closeLabel: "Close review and go back to Today", review: "/admin/review", done: TURN_PATH };
 
 /** One preview at a time: point at what's wrong, say it, and send it all back to the builder in one go. */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
@@ -32,16 +39,5 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       </EmptyState>
     );
   }
-  const index = Math.max(0, queue.findIndex((item) => item.id === id));
-  const item = queue[index];
-  return (
-    <ReviewStudio
-      key={`${item.id}:${item.previewUrl}`}
-      item={{ id: item.id, businessName: item.businessName, website: item.website, previewUrl: item.previewUrl, held: item.stage === "new" }}
-      position={index + 1}
-      total={queue.length}
-      previousId={queue[index - 1]?.id ?? null}
-      nextId={queue[index + 1]?.id ?? queue.find((other) => other.id !== item.id)?.id ?? null}
-    />
-  );
+  return <QueuedStudio queue={queue} id={id} actions={FOUNDER_STUDIO} paths={FOUNDER_PATHS} />;
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { reviewAsksAction } from "@/app/admin/(panel)/review/studioActions";
 import type { ReviewAsk } from "@/lib/reviewAsks";
+import { type StudioActions, useStudio } from "./StudioContext";
 
 export type AsksState = { status: "loading" | "ready" | "none"; asks: ReviewAsk[] };
 
@@ -29,9 +29,9 @@ function cache(businessId: string, previewUrl: string, asks: ReviewAsk[]) {
 }
 
 /** Writes the next preview's questions into this browser while the founder answers this one's. */
-function prepareNext(nextId: string | null) {
+function prepareNext(nextId: string | null, asksFor: StudioActions["asks"]) {
   if (!nextId) return;
-  void reviewAsksAction(nextId).then(({ previewUrl, asks }) => {
+  void asksFor(nextId).then(({ previewUrl, asks }) => {
     if (!readCached(nextId, previewUrl)) cache(nextId, previewUrl, asks);
   });
 }
@@ -43,23 +43,24 @@ export function useReviewAsks(businessId: string, previewUrl: string, nextId: st
     return cached ? { status: "ready", asks: cached } : { status: "loading", asks: [] };
   });
   const needsWriting = state.status === "loading";
+  const asksFor = useStudio().actions.asks;
 
   useEffect(() => {
     if (!needsWriting) {
-      prepareNext(nextId);
+      prepareNext(nextId, asksFor);
       return;
     }
     let current = true;
-    void reviewAsksAction(businessId).then(({ previewUrl: written, asks }) => {
+    void asksFor(businessId).then(({ previewUrl: written, asks }) => {
       if (!current) return;
       if (written === previewUrl) cache(businessId, previewUrl, asks);
       setState(written === previewUrl && asks.length ? { status: "ready", asks } : { status: "none", asks: [] });
-      prepareNext(nextId);
+      prepareNext(nextId, asksFor);
     });
     return () => {
       current = false;
     };
-  }, [businessId, previewUrl, nextId, needsWriting]);
+  }, [businessId, previewUrl, nextId, needsWriting, asksFor]);
 
   return state;
 }

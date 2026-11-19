@@ -38,10 +38,12 @@ const notBuilding = (database: Awaited<ReturnType<typeof db>>) =>
   );
 
 /**
- * Built previews no founder has reviewed yet, held ones first (the outside reviewer wanted changes, so they wait on a
- * founder before outreach), then the newest. A preview leaves the queue once it's reviewed or while it rebuilds.
+ * Built previews no founder or designer has reviewed yet, held ones first (the outside reviewer wanted changes, so they
+ * wait on a review before outreach), then the newest. A preview leaves the queue once it's reviewed or while it
+ * rebuilds. `among` keeps only those businesses: a designer's own.
  */
-export async function reviewQueue(limit = 60): Promise<ReviewItem[]> {
+export async function reviewQueue(limit = 60, among?: string[]): Promise<ReviewItem[]> {
+  if (among && !among.length) return [];
   const database = await db();
   return database
     .select({
@@ -55,7 +57,7 @@ export async function reviewQueue(limit = 60): Promise<ReviewItem[]> {
       area: businesses.area,
     })
     .from(businesses)
-    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database)))
+    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database), among ? inArray(businesses.id, among) : undefined))
     .orderBy(asc(sql`case when ${businesses.stage} = 'new' then 0 else 1 end`), desc(businesses.previewBuiltAt))
     .limit(limit);
 }

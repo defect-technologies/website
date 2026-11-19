@@ -3,11 +3,11 @@
 import { ArrowsClockwise, ArrowSquareOut, Hammer, Keyboard, PencilSimpleLine, X } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { chooseBoardAction, redrawBoardsAction, reviseBoardAction } from "@/app/admin/(panel)/designs/actions";
 import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import type { BoardLetter, BoardOption } from "@/lib/boards";
 import { DOCK_CARD, DockAction, DockConfirm, DockMic, DockSideButton, DockSpoken, DockTypeField, useCloseOnTouchElsewhere } from "../dock";
 import Segmented, { type Segment } from "../Segmented";
+import type { BoardActions } from "./boardActions";
 import { BoardPicture, DRAWN_AT, Letter, OptionFacts, Reach } from "./parts";
 import WidePicture from "./WidePicture";
 
@@ -17,7 +17,8 @@ type Slide = BoardLetter | typeof NEW;
 /** For three revisions of an earlier option: which option they revise and what the founder asked for. */
 type Revision = { letter: string; name: string; feedback: string };
 
-type Props = { boardId: string; businessName: string; website: string; options: BoardOption[]; revision: Revision | null };
+/** `close` is where the chooser's close button goes, with what it says to a screen reader. */
+type Props = { boardId: string; businessName: string; website: string; options: BoardOption[]; revision: Revision | null; actions: BoardActions; close: { href: string; label: string } };
 
 /** A screen starts under the floating top bar, so the bar never covers the logo and menu of a first screen. */
 const BELOW_TOP_BAR = "pt-[calc(max(0.75rem,env(safe-area-inset-top))+3.5rem)]";
@@ -130,13 +131,13 @@ function decisionFor(slide: Slide, options: BoardOption[], hasNote: boolean) {
 }
 
 /** Closes the chooser, names the business and switches between the options and the last screen. */
-function TopBar({ businessName, slides, slide, onShow }: { businessName: string; slides: Segment<Slide>[]; slide: Slide; onShow: (next: Slide) => void }) {
+function TopBar({ businessName, slides, slide, onShow, close }: { businessName: string; slides: Segment<Slide>[]; slide: Slide; onShow: (next: Slide) => void; close: Props["close"] }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
       <div className="bg-paper/95 text-ink shadow-lifted pointer-events-auto flex min-h-11 min-w-0 items-center rounded-full pr-4 backdrop-blur">
-        <Link href="/admin/designs" className="focus-visible:outline-ink grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2">
+        <Link href={close.href} className="focus-visible:outline-ink grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2">
           <X size={18} aria-hidden="true" />
-          <span className="sr-only">Close and go back to Designs</span>
+          <span className="sr-only">{close.label}</span>
         </Link>
         <h1 className="min-w-0 truncate text-sm font-semibold">{businessName}</h1>
       </div>
@@ -170,7 +171,7 @@ function useSlides(slides: Segment<Slide>[]) {
  * shows it, then its idea, colours, type and the wide pictures. The dock's button asks to confirm the option in view,
  * with what the founder said or typed, and only the confirm builds it. The last screen asks for three new designs.
  */
-export default function PhoneChooser({ boardId, businessName, website, options, revision }: Props) {
+export default function PhoneChooser({ boardId, businessName, website, options, revision, actions, close }: Props) {
   const slides = slidesOf(options);
   const { track, slide, show, onScroll } = useSlides(slides);
   const [note, setNote] = useState("");
@@ -187,7 +188,7 @@ export default function PhoneChooser({ boardId, businessName, website, options, 
     form.set("feedback", note);
     if (slide !== NEW) form.set("letter", slide);
     dictation.stop();
-    const action = slide === NEW ? redrawBoardsAction : revise ? reviseBoardAction : chooseBoardAction;
+    const action = slide === NEW ? actions.redraw : revise ? actions.revise : actions.choose;
     startTransition(() => action(form));
   };
   const askToConfirm = () => {
@@ -200,7 +201,7 @@ export default function PhoneChooser({ boardId, businessName, website, options, 
   const revise = decision.revisable ? { label: `Revise ${decision.letter}`, icon: <PencilSimpleLine size={18} aria-hidden="true" />, onPress: () => decide(true) } : undefined;
   return (
     <div className="bg-paper fixed inset-0 z-20 flex flex-col lg:hidden">
-      <TopBar businessName={businessName} slides={slides} slide={slide} onShow={show} />
+      <TopBar businessName={businessName} slides={slides} slide={slide} onShow={show} close={close} />
       <div ref={track} onScroll={onScroll} className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
         {options.map((option) => (
           <OptionSlide key={option.letter} option={option} website={website} revision={revision} />

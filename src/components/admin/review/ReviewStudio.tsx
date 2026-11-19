@@ -4,7 +4,6 @@ import { ArrowSquareOut, CaretLeft, CaretRight, Check, CircleNotch, Desktop, Dev
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { addPointingAction, approveReviewAction, sendReviewAction, type ReviewResult } from "@/app/admin/(panel)/review/studioActions";
 import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import { useHydrated } from "@/hooks/useHydrated";
 import { type BridgeState, useReviewBridge } from "@/hooks/useReviewBridge";
@@ -13,7 +12,6 @@ import { Button, buttonClasses } from "../../Button";
 import type { CriticKind } from "@/lib/critics";
 import { askAnchor, type ReviewAsk } from "@/lib/reviewAsks";
 import { quickNote, quickNoteOn, sectionAnchor } from "@/lib/reviewSections";
-import { TURN_PATH } from "@/lib/turn";
 import AskCard from "./AskCard";
 import Segmented, { type Segment } from "../Segmented";
 import SectionCard from "./SectionCard";
@@ -31,6 +29,8 @@ import { useProposalAnswer } from "./useProposalAnswer";
 import { useShowAsk } from "./useShowAsk";
 import { useStudioAsks } from "./useStudioAsks";
 import { usePhoneReview } from "./usePhoneReview";
+import { reviewHref, type StudioActions, type StudioPaths, StudioProvider, useStudio } from "./StudioContext";
+import type { ReviewResult } from "@/server/review/verdicts";
 
 export type StudioItem = { id: string; businessName: string; website: string; previewUrl: string; held: boolean };
 
@@ -55,9 +55,10 @@ function DeviceSwitch({ device, onChange }: { device: Device; onChange: (device:
 }
 
 function QueueSteps({ position, total, previousId, nextId }: Omit<Props, "item">) {
+  const { paths } = useStudio();
   const step = (id: string | null, label: string, icon: React.ReactNode) =>
     id ? (
-      <Link href={`/admin/review?id=${id}`} aria-label={label} className={buttonClasses("ghost", "icon")}>
+      <Link href={reviewHref(paths, id)} aria-label={label} className={buttonClasses("ghost", "icon")}>
         {icon}
       </Link>
     ) : (
@@ -75,12 +76,13 @@ function QueueSteps({ position, total, previousId, nextId }: Omit<Props, "item">
 }
 
 function StudioBar({ item, ...queue }: Props) {
+  const { paths } = useStudio();
   return (
     <header className="flex items-center justify-between gap-x-6 max-lg:hidden">
       <div className="flex min-w-0 items-center gap-x-4">
-        <Link href="/admin" className={buttonClasses("ghost", "icon")}>
+        <Link href={paths.close} className={buttonClasses("ghost", "icon")}>
           <X size={20} aria-hidden="true" />
-          <span className="sr-only">Close review and go back to Today</span>
+          <span className="sr-only">{paths.closeLabel}</span>
         </Link>
         <h1 className="font-display min-w-0 truncate text-3xl leading-none font-black">{item.businessName}</h1>
         {item.held && <span className="text-warn text-sm font-medium">Held from outreach until approved</span>}
@@ -168,6 +170,7 @@ function dockNotice(result: ReviewResult | null, micError: string) {
 }
 
 type PointOptions = {
+  addPointing: StudioActions["addPointing"];
   bridgeState: BridgeState;
   businessId: string;
   /** Notes not sent yet would be lost when the rebuild replaces this preview. */
@@ -179,13 +182,13 @@ type PointOptions = {
 };
 
 /** Points when the preview can; a preview built before pointing worked is rebuilt on the newest kit instead. */
-function pointHandler({ bridgeState, businessId, hasNotes, setPointing, setResult, startTransition, leave }: PointOptions) {
+function pointHandler({ addPointing, bridgeState, businessId, hasNotes, setPointing, setResult, startTransition, leave }: PointOptions) {
   return () => {
     if (bridgeState === "connected") return setPointing((on) => !on);
     if (bridgeState === "connecting") return setResult({ ok: false, message: "Still connecting to the preview. Try again in a moment." });
     if (hasNotes) return setResult({ ok: false, message: "This preview can't point yet. Send your notes: their rebuild adds pointing." });
     startTransition(async () => {
-      const outcome = await addPointingAction(businessId);
+      const outcome = await addPointing(businessId);
       setResult(outcome);
       if (outcome.ok) window.setTimeout(leave, 2500);
     });
@@ -201,6 +204,7 @@ function draftTarget(draft: Draft, section: NoteAnchor | null, openQuestion: Rev
 
 function Studio({ item, ...queue }: Props) {
   const router = useRouter();
+  const { actions, paths } = useStudio();
   const frame = useRef<HTMLIFrameElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -277,19 +281,19 @@ function Studio({ item, ...queue }: Props) {
     const all = target.text.trim() ? [...notes, noteFromDraft(target, device, bridge.path)] : notes;
     const input = { businessId: item.id, previewUrl: item.previewUrl, notes: all };
     startTransition(async () => {
-      const outcome = all.length ? await sendReviewAction(input) : await approveReviewAction(input);
+      const outcome = all.length ? await actions.send(input) : await actions.approve(input);
       setResult(outcome);
       if (!outcome.ok) return;
       dictation.stop();
       saveNotes(item.id, item.previewUrl, []);
       // Back to Your turn, which lists what waits next: another site, or a design to choose.
-      router.replace(TURN_PATH);
+      router.replace(paths.done);
       router.refresh();
     });
   };
 
-  const nextHref = queue.nextId ? `/admin/review?id=${queue.nextId}` : "/admin/review";
-  const point = pointHandler({ bridgeState: bridge.state, businessId: item.id, hasNotes: notes.length > 0 || Boolean(draft.text.trim()), setPointing, setResult, startTransition, leave: () => router.replace(nextHref) });
+  const nextHref = queue.nextId ? reviewHref(paths, queue.nextId) : paths.review;
+  const point = pointHandler({ addPointing: actions.addPointing, bridgeState: bridge.state, businessId: item.id, hasNotes: notes.length > 0 || Boolean(draft.text.trim()), setPointing, setResult, startTransition, leave: () => router.replace(nextHref) });
 
   useStudioShortcuts({ point, stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
   const count = notes.length + (draft.text.trim() ? 1 : 0);
@@ -356,9 +360,16 @@ function NoNotesYet() {
   );
 }
 
-/** Saved notes come from this browser's storage, so the studio only renders once the page is in the browser. */
-export default function ReviewStudio(props: Props) {
+/**
+ * Saved notes come from this browser's storage, so the studio only renders once the page is in the browser. A
+ * founder's Review page and a designer's pass their own actions and links.
+ */
+export default function ReviewStudio({ actions, paths, ...props }: Props & { actions: StudioActions; paths: StudioPaths }) {
   const hydrated = useHydrated();
   if (!hydrated) return <div className="lg:h-[calc(100svh-4rem)]" />;
-  return <Studio {...props} />;
+  return (
+    <StudioProvider actions={actions} paths={paths}>
+      <Studio {...props} />
+    </StudioProvider>
+  );
 }

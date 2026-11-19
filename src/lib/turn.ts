@@ -26,19 +26,24 @@ export type Turn = {
 export type WaitingDesign = { id: string; businessName: string; firstScreens: string[]; since: Date | null };
 export type WaitingSite = { id: string; businessName: string; previewUrl: string; held: boolean; since: Date | null };
 
-const siteTurn = (kind: "repair" | "review", site: WaitingSite): Turn => ({ kind, href: `/admin/review?id=${site.id}`, firstScreens: [], ...site });
+/** Where a turn opens: a founder's Designs and Review, or a designer's own. */
+export type TurnPaths = { design: (boardId: string) => string; review: (businessId: string) => string };
 
-const designTurn = (design: WaitingDesign): Turn => ({ kind: "design", href: `/admin/designs/${design.id}`, previewUrl: "", held: false, ...design });
+export const FOUNDER_TURN_PATHS: TurnPaths = { design: (id) => `/admin/designs/${id}`, review: (id) => `/admin/review?id=${id}` };
+
+const siteTurn = (kind: "repair" | "review", site: WaitingSite, paths: TurnPaths): Turn => ({ kind, href: paths.review(site.id), firstScreens: [], ...site });
+
+const designTurn = (design: WaitingDesign, paths: TurnPaths): Turn => ({ kind: "design", href: paths.design(design.id), previewUrl: "", held: false, ...design });
 
 /**
  * The list's order. A repair comes first: a founder asked for it minutes ago and still has the site in mind. Then
  * designs, because a build waits for each one. Then the sites no founder has looked at yet.
  */
-export function turnsInOrder(repaired: WaitingSite[], designs: WaitingDesign[], sites: WaitingSite[]): Turn[] {
+export function turnsInOrder(repaired: WaitingSite[], designs: WaitingDesign[], sites: WaitingSite[], paths: TurnPaths = FOUNDER_TURN_PATHS): Turn[] {
   const repairedIds = new Set(repaired.map((site) => site.id));
   return [
-    ...repaired.map((site) => siteTurn("repair", site)),
-    ...designs.map(designTurn),
-    ...sites.filter((site) => !repairedIds.has(site.id)).map((site) => siteTurn("review", site)),
+    ...repaired.map((site) => siteTurn("repair", site, paths)),
+    ...designs.map((design) => designTurn(design, paths)),
+    ...sites.filter((site) => !repairedIds.has(site.id)).map((site) => siteTurn("review", site, paths)),
   ];
 }

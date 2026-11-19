@@ -2,129 +2,54 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { CRITIC_KINDS, CRITIC_TARGETS } from "@/lib/critics";
-import { compileReviewNote, DEVICES, MAX_NOTE_TEXT, MAX_NOTES, POINTING_NOTE } from "@/lib/review";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
-import { closeFlagsOn } from "@/server/bots/flags";
-import { db } from "@/server/db/client";
-import { isDevelopment } from "@/server/env";
-import { previewReviews, type Business } from "@/server/db/schema";
-import { businessById, updateBusiness } from "@/server/leads/businesses";
 import type { ReviewAsk } from "@/lib/reviewAsks";
-import { reviewQuestionsFor } from "@/server/review/askWriter";
-import { recordProposalAnswer } from "@/server/review/criticProposals";
-import { withClasses } from "@/server/review/noteClassifier";
-import { splitSpokenNotes, type SplitNote } from "@/server/review/noteWriter";
+import type { SplitNote } from "@/server/review/noteWriter";
 import { addTasteLessons, restoreTasteLesson, retireTasteLesson, updateTasteLesson } from "@/server/review/taste";
-import { activeJobFor, requestPreview } from "@/server/runner/jobs";
+import { addPointing, answerProposal, approveReview, asksFor, businessFrom, type ProposalAnswerInput, type ReviewInput, type ReviewResult, sendReview, splitSpoken } from "@/server/review/verdicts";
 
-export type ReviewResult = { ok: boolean; message: string };
-
-const Anchor = z.object({
-  path: z.string().max(500),
-  selector: z.string().max(500),
-  tag: z.string().max(40),
-  text: z.string().max(300),
-});
-
-const Note = z.object({
-  id: z.string().max(64),
-  text: z.string().trim().min(1).max(MAX_NOTE_TEXT),
-  device: z.enum(DEVICES),
-  path: z.string().max(500),
-  anchor: Anchor.nullable(),
-  kind: z.enum(CRITIC_KINDS).optional(),
-  target: z.enum(CRITIC_TARGETS).optional(),
-  proposalId: z.string().max(100).optional(),
-});
-
-const Review = z.object({
-  businessId: z.uuid(),
-  // A local preview server is plain http, so development also takes http.
-  previewUrl: z.url({ protocol: isDevelopment ? /^https?$/ : /^https$/ }),
-  notes: z.array(Note).max(MAX_NOTES),
-});
-
-type Checked = { error: string } | { error: null; founder: Awaited<ReturnType<typeof requireFounder>>; lead: Business; review: z.infer<typeof Review> };
-
-async function reviewedLead(input: z.input<typeof Review>): Promise<Checked> {
-  const founder = await requireFounder();
-  const parsed = Review.safeParse(input);
-  if (!parsed.success) return { error: "Some notes didn't come through. Check them and send again." };
-  const lead = await businessById(parsed.data.businessId);
-  if (!lead || lead.previewUrl !== parsed.data.previewUrl) return { error: "This preview changed while you were looking. Open the next one." };
-  return { error: null, founder, lead, review: parsed.data };
-}
-
-const REBUILDING_MESSAGE = "This preview is already rebuilding. Your notes are still here.";
+export type { ReviewResult };
 
 /** Sends the notes to the builder as one rebuild. The review keeps them with the founder who wrote them. */
-export async function sendReviewAction(input: z.input<typeof Review>): Promise<ReviewResult> {
-  const checked = await reviewedLead(input);
-  if (checked.error !== null) return { ok: false, message: checked.error };
-  const { founder, lead, review } = checked;
-  if (!review.notes.length) return { ok: false, message: "Add a note first, or approve the preview." };
-  if (await activeJobFor(lead.id)) return { ok: false, message: REBUILDING_MESSAGE };
-  const notes = await withClasses(review.notes);
-  const { job, created } = await requestPreview(lead, founder.email, compileReviewNote(notes, review.previewUrl));
-  if (!created) return { ok: false, message: REBUILDING_MESSAGE };
-  await (await db()).insert(previewReviews).values({ businessId: lead.id, previewUrl: review.previewUrl, verdict: "changes", notes, jobId: job.id, reviewedBy: founder.email });
-  revalidatePath("/admin", "layout");
-  return { ok: true, message: `Sent ${review.notes.length} ${review.notes.length === 1 ? "note" : "notes"} to the builder.` };
+export async function sendReviewAction(input: ReviewInput): Promise<ReviewResult> {
+  const founder = await requireFounder();
+  const result = await sendReview(founder.email, input);
+  if (result.ok) revalidatePath("/admin", "layout");
+  return result;
 }
 
 /** The preview is good as it is: a held one moves to the outreach queue. */
-export async function approveReviewAction(input: z.input<typeof Review>): Promise<ReviewResult> {
-  const checked = await reviewedLead({ ...input, notes: [] });
-  if (checked.error !== null) return { ok: false, message: checked.error };
-  const { founder, lead, review } = checked;
-  if (lead.stage === "new") {
-    await updateBusiness(lead.id, { stage: "preview_built" });
-    await closeFlagsOn(lead.id, ["preview-review"], "A founder approved the preview on the review page.", founder.email);
-  }
-  await (await db()).insert(previewReviews).values({ businessId: lead.id, previewUrl: review.previewUrl, verdict: "approved", reviewedBy: founder.email });
-  await record(founder.email, "approved the preview", { businessId: lead.id });
-  revalidatePath("/admin", "layout");
-  return { ok: true, message: "Approved." };
+export async function approveReviewAction(input: ReviewInput): Promise<ReviewResult> {
+  const founder = await requireFounder();
+  const result = await approveReview(founder.email, input);
+  if (result.ok) revalidatePath("/admin", "layout");
+  return result;
 }
-
-const Spoken = z.string().trim().min(1).max(8000);
 
 /** Splits what the founder said on the phone into separate notes. */
 export async function splitSpokenNotesAction(transcript: string): Promise<SplitNote[]> {
   await requireFounder();
-  const parsed = Spoken.safeParse(transcript);
-  return parsed.success ? splitSpokenNotes(parsed.data) : [];
+  return splitSpoken(transcript);
 }
 
 /** Claude's questions about a lead's current preview, with the preview they're about so the page can keep them. */
 export async function reviewAsksAction(businessId: string): Promise<{ previewUrl: string; asks: ReviewAsk[] }> {
   await requireFounder();
-  const id = z.uuid().safeParse(businessId);
-  const lead = id.success ? await businessById(id.data) : null;
-  if (!lead?.previewUrl) return { previewUrl: "", asks: [] };
-  return { previewUrl: lead.previewUrl, asks: await reviewQuestionsFor(lead.id, lead.businessName, lead.previewUrl) };
+  return asksFor(await businessFrom(businessId));
 }
 
-const ProposalAnswer = z.object({ jobId: z.uuid(), proposalId: z.string().min(1).max(100), accepted: z.boolean() });
-
 /** Keeps the founder's yes or no to one critic proposal. The note itself is added in the browser. */
-export async function answerProposalAction(input: z.input<typeof ProposalAnswer>): Promise<boolean> {
+export async function answerProposalAction(input: ProposalAnswerInput): Promise<boolean> {
   const founder = await requireFounder();
-  const parsed = ProposalAnswer.safeParse(input);
-  return parsed.success ? recordProposalAnswer({ ...parsed.data, answeredBy: founder.email }) : false;
+  return answerProposal(founder.email, input);
 }
 
 /** Queues the kit-only rebuild for a preview built before pointing worked. */
 export async function addPointingAction(businessId: string): Promise<ReviewResult> {
   const founder = await requireFounder();
-  const id = z.uuid().safeParse(businessId);
-  const lead = id.success ? await businessById(id.data) : null;
-  if (!lead) return { ok: false, message: "That lead isn't here any more." };
   // No revalidation here: the page shows its message, then opens the next preview itself.
-  const { created } = await requestPreview(lead, founder.email, POINTING_NOTE);
-  return created ? { ok: true, message: "Updating this preview so you can point at it. It comes back here when it's built." } : { ok: false, message: "This preview is already rebuilding." };
+  return addPointing(founder.email, await businessFrom(businessId));
 }
 
 const LessonId = z.uuid();

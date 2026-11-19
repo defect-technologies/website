@@ -1,17 +1,18 @@
 "use client";
 
-import { answerProposalAction } from "@/app/admin/(panel)/review/studioActions";
 import type { ReviewNote } from "@/lib/review";
 import type { ReviewAsk } from "@/lib/reviewAsks";
 import { noteFromProposal } from "./reviewDraft";
+import { useStudio } from "./StudioContext";
 import type { AskFlow } from "./useAskFlow";
 
 /** Yes keeps the critic's proposal as one of the founder's notes; either answer is saved, and the flow moves on. */
 export function useProposalAnswer(ask: ReviewAsk | null, flow: AskFlow, add: (note: ReviewNote) => void) {
+  const { answerProposal } = useStudio().actions;
   return (accepted: boolean) => {
     const proposal = ask?.proposal;
     if (!ask || !proposal) return;
-    void answerProposalAction({ jobId: proposal.jobId, proposalId: proposal.id, accepted });
+    void answerProposal({ jobId: proposal.jobId, proposalId: proposal.id, accepted });
     const note = accepted ? noteFromProposal(ask) : null;
     if (note) add(note);
     if (accepted) flow.good();
