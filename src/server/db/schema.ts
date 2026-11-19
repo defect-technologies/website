@@ -350,6 +350,8 @@ export const previewJobs = pgTable(
     result: jsonb("result"),
     /** Every note the critics wrote about this build, as the runner reported them. Null when the runner sent none. */
     criticNotes: jsonb("critic_notes").$type<CriticNote[]>(),
+    /** Whether the runner was told to repair the built site rather than build it, decided when it claimed the job. A repair doesn't count against the daily cap. */
+    repair: boolean("repair").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -596,6 +598,54 @@ export const prospects = pgTable(
 
 export type LeadSource = "lead_finder" | "request";
 
+/** A student designer who chooses designs and reviews builds in the founders' place. Emails are stored lowercased. */
+export const designers = pgTable(
+  "designers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    addedBy: text("added_by").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Set when a founder deactivates them: they can no longer sign in, and their businesses stay theirs. */
+    deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
+    deactivatedBy: text("deactivated_by").notNull().default(""),
+  },
+  (table) => [uniqueIndex("designers_email").on(table.email)],
+);
+
+/** The designer a business belongs to. One row per business, so two designers never share one. */
+export const designerClaims = pgTable(
+  "designer_claims",
+  {
+    businessId: uuid("business_id")
+      .primaryKey()
+      .references(() => businesses.id),
+    designerId: uuid("designer_id")
+      .notNull()
+      .references(() => designers.id),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("designer_claims_designer").on(table.designerId, table.claimedAt)],
+);
+
+/** Money a founder sent a designer, by Zelle, recorded here. What a designer is owed is what they earned less these. */
+export const designerPayments = pgTable(
+  "designer_payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    designerId: uuid("designer_id")
+      .notNull()
+      .references(() => designers.id),
+    amountCents: integer("amount_cents").notNull(),
+    paidOn: date("paid_on", { mode: "string" }).notNull(),
+    note: text("note").notNull().default(""),
+    recordedBy: text("recorded_by").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("designer_payments_designer").on(table.designerId, table.paidOn)],
+);
+
 /**
  * People asking us for a website through the form on defect.tech, and emails to hello@defect.tech from
  * addresses that match no lead. The Client care bot sorts the emails; a founder approves every request.
@@ -662,3 +712,6 @@ export type BrandFile = typeof brandFiles.$inferSelect;
 export type PreviewReview = typeof previewReviews.$inferSelect;
 export type TasteLesson = typeof tasteLessons.$inferSelect;
 export type DesignBoard = typeof designBoards.$inferSelect;
+export type Designer = typeof designers.$inferSelect;
+export type DesignerClaim = typeof designerClaims.$inferSelect;
+export type DesignerPayment = typeof designerPayments.$inferSelect;

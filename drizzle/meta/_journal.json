@@ -169,6 +169,13 @@
       "when": 1794826118076,
       "tag": "0023_replaced_redraws",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795046007023,
+      "tag": "0024_designers",
+      "breakpoints": true
     }
   ]
 }
