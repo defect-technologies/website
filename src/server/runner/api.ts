@@ -18,14 +18,14 @@ import { BotError } from "../bots/http";
 import { ownedLead } from "../bots/leads";
 import { asClause } from "@/lib/emailTemplate";
 import { CriticNotesField } from "../review/criticNotes";
-import { choiceForJob, countBoardsWaiting, newestBoardFor, noteBehindBoards, redrawFor, type BoardChoice } from "../boards/store";
+import { choiceForJob, choiceWaitsFor, countBoardsWaiting, newestBoardFor, noteBehindBoards, redrawFor, type BoardChoice } from "../boards/store";
 import { brandFilesFor } from "../leads/brandFiles";
 import { buildBrief } from "../leads/buildCommand";
 import { welcomeLink } from "../outreach/compose";
 import { updateBusiness } from "../leads/businesses";
 import { BuildName, withBuildName } from "./naming";
 import { maybePickForSpotCheck } from "../spotChecks";
-import { autoQueueNext, buildsToday, claimJob, claimNextJob, failuresInARow, isActive, jobById, leadForJob, requeueOrphans, requestPreview, updateJob } from "./jobs";
+import { autoQueueNext, buildsToday, claimJob, claimNextJob, failuresInARow, isActive, jobById, leadForJob, queuedPreviewJobs, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
 import { repairChecks, repairNotesFor, RepairsField } from "./repairs";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
@@ -52,8 +52,8 @@ function idle(reason: string) {
 type Limits = { settings: RunnerSettings; noBuilds: string | null; paused: boolean };
 
 /**
- * What the runner may start now. Claude's usage pause stops everything that uses Claude. The daily cap stops builds
- * only: a job that stops at its design boards builds nothing and doesn't count against the cap.
+ * What the runner may start now. Claude's usage pause stops everything that uses Claude. The daily cap stops new sites
+ * only: a job that stops at its design boards, or repairs a built site, doesn't count against it and goes ahead past it.
  */
 async function limitsNow(): Promise<Limits> {
   const settings = await runnerSettings();
@@ -157,15 +157,35 @@ async function whyIdle(limits: Limits): Promise<string> {
   return limits.noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.";
 }
 
-/** The next job: work a founder or client is waiting on first, then designs to review, or builds with boards off. */
-async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
+/**
+ * Past the daily cap, the oldest queued job that would repair a built site: someone's notes on a preview, made on the
+ * site as it is. It is told apart the same way a claim tells it (repairing, below) from the lead as it is now.
+ */
+async function claimRepair(runnerName: string): Promise<PreviewJob | null> {
+  for (const job of await queuedPreviewJobs()) {
+    if (!(await wouldRepair(job, await leadForJob(job)))) continue;
+    const claimed = await claimJob(runnerName, job.id);
+    if (claimed) return claimed;
+  }
+  return null;
+}
+
+/** Asked-for work the limits allow: any kind under the cap; past it, launches and then repairs. */
+async function claimAsked(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
   const kinds = kindsAllowed(search, limits.noBuilds);
   const asked = kinds.length ? await claimNextJob(runnerName, kinds, "asked") : null;
+  if (asked || limits.paused || !limits.noBuilds) return asked;
+  return claimRepair(runnerName);
+}
+
+/** The next job: work a founder or client is waiting on first, then designs to review, or builds with boards off. */
+async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
+  const asked = await claimAsked(runnerName, search, limits);
   if (asked || limits.paused) return asked && founderJob(asked);
   // New designs a founder asked for build nothing, so they go ahead past the daily cap, and before any the runner draws itself.
   const redraw = await claimNextJob(runnerName, ["preview"], "redraw");
   if (redraw) return founderJob(redraw);
-  return limits.settings.designBoards ? claimDesignWork(runnerName, limits.settings) : claimBuildWork(runnerName, kinds, limits);
+  return limits.settings.designBoards ? claimDesignWork(runnerName, limits.settings) : claimBuildWork(runnerName, kindsAllowed(search, limits.noBuilds), limits);
 }
 
 /**
@@ -178,17 +198,27 @@ async function founderJob(job: PreviewJob): Promise<PreviewJob> {
   return board ? updateJob(job.id, { note: await noteBehindBoards(board) }) : job;
 }
 
+/** A chosen design is always built and turned-down boards are always drawn again; otherwise isRepair decides. */
+const repairing = (job: PreviewJob, lead: Business, decided: { choice: unknown; redraw: unknown }) => !decided.choice && !decided.redraw && isRepair(job, lead.previewUrl);
+
+/** Whether claiming this job now would make it a repair, without taking the lead's choice for it. */
+async function wouldRepair(job: PreviewJob, lead: Business): Promise<boolean> {
+  if (!isRepair(job, lead.previewUrl)) return false;
+  return repairing(job, lead, { choice: await choiceWaitsFor(lead.id, job.id), redraw: await redrawFor(lead.id) });
+}
+
 /**
- * How a claimed job treats the lead's design. A founder's choice is always built, and boards a founder turned down
- * are always drawn again. Otherwise a note about the preview the lead has keeps that preview's design: no boards, and
- * the note is repaired on the site as it is.
+ * How a claimed job treats the lead's design. A founder's or designer's choice is always built, and boards they turned
+ * down are always drawn again. Otherwise a note about the preview the lead has keeps that preview's design: no boards,
+ * and the note is repaired on the site as it is. The job keeps whether it was a repair, for the daily cap.
  */
 async function designAndRepairFor(job: PreviewJob, lead: Business) {
   const choice = job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null;
   const redraw = job.kind === "preview" && !choice ? await redrawFor(lead.id) : null;
   const boards = { on: Boolean(redraw) || ((await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl))), choice, redraw };
-  const repairing = !choice && !redraw && isRepair(job, lead.previewUrl);
-  return { boards, repair: { on: repairing, notes: repairing ? await repairNotesFor(lead.id, lead.previewUrl) : null } };
+  const repair = repairing(job, lead, { choice, redraw });
+  await updateJob(job.id, { repair });
+  return { boards, repair: { on: repair, notes: repair ? await repairNotesFor(lead.id, lead.previewUrl) : null } };
 }
 
 /** GET /api/runner/next: claims one queued build, or 204 with why there's nothing to do. */

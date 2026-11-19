@@ -17,7 +17,7 @@ after(closeDatabase);
 const { eq } = await import("drizzle-orm");
 const { db } = await import("../db/client");
 const { businesses, designBoards, previewJobs } = await import("../db/schema");
-const { requestPreview, runNext } = await import("./jobs");
+const { buildsToday, requestPreview, runNext } = await import("./jobs");
 const { claimNext } = await import("./api");
 const { updateRunnerSettings } = await import("./settings");
 const { POINTING_NOTE } = await import("@/lib/review");
@@ -85,11 +85,11 @@ test("a founder's note goes before new designs", async () => {
 test("designs go on past the daily cap, and builds stop at it", async () => {
   await updateRunnerSettings({ dailyCap: 0 }, "one@example.com");
   const noted = await builtLead();
-  await requestPreview(noted, "brendan@g.studio", "The phone number is wrong.");
+  await requestPreview(noted, "bot:outreach", "The owner asked for a new look.");
   const old = await builtLead();
   await requestPreview(old, "admin", POINTING_NOTE);
   const fresh = await lead();
-  assert.equal((await ask())?.lead.id, old.id, "the note's build waits for tomorrow, designs don't");
+  assert.equal((await ask())?.lead.id, old.id, "another bot's request is built the long way, so it waits for tomorrow, designs don't");
   assert.equal((await ask())?.lead.id, fresh.id);
   assert.equal(await ask(), null);
 });
@@ -195,4 +195,57 @@ test("a founder can have a queued build taken next, and one that already started
   assert.equal(await runNext(jobs[2].id), true);
   assert.deepEqual([(await ask())?.lead.id, (await ask())?.lead.id, (await ask())?.lead.id], [leads[2].id, leads[0].id, leads[1].id]);
   assert.equal(await runNext(jobs[1].id), false, "it isn't queued any more");
+});
+
+type RepairClaim = Claim & { repair?: boolean };
+
+async function claimed(jobId: string) {
+  const [job] = await database.select().from(previewJobs).where(eq(previewJobs.id, jobId));
+  return job;
+}
+
+test("a repair goes past the daily cap, is kept as a repair, and doesn't use up a build", async () => {
+  await updateRunnerSettings({ dailyCap: 1, designBoards: false }, "one@example.com");
+  const site = await lead();
+  const first = await ask();
+  assert.equal(first?.lead.id, site.id, "a new site uses the day's one build");
+  assert.equal((await claimed(first!.job.id)).repair, false);
+  assert.equal(await buildsToday(), 1);
+
+  const noted = await builtLead();
+  await requestPreview(noted, "designer@example.com", "The phone number is wrong.");
+  await lead();
+  const repair = (await ask()) as RepairClaim | null;
+  assert.equal(repair?.lead.id, noted.id, "the designer's notes are repaired past the cap");
+  assert.equal(repair?.repair, true);
+  assert.equal((await claimed(repair!.job.id)).repair, true, "the job keeps that it was a repair");
+  assert.equal(await buildsToday(), 1, "a repair is not a new site");
+  assert.equal(await ask(), null, "the new lead still waits for tomorrow");
+});
+
+test("the repair decision kept on the job stands when the lead's preview changes later", async () => {
+  await updateRunnerSettings({ dailyCap: 5, designBoards: false }, "one@example.com");
+  const noted = await builtLead();
+  await requestPreview(noted, "brendan@g.studio", "Make the hours bigger.");
+  const repair = await ask();
+  await database.update(businesses).set({ previewUrl: "" }).where(eq(businesses.id, noted.id));
+  assert.equal((await claimed(repair!.job.id)).repair, true);
+  assert.equal(await buildsToday(), 0);
+});
+
+test("a retry of a failed repair is a repair, and a retry of a new site counts like the site", async () => {
+  await updateRunnerSettings({ dailyCap: 0, designBoards: false }, "one@example.com");
+  const { RETRY_NOTE, RUNNER_ACTOR } = await import("@/lib/previewJobs");
+  const noted = await builtLead();
+  await requestPreview(noted, RUNNER_ACTOR, ["The phone number is wrong.", RETRY_NOTE].join("\n\n"));
+  const fresh = await lead();
+  await requestPreview(fresh, RUNNER_ACTOR, RETRY_NOTE);
+  assert.equal((await ask())?.lead.id, noted.id, "the retried repair goes past the cap");
+  assert.equal(await ask(), null, "the retried new site waits for tomorrow");
+});
+
+test("Claude's usage pause stops repairs too", async () => {
+  await updateRunnerSettings({ dailyCap: 0, pausedUntil: new Date(Date.now() + 3_600_000).toISOString() }, "one@example.com");
+  await requestPreview(await builtLead(), "brendan@g.studio", "The phone number is wrong.");
+  assert.equal(await ask(), null);
 });

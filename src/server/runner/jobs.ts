@@ -117,13 +117,17 @@ export async function autoQueueNext(): Promise<PreviewJob | null> {
   return request.created ? request.job : null;
 }
 
-/** Builds started (or claimed) since midnight in Los Angeles. */
+/**
+ * New sites started (or claimed) since midnight in Los Angeles: first builds, redesigns and their retries. The cap they
+ * count against keeps the runner from spending Claude's usage on new sites around the clock.
+ */
 export async function buildsToday(): Promise<number> {
   const [row] = await (await db())
     .select({ count: sql<number>`count(*)::int` })
     .from(previewJobs)
-    // A skip takes a minute and builds nothing, so it doesn't use up a build. Neither does a job that only made boards.
-    .where(and(eq(previewJobs.kind, "preview"), notInArray(previewJobs.step, [SKIPPED_STEP, BOARDS_STEP]), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
+    // A skip takes a minute and builds nothing, so it doesn't use up a build. Neither does a job that only made boards,
+    // nor a repair of a built site, which makes the notes' changes and builds nothing new.
+    .where(and(eq(previewJobs.kind, "preview"), eq(previewJobs.repair, false), notInArray(previewJobs.step, [SKIPPED_STEP, BOARDS_STEP]), gte(sql`coalesce(${previewJobs.startedAt}, ${previewJobs.claimedAt})`, LA_MIDNIGHT)));
   return row?.count ?? 0;
 }
 
@@ -177,6 +181,16 @@ export async function claimNextJob(runnerName: string, kinds: JobKind[] = ["prev
     .where(and(eq(previewJobs.id, oldestQueued), eq(previewJobs.status, "queued")))
     .returning();
   return job ?? null;
+}
+
+/** Queued preview jobs, the oldest first: the ones a runner past its daily cap looks through for repairs. */
+export async function queuedPreviewJobs(limit = 50): Promise<PreviewJob[]> {
+  return (await db())
+    .select()
+    .from(previewJobs)
+    .where(and(eq(previewJobs.status, "queued"), eq(previewJobs.kind, "preview")))
+    .orderBy(asc(previewJobs.createdAt))
+    .limit(limit);
 }
 
 /** Claims this one queued job, unless another runner got to it first. */
