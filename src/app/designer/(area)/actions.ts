@@ -15,7 +15,7 @@ export async function claimAction(formData: FormData) {
   const designer = await requireDesigner();
   const id = boardIdIn(formData);
   const { result, board } = await claimBoard(id, designer.id);
-  if (result === "claimed" && board) await record(designer.email, "claimed a business", { businessId: board.businessId });
+  if (result === "claimed" && board) await record(designer.email, "took a design", { businessId: board.businessId });
   refresh();
   redirect(result === "claimed" || result === "yours" ? `/designer/designs/${id}` : `/designer/pool?missed=${result}`);
 }

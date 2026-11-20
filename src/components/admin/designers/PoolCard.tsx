@@ -27,7 +27,7 @@ export default function PoolCard({ board, place, claim }: { board: BoardWithLead
         <form action={claim}>
           <input type="hidden" name="id" value={board.id} />
           <SubmitButton variant="solid" icon={<HandGrabbing size={18} aria-hidden="true" />}>
-            Take this business
+            Take this design
           </SubmitButton>
         </form>
       </div>

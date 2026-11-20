@@ -20,7 +20,7 @@ export default function ActivitySheet({ rows }: { rows: ActivityRow[] }) {
             <Cell className="text-ink-faint whitespace-nowrap">
               <When date={entry.at} />
             </Cell>
-            <RowHeader className="whitespace-nowrap">{actorLabel(entry.actor)}</RowHeader>
+            <RowHeader className="whitespace-nowrap">{entry.actorName ?? actorLabel(entry.actor)}</RowHeader>
             <Cell label="Lead" className="lg:min-w-40">
               {entry.businessId ? (
                 <Link href={`/admin/sites/${entry.businessId}`} className="hover:underline focus-visible:outline-2 focus-visible:outline-ink">

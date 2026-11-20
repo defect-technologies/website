@@ -47,7 +47,7 @@ export default async function DesignerPage({ params }: { params: Promise<{ id: s
       {businesses.length ? (
         <WorkList businesses={businesses} hrefFor={(business) => `/admin/sites/${business.id}`} settled={ledger.settled} />
       ) : (
-        <EmptyState title={`${designer.name} hasn't taken a design yet`}>Designs they take from the pool show here, with where each stands.</EmptyState>
+        <EmptyState title={`${designer.name} has no designs`}>Designs they take from the pool show here, with where each stands.</EmptyState>
       )}
       <DecisionList decisions={decisions} />
       <BuildVerdictList verdicts={verdicts} />

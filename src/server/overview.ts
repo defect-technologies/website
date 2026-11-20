@@ -1,10 +1,11 @@
 import "server-only";
 import { desc, eq, inArray, isNotNull, like, max } from "drizzle-orm";
-import { BOTS, type Bot } from "@/lib/bots";
+import { actorLabel, BOTS, type Bot } from "@/lib/bots";
 import { leadStatus, type LeadStatus } from "@/lib/leadStatus";
 import { db } from "./db/client";
 import { activity, botCalls, businesses, messages, previewJobs, type Activity, type BotKey, type Business, type Message, type PreviewJob } from "./db/schema";
 import { listBotKeys } from "./bots/keys";
+import { deciders } from "./designers/people";
 import { buildsToday, spentToday } from "./runner/jobs";
 import { activePause, runnerSettings } from "./runner/settings";
 
@@ -51,7 +52,7 @@ export async function sheetRows(): Promise<{ all: LeadRow[]; leads: LeadRow[]; c
   return { all: rows, leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live"), readAt: Date.now() };
 }
 
-export type ActivityRow = Activity & { businessName: string | null };
+export type ActivityRow = Activity & { businessName: string | null; actorName?: string };
 
 /** The newest entries in the activity log, or with `actor` only what that person did. */
 export async function recentActivity(limit = 300, actor?: string): Promise<ActivityRow[]> {
@@ -62,7 +63,17 @@ export async function recentActivity(limit = 300, actor?: string): Promise<Activ
     .where(actor ? eq(activity.actor, actor) : undefined)
     .orderBy(desc(activity.at))
     .limit(limit);
-  return rows.map(({ entry, businessName }) => ({ ...entry, businessName }));
+  const named = await actorNames();
+  return rows.map(({ entry, businessName }) => ({ ...entry, businessName, actorName: named(entry.actor) }));
+}
+
+/** Who did something, by name: a founder or designer by their name, a bot by its label. */
+async function actorNames(): Promise<(actor: string) => string> {
+  const decider = await deciders();
+  return (actor) => {
+    const person = decider(actor);
+    return person.role === "designer" || person.name !== actor ? person.name : actorLabel(actor);
+  };
 }
 
 export type AgentState = {
