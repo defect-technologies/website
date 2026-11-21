@@ -1,27 +1,29 @@
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { Card, KeyValue, Section, When } from "@/components/admin/ui";
+import type { ReactNode } from "react";
+import { Card, Section, StatusMark, When } from "@/components/admin/ui";
+import KnifeStroke from "../KnifeStroke";
 import { formatCents } from "@/lib/settleUp";
 import type { DesignerPayment } from "@/server/db/schema";
-import type { Earning, Ledger } from "@/server/designers/pay";
+import type { Earning } from "@/server/designers/pay";
 
 const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
 const paidOn = (date: string) => day.format(new Date(`${date}T00:00:00Z`));
 
-/** What is owed, big, with what was earned and paid under it. Paid past what was earned reads as paid ahead. */
-export function OwedFigure({ ledger }: { ledger: Ledger }) {
-  const ahead = ledger.owedCents < 0;
+/** What we still owe a designer, big. Nothing owed reads as all paid, and `children` (the way to pay) shows only while something is. */
+export function BalanceCard({ title, owedCents, children }: { title: string; owedCents: number; children?: ReactNode }) {
+  const outstanding = Math.max(owedCents, 0);
   return (
-    <Card className="flex flex-col gap-4 p-5">
+    <Card className="flex flex-col gap-6 p-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex flex-col gap-1">
-        <span className="text-ink-soft text-sm">{ahead ? "Paid ahead" : "Owed"}</span>
-        <span className={`font-display text-5xl leading-none font-black tabular-nums ${ledger.owedCents > 0 ? "text-ink" : "text-ink-soft"}`}>{formatCents(Math.abs(ledger.owedCents))}</span>
+        <p className="text-lg font-semibold">{title}</p>
+        <p className="relative isolate w-fit">
+          {outstanding > 0 && <KnifeStroke className="text-vermilion/25 absolute -inset-x-3 inset-y-1 -z-10 h-[calc(100%-0.5rem)] w-[calc(100%+1.5rem)]" />}
+          <span className={`font-display text-6xl leading-none font-black tabular-nums ${outstanding > 0 ? "" : "text-ink-faint"}`}>{formatCents(outstanding)}</span>
+        </p>
+        {outstanding === 0 && <StatusMark icon={CheckCircle} tone="good" label="All paid" />}
       </div>
-      <KeyValue
-        rows={[
-          ["Earned", `${formatCents(ledger.earnedCents)} from ${ledger.earned.length} ${ledger.earned.length === 1 ? "sign-up" : "sign-ups"}`],
-          ["Paid", formatCents(ledger.paidCents)],
-        ]}
-      />
+      {outstanding > 0 && children}
     </Card>
   );
 }

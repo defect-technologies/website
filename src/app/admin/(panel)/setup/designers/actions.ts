@@ -5,7 +5,7 @@ import { z } from "zod";
 import { formatCents, todayInPacific } from "@/lib/settleUp";
 import { record } from "@/server/activity";
 import { isFounder, requireFounder } from "@/server/auth/session";
-import { recordPayment } from "@/server/designers/pay";
+import { ledgerOf, recordPayment } from "@/server/designers/pay";
 import { addDesigner, designerById, setDesignerActive } from "@/server/designers/people";
 import { releaseUnfinished } from "@/server/designers/work";
 
@@ -47,29 +47,16 @@ export async function setDesignerActiveAction(form: FormData) {
   refresh();
 }
 
-const dollarsToCents = (amount: string) => Math.round(Number(amount.replace(/[$,\s]/g, "")) * 100);
-
-const Payment = z.object({
-  designerId: z.uuid(),
-  amount: z
-    .string()
-    .regex(/^\s*\$?\s*[\d,]+(\.\d{1,2})?\s*$/, "Write the amount in dollars, like 59 or 59.00.")
-    .transform(dollarsToCents)
-    .refine((cents) => cents > 0, "The amount has to be more than $0."),
-  paidOn: z.iso.date("Pick the date it was sent.").refine((date) => date <= todayInPacific(), "Pick a date that isn't in the future."),
-  note: z.string().trim().max(300, "Keep the note under 300 characters.").default(""),
-});
-
-/** Records a Zelle a founder sent a designer. What they're owed goes down by it. */
-export async function recordPaymentAction(_previous: FormState, form: FormData): Promise<FormState> {
+/** Records that a founder sent a designer everything they are owed by Zelle, today. Nothing owed records nothing. */
+export async function settleDesignerAction(form: FormData) {
   const founder = await requireFounder();
-  const parsed = Payment.safeParse({ designerId: form.get("designerId"), amount: form.get("amount") ?? "", paidOn: form.get("paidOn"), note: form.get("note") ?? "" });
-  if (!parsed.success) return { problems: parsed.error.issues.map((issue) => issue.message) };
-  const designer = await designerById(parsed.data.designerId);
-  if (!designer) return { problems: ["That designer isn't here any more."] };
-  const { amount, paidOn, note } = parsed.data;
-  await recordPayment({ designerId: designer.id, amountCents: amount, paidOn, note, recordedBy: founder.email });
-  await record(founder.email, "recorded a designer payment", { detail: `${formatCents(amount)} to ${designer.name} on ${paidOn}${note ? `. ${note}` : ""}` });
+  const id = z.uuid().safeParse(form.get("id"));
+  const designer = id.success ? await designerById(id.data) : null;
+  if (!designer) return;
+  const { owedCents } = await ledgerOf(designer.id);
+  if (owedCents > 0) {
+    await recordPayment({ designerId: designer.id, amountCents: owedCents, paidOn: todayInPacific(), note: "", recordedBy: founder.email });
+    await record(founder.email, "paid a designer", { detail: `${formatCents(owedCents)} to ${designer.name} by Zelle` });
+  }
   refresh();
-  return { problems: [], done: `Recorded ${formatCents(amount)} to ${designer.name}.` };
 }

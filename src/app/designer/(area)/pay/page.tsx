@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { EarnedList, OwedFigure, PaymentList } from "@/components/admin/designers/PayParts";
+import { BalanceCard, EarnedList, PaymentList } from "@/components/admin/designers/PayParts";
 import { PageHeader } from "@/components/admin/ui";
 import { founderName } from "@/lib/founders";
 import { requireDesigner } from "@/server/auth/designerSession";
@@ -14,7 +14,7 @@ export default async function DesignerPayPage() {
   return (
     <>
       <PageHeader title="Pay" />
-      <OwedFigure ledger={ledger} />
+      <BalanceCard title="Owed to you" owedCents={ledger.owedCents} />
       {!ledger.earned.length && <p className="text-ink-soft max-w-prose text-pretty">You earn one month of a client&rsquo;s fee when a business signs up for a design of yours. The founders pay you by Zelle.</p>}
       <EarnedList earned={ledger.earned} />
       <PaymentList payments={ledger.payments} recorderName={founderName} />

@@ -62,7 +62,7 @@ function DesignerRow({ summary }: { summary: Summary }) {
           {summary.waiting > 0 && <span className="text-ink font-medium">{summary.waiting} waiting on them</span>}
         </span>
         <span className={`w-24 text-right font-semibold tabular-nums ${summary.owedCents > 0 ? "text-ink" : "text-ink-faint"}`} title="Owed">
-          {formatCents(summary.owedCents)}
+          {formatCents(Math.max(summary.owedCents, 0))}
           <span className="sr-only"> owed</span>
         </span>
         <CaretRight size={16} weight="bold" className="text-ink-faint shrink-0" aria-hidden="true" />

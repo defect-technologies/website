@@ -33,7 +33,7 @@ function Commission({ cents, settled }: { cents: number; settled: boolean }) {
   return (
     <span className="flex flex-col items-end">
       <span className={`font-semibold ${settled ? "text-ink-soft" : "text-good"}`}>{formatCents(cents)}</span>
-      <span className="text-ink-faint text-sm">{settled ? "Paid to you" : "Owed to you"}</span>
+      <span className="text-ink-faint text-sm">{settled ? "Paid" : "Owed"}</span>
     </span>
   );
 }

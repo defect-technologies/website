@@ -211,3 +211,19 @@ test("the tracked link counts the business's opens, never a founder's or a desig
   await open();
   assert.equal(await opens(), 1, "the business's click");
 });
+
+test("marking a designer paid records exactly what they are owed, and a second click records nothing", async () => {
+  const setupActions = await import("@/app/admin/(panel)/setup/designers/actions");
+  const rio = await designer("rio@example.com", "Rio");
+  const { lead, board } = await waitingBoard("Settled Surf Shop");
+  await claimBoard(board.id, rio.id);
+  await database.update(designBoards).set({ chosenLetter: "a", chosenAt: new Date(), chosenBy: "rio@example.com" }).where(eq(designBoards.id, board.id));
+  await database.update(businesses).set({ stage: "paid", paidAt: new Date(), plan: "$79/month", firstSentAt: new Date() }).where(eq(businesses.id, lead.id));
+  await startSession({ email: "brendan@g.studio", name: "Brendan" });
+
+  await setupActions.settleDesignerAction(form({ id: rio.id }));
+  await setupActions.settleDesignerAction(form({ id: rio.id }));
+  const ledger = await ledgerOf(rio.id);
+  assert.deepEqual(ledger.payments.map((payment) => payment.amountCents), [7900]);
+  assert.equal(ledger.owedCents, 0);
+});

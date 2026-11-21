@@ -11,9 +11,9 @@ const VERDICT: Record<BoardVerdict, { icon: Icon; label: (decision: DesignDecisi
   redraw: { icon: ArrowsClockwise, label: () => "Asked for three new designs" },
 };
 
-/** Their words, as they wrote them, or a quiet line when they wrote none. */
+/** Their words, as they wrote them, when they wrote any. */
 function Words({ text }: { text: string }) {
-  return text ? <p className="max-w-prose text-pretty whitespace-pre-line">{text}</p> : <p className="text-ink-faint text-sm">No words</p>;
+  return text ? <p className="max-w-prose text-pretty whitespace-pre-line">{text}</p> : null;
 }
 
 /** Every design decision a designer made, with their words. */

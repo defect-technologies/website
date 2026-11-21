@@ -1,10 +1,10 @@
 "use client";
 
-import { Plus, Wallet } from "@phosphor-icons/react";
+import { Plus } from "@phosphor-icons/react";
 import { useActionState } from "react";
-import { addDesignerAction, type FormState, recordPaymentAction } from "@/app/admin/(panel)/setup/designers/actions";
+import { addDesignerAction, type FormState } from "@/app/admin/(panel)/setup/designers/actions";
 import SubmitButton from "../SubmitButton";
-import { controlClass, TextField } from "../fields";
+import { TextField } from "../fields";
 import { Card, Notice, Problems } from "../ui";
 
 const EMPTY: FormState = { problems: [] };
@@ -25,38 +25,6 @@ export function AddDesignerForm() {
         <TextField label="Google account email" name="email" type="email" required autoComplete="off" placeholder="name@example.com" />
         <SubmitButton variant="solid" icon={<Plus size={18} weight="bold" aria-hidden="true" />}>
           Add designer
-        </SubmitButton>
-      </Card>
-    </form>
-  );
-}
-
-/** Records a Zelle a founder sent this designer. */
-export function RecordPaymentForm({ designerId, today, owedCents }: { designerId: string; today: string; owedCents: number }) {
-  const [state, action] = useActionState(recordPaymentAction, EMPTY);
-  const suggested = owedCents > 0 ? (owedCents / 100).toFixed(2) : "";
-  return (
-    <form action={action} className="flex flex-col gap-3">
-      <Outcome state={state} />
-      <Card key={state.done ?? "first"} className="flex flex-col gap-4 p-5">
-        <input type="hidden" name="designerId" value={designerId} />
-        <div className="grid items-end gap-4 sm:grid-cols-[9.5rem_8rem]">
-          <TextField label="Date sent" name="paidOn" type="date" required defaultValue={today} max={today} />
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="payment-amount" className="text-sm font-medium">
-              Amount
-            </label>
-            <div className="relative">
-              <span aria-hidden="true" className="text-ink-faint pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                $
-              </span>
-              <input id="payment-amount" name="amount" inputMode="decimal" required defaultValue={suggested} autoComplete="off" className={`${controlClass} pl-7 text-right tabular-nums`} />
-            </div>
-          </div>
-        </div>
-        <TextField label="Note (optional)" name="note" maxLength={300} autoComplete="off" />
-        <SubmitButton variant="solid" className="w-fit" icon={<Wallet size={18} aria-hidden="true" />}>
-          Record payment
         </SubmitButton>
       </Card>
     </form>
