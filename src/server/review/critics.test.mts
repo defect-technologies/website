@@ -66,16 +66,22 @@ after(async () => {
 
 describe("settings", () => {
   it("start with everything off, as the contract lists them", async () => {
-    assert.deepEqual(await criticSettings(), { enabled: false, minutes: 20, apply: [], maxNotes: 24, secondBuilder: false });
+    assert.deepEqual(await criticSettings(), { enabled: false, apply: [], maxNotes: 24, secondBuilder: false });
   });
 
   it("keep what a founder saves, in kind order, and refuse values that make no sense", async () => {
-    const saved = await updateCriticSettings({ enabled: true, minutes: 30, apply: ["spacing", "text", "text"] }, "founder@example.com");
+    const saved = await updateCriticSettings({ enabled: true, apply: ["spacing", "text", "text"] }, "founder@example.com");
     assert.deepEqual(saved.apply, ["text", "spacing"]);
-    assert.deepEqual(await criticSettings(), { enabled: true, minutes: 30, apply: ["text", "spacing"], maxNotes: 24, secondBuilder: false });
-    await assert.rejects(updateCriticSettings({ minutes: 0 }, "founder@example.com"));
+    assert.deepEqual(await criticSettings(), { enabled: true, apply: ["text", "spacing"], maxNotes: 24, secondBuilder: false });
+    await assert.rejects(updateCriticSettings({ maxNotes: 0 }, "founder@example.com"));
     await assert.rejects(updateCriticSettings({ apply: ["nonsense" as never] }, "founder@example.com"));
-    await updateCriticSettings({ enabled: false, minutes: 20, apply: [] }, "founder@example.com");
+    await updateCriticSettings({ enabled: false, apply: [] }, "founder@example.com");
+  });
+
+  it("drop the minutes critics once got, which no longer limit anything", async () => {
+    await updateCriticSettings({ enabled: true, minutes: 30 } as never, "founder@example.com");
+    assert.ok(!("minutes" in (await criticSettings())));
+    await updateCriticSettings({ enabled: false }, "founder@example.com");
   });
 });
 

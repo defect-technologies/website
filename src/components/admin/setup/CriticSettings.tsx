@@ -1,10 +1,9 @@
 import { Check, FloppyDisk, Question, ShieldCheck, X } from "@phosphor-icons/react/dist/ssr";
 import { saveCriticSettingsAction } from "@/app/admin/(panel)/setup/bots/actions";
-import { TextField } from "@/components/admin/fields";
 import SubmitButton from "@/components/admin/SubmitButton";
 import Switch from "@/components/admin/Switch";
 import { Card, Section } from "@/components/admin/ui";
-import { acceptedShare, CRITIC_KINDS, type CriticKind, type CriticSettings as Settings, hasEarnedTrust, KIND_LABEL, type KindTally, MAX_CRITIC_MINUTES, MIN_CRITIC_MINUTES } from "@/lib/critics";
+import { acceptedShare, CRITIC_KINDS, type CriticKind, type CriticSettings as Settings, hasEarnedTrust, KIND_LABEL, type KindTally } from "@/lib/critics";
 
 const ROW_GRID = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,1fr)_9rem_repeat(3,4.5rem)_auto]";
 
@@ -72,9 +71,6 @@ export default function CriticSettings({ settings, tallies }: { settings: Settin
       <form action={saveCriticSettingsAction} className="flex flex-col gap-6">
         <Card className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 p-5">
           <Switch name="enabled" defaultChecked={settings.enabled} label="Run critics on every build" />
-          <div className="w-36">
-            <TextField label="Minutes per build" name="minutes" type="number" min={MIN_CRITIC_MINUTES} max={MAX_CRITIC_MINUTES} defaultValue={settings.minutes} required />
-          </div>
         </Card>
         <Card className="overflow-hidden py-4">
           <ColumnHeads />
