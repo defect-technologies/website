@@ -77,7 +77,7 @@ export async function reportBoards(id: string, body: z.infer<typeof BoardsBody>)
   const board = await saveBoards({ businessId: lead.id, jobId: job.id, options: body.options, pick: body.pick });
   await updateJob(job.id, { status: "done", step: BOARDS_STEP, finishedAt: new Date() });
   await record(ACTOR, "sent three design boards", { businessId: lead.id, detail: body.options.map((option) => `${option.letter.toUpperCase()}: ${option.name}`).join("; ") });
-  await tellFounders((adminUrl) => designsWaitEmail(lead.businessName, body.options, `${adminUrl}/designs/${board.id}`, `${adminUrl}/turn`), { onYourTurn: lead.id });
+  await tellFounders((adminUrl) => designsWaitEmail(lead.businessName, body.options, `${adminUrl}/designs/${board.id}`, adminUrl), { onYourTurn: lead.id });
   return { ok: true, board: board.id };
 }
 

@@ -59,17 +59,14 @@ export async function today() {
   };
 }
 
-/** The nav's badges. Today counts what a founder has to do; Messages counts what they haven't read. */
+/** The nav's badges. To do counts what a founder has to do, a design or a site to look at among it; Messages counts what they haven't read. */
 export async function navCounts() {
   const [flags, inbound, sendQueue, spotChecks, monthRows, unreadMessages] = await Promise.all([flagsOpen(), founderMail(), queue(), spotChecksOpen(), months(), unreadMessageCount()]);
   const sendable = [...sendQueue.requested, ...sendQueue.followUps, ...sendQueue.firstEmails].filter((item) => item.blockers.length === 0).length;
   const [builds, review, designs] = await Promise.all([runnerStatus(), reviewQueueCount(), countBoardsWaiting()]);
   return {
-    turn: review + designs,
-    review,
-    designs,
+    todo: flags.length + inbound.length + sendable + spotChecks.length + settleDue(monthRows).length + review + designs,
     building: builds.current.length > 0,
-    today: flags.length + inbound.length + sendable + spotChecks.length + settleDue(monthRows).length,
     messages: unreadMessages,
   };
 }

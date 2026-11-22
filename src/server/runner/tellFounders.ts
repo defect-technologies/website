@@ -7,7 +7,7 @@ import { runnerSettings } from "./settings";
 
 type Options = {
   send?: (subject: string, body: string) => Promise<unknown>;
-  /** The lead the email is about, when it goes on Your turn: the email goes only if nothing else waits there. */
+  /** The lead the email is about, when it goes on To do: the email goes only if nothing else waits there. */
   onYourTurn?: string;
 };
 
@@ -17,8 +17,8 @@ async function shouldTell(onYourTurn: string | undefined): Promise<boolean> {
 }
 
 /**
- * Emails both founders that something waits for them, unless they switched these emails off in Setup > Bots. A design
- * or a site for Your turn is emailed only when it is the first thing to wait there. The email is written from the
+ * Emails both founders that something waits for them, unless they switched these emails off in Setup > Runner. A design
+ * or a site for To do is emailed only when it is the first thing to wait there. The email is written from the
  * admin's own address, so its links open the admin. It never throws: the runner's report that led here has to be kept
  * whether or not the email goes out. True when it was sent.
  */

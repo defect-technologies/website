@@ -1,7 +1,8 @@
 import { requireFounder } from "@/server/auth/session";
-import { CaretRight, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, ClockCounterClockwise, Swatches, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
 import FlagCard, { ResolvedFlags } from "@/components/admin/FlagCard";
 import { FounderEmailCard, RequestCard, type MatchedLead } from "@/components/admin/InboundCards";
@@ -13,6 +14,7 @@ import SendMeter from "@/components/admin/SendMeter";
 import SettleCard from "@/components/admin/SettleCard";
 import SpotCheckCard from "@/components/admin/SpotCheckCard";
 import { CheckMailButton } from "@/components/admin/ThreadControls";
+import TodoTurns from "@/components/admin/turn/TodoTurns";
 import { Card, PageHeader, Section, StatusMark, When } from "@/components/admin/ui";
 import type { InboundRequest } from "@/server/db/schema";
 import type { LeadMatcher } from "@/server/inbound/requests";
@@ -21,8 +23,9 @@ import { agentStates, runnerDay } from "@/server/overview";
 import { runnerStatus } from "@/server/runner/status";
 import type { QueueItem } from "@/server/outreach/queue";
 import { today } from "@/server/today";
+import { turns } from "@/server/turn";
 
-export const metadata: Metadata = { title: "Today" };
+export const metadata: Metadata = { title: "To do" };
 
 type Today = Awaited<ReturnType<typeof today>>;
 
@@ -119,7 +122,7 @@ function Send({ queue }: { queue: Today["queue"] }) {
   const limitReached = queue.sentToday >= queue.settings.dailyLimit;
   const meter = (
     <div className="flex items-center gap-3">
-      {limitReached && <StatusMark icon={WarningCircle} tone="warn" label="Limit reached" detail="The rest can go tomorrow, or raise the limit in Setup > Email template." />}
+      {limitReached && <StatusMark icon={WarningCircle} tone="warn" label="Limit reached" detail="The rest can go tomorrow, or raise the limit in Setup > Outreach." />}
       <SendMeter sent={queue.sentToday} limit={queue.settings.dailyLimit} />
     </div>
   );
@@ -182,30 +185,51 @@ function Done({ data }: { data: Today }) {
   );
 }
 
-function nothingWaiting(data: Today) {
-  const queued = data.queue.requested.length + data.queue.followUps.length + data.queue.firstEmails.length;
-  return data.flags.length + data.requests.length + data.founderEmails.length + data.unsorted.length + data.replies.length + queued + data.spotChecks.length + data.settle.length === 0;
+/** The past, for a founder who wants it: what was dealt with, every design chosen, and everything anyone did. */
+function History({ data }: { data: Today }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <Done data={data} />
+      </div>
+      <div className="flex shrink-0 flex-wrap justify-end gap-1">
+        <ButtonLink href="/admin/designs" variant="ghost" size="sm" icon={<Swatches size={16} aria-hidden="true" />}>
+          Chosen designs
+        </ButtonLink>
+        <ButtonLink href="/admin/setup/activity" variant="ghost" size="sm" icon={<ClockCounterClockwise size={16} aria-hidden="true" />}>
+          Activity log
+        </ButtonLink>
+      </div>
+    </div>
+  );
 }
 
-export default async function TodayPage() {
+function nothingWaiting(data: Today, turnCount: number) {
+  const queued = data.queue.requested.length + data.queue.followUps.length + data.queue.firstEmails.length;
+  return turnCount + data.flags.length + data.requests.length + data.founderEmails.length + data.unsorted.length + data.replies.length + queued + data.spotChecks.length + data.settle.length === 0;
+}
+
+/** Everything that waits on a founder: their turns first, the design or site to take now shown big, then the rest of the day. */
+export default async function TodoPage() {
   await requireFounder();
-  const [data, agents, runner, builds] = await Promise.all([today(), agentStates(), runnerDay(), runnerStatus()]);
+  const [data, waiting, agents, runner, builds] = await Promise.all([today(), turns(), agentStates(), runnerDay(), runnerStatus()]);
 
   return (
     <>
-      <PageHeader title="Today">
+      <PageHeader title="To do">
         <LiveRefresh renderedAt={data.readAt} />
         <CheckMailButton />
       </PageHeader>
       <AgentRow agents={agents} now={data.readAt} runner={runner} builds={builds} />
-      {nothingWaiting(data) && <EmptyState title="Nothing needs you" />}
+      {nothingWaiting(data, waiting.length) && <EmptyState title="Nothing needs you" />}
+      <TodoTurns turns={waiting} />
       <Flags data={data} />
       <Requests data={data} />
       <Replies threads={data.replies} />
       <Send queue={data.queue} />
       <SpotChecks data={data} />
       <SettleUp data={data} />
-      <Done data={data} />
+      <History data={data} />
     </>
   );
 }

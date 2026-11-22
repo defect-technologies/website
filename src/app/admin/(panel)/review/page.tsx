@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Review" };
 
 const FOUNDER_STUDIO: StudioActions = { send: sendReviewAction, approve: approveReviewAction, addPointing: addPointingAction, splitSpoken: splitSpokenNotesAction, asks: reviewAsksAction, answerProposal: answerProposalAction };
 
-const FOUNDER_PATHS: StudioPaths = { close: "/admin", closeLabel: "Close review and go back to Today", review: "/admin/review", done: TURN_PATH };
+const FOUNDER_PATHS: StudioPaths = { close: "/admin", closeLabel: "Close review and go back to To do", review: "/admin/review", done: TURN_PATH };
 
 /** One preview at a time: point at what's wrong, say it, and send it all back to the builder in one go. */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
@@ -28,8 +28,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     if (updating) {
       const previews = `${updating} ${updating === 1 ? "preview" : "previews"}`;
       return (
-        <EmptyState title={designBoards ? `New designs for ${previews}` : `Updating ${previews}`} action={<ButtonLink href={designBoards ? "/admin/designs" : "/admin/builds"} variant="soft" icon={<CheckCircle size={18} aria-hidden="true" />}>{designBoards ? "Open Designs" : "See what\u2019s building"}</ButtonLink>}>
-          {designBoards ? "Each gets three new designs, which land on Designs as they are drawn." : "Each comes back here as it finishes, and its questions take you to the part they ask about."}
+        <EmptyState title={designBoards ? `New designs for ${previews}` : `Updating ${previews}`} action={<ButtonLink href={designBoards ? "/admin" : "/admin/builds"} variant="soft" icon={<CheckCircle size={18} aria-hidden="true" />}>{designBoards ? "Open To do" : "See what\u2019s building"}</ButtonLink>}>
+          {designBoards ? "Each gets three new designs, which land on To do as they are drawn." : "Each comes back here as it finishes, and its questions take you to the part they ask about."}
         </EmptyState>
       );
     }

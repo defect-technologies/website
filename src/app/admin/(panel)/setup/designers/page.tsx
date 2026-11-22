@@ -7,6 +7,7 @@ import { AddDesignerForm } from "@/components/admin/designers/DesignerForms";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { Card, PageHeader, Section } from "@/components/admin/ui";
 import { THEIR_TURN } from "@/lib/designerWork";
+import { FOUNDERS, founderSlug } from "@/lib/founders";
 import { formatCents } from "@/lib/settleUp";
 import type { Designer } from "@/server/db/schema";
 import { ledgerOf } from "@/server/designers/pay";
@@ -52,7 +53,7 @@ function DesignerRow({ summary }: { summary: Summary }) {
   const active = !designer.deactivatedAt;
   return (
     <li className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 ${active ? "" : "bg-paper-shade/40"}`}>
-      <Link href={`/admin/setup/designers/${designer.id}`} className="hover:bg-paper-shade/50 focus-visible:outline-ink -mx-2 flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-1 focus-visible:outline-2">
+      <Link href={`/admin/setup/designers/${designer.id}`} className={ROW_LINK}>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className={`truncate font-medium ${active ? "" : "text-ink-soft"}`}>{designer.name}</span>
           <span className="text-ink-faint truncate text-sm">{active ? designer.email : `Deactivated, ${designer.email}`}</span>
@@ -72,7 +73,24 @@ function DesignerRow({ summary }: { summary: Summary }) {
   );
 }
 
-/** Student designers who choose designs and review builds in the founders' place, and what each is owed. */
+const ROW_LINK = "hover:bg-paper-shade/50 focus-visible:outline-ink -mx-2 flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-1 focus-visible:outline-2";
+
+/** A founder decides designs too. Their row opens their lessons and notes; a founder is never paid. */
+function FounderRow({ founder }: { founder: (typeof FOUNDERS)[number] }) {
+  return (
+    <li className="flex items-center px-5 py-3">
+      <Link href={`/admin/setup/designers/founder/${founderSlug(founder.name)}`} className={ROW_LINK}>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate font-medium">{founder.name}</span>
+          <span className="text-ink-faint truncate text-sm">Founder, {founder.email}</span>
+        </span>
+        <CaretRight size={16} weight="bold" className="text-ink-faint shrink-0" aria-hidden="true" />
+      </Link>
+    </li>
+  );
+}
+
+/** The founders, then the student designers who choose designs and review builds in their place, and what each is owed. */
 export default async function DesignersPage() {
   await requireFounder();
   const summaries = await Promise.all((await allDesigners()).map(summaryOf));
@@ -82,18 +100,18 @@ export default async function DesignersPage() {
       <Section title="Add a designer">
         <AddDesignerForm />
       </Section>
-      <Section title="Designers" count={summaries.length}>
-        {summaries.length ? (
-          <Card>
-            <ul className="divide-ink/8 divide-y">
-              {summaries.map((summary) => (
-                <DesignerRow key={summary.designer.id} summary={summary} />
-              ))}
-            </ul>
-          </Card>
-        ) : (
-          <EmptyState title="No designers yet">A designer signs in with Google, takes waiting designs, chooses one and reviews the build. They earn one month of the fee for each design a business signs up for.</EmptyState>
-        )}
+      <Section title="Designers" count={FOUNDERS.length + summaries.length}>
+        <Card>
+          <ul className="divide-ink/8 divide-y">
+            {FOUNDERS.map((founder) => (
+              <FounderRow key={founder.email} founder={founder} />
+            ))}
+            {summaries.map((summary) => (
+              <DesignerRow key={summary.designer.id} summary={summary} />
+            ))}
+          </ul>
+        </Card>
+        {summaries.length === 0 && <EmptyState title="No student designers yet">A designer signs in with Google, takes waiting designs, chooses one and reviews the build. They earn one month of the fee for each design a business signs up for.</EmptyState>}
       </Section>
     </>
   );

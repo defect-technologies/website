@@ -117,7 +117,7 @@ export function isRepair(job: { kind: string; note: string; requestedBy: string 
   return job.kind === "preview" && !byAnotherBot && !takesNewKit && changesBuiltPreview(job.note, previewUrl);
 }
 
-/** Settings the founders control from Setup > Bots. */
+/** Settings the founders control from Setup > Runner. */
 export type RunnerSettings = {
   dailyCap: number;
   pausedUntil: string | null;

@@ -59,7 +59,7 @@ export type WorkFacts = {
 const DAY_MS = 86_400_000;
 
 /**
- * Whether the business has stopped answering. Each email we send gets the follow-up wait (Setup > Email template) for
+ * Whether the business has stopped answering. Each email we send gets the follow-up wait (Setup > Outreach) for
  * a reply. A lead we found gets a follow-up when its first email's wait ends, so it has had no reply only once the
  * follow-up's wait has ended too. A business that asked us gets no follow-up, so its first email's wait is all.
  */

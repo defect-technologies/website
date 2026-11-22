@@ -9,6 +9,7 @@ import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { addExpense, deleteExpense, settleMonth, updateExpense } from "@/server/expenses/expenses";
 import { addRecurring, stopRecurring, updateRecurring } from "@/server/expenses/recurring";
+import { syncPayments } from "@/server/integrations/stripe";
 
 export type ExpenseValues = { spentOn: string; item: string; amount: string; paidBy: string; frequency: string };
 export type AddExpenseResult = { problems: string[]; values: ExpenseValues; addedId?: string };
@@ -117,4 +118,13 @@ export async function settleMonthAction(form: FormData) {
   const who = `${founderName(settlement.fromFounder)} sent ${founderName(settlement.toFounder)}`;
   await record(founder.email, "settled expenses by Zelle", { detail: `${who} ${formatCents(settlement.amountCents)} for ${monthName(month)}` });
   refresh();
+}
+
+export async function syncPaymentsAction(): Promise<{ summary: string }> {
+  await requireFounder();
+  const result = await syncPayments();
+  revalidatePath("/admin", "layout");
+  if (result.state === "not_configured") return { summary: `Set ${result.needs.join(" and ")} first.` };
+  if (result.state === "error") return { summary: result.message };
+  return { summary: `${result.data.checkouts} checkouts since the last check, ${result.data.newClients} new clients.` };
 }

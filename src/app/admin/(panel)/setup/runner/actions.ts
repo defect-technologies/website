@@ -6,6 +6,7 @@ import { BOTS, BOT_LABEL } from "@/lib/bots";
 import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { createBotKey, revokeBotKey } from "@/server/bots/keys";
+import { CriticSettingsInput, updateCriticSettings } from "@/server/review/criticSettings";
 import { updateRunnerSettings } from "@/server/runner/settings";
 
 export type CreateKeyState = { key: string; bot: string; error: string };
@@ -47,4 +48,16 @@ export async function resumeRunnerAction() {
   await updateRunnerSettings({ pausedUntil: null }, founder.email);
   await record(founder.email, "resumed preview builds");
   revalidatePath("/admin", "layout");
+}
+
+const SwitchesAndMinutes = CriticSettingsInput.pick({ enabled: true, minutes: true, apply: true });
+
+/** The master switch, the critics' minutes, and the kinds the builder applies without a founder. */
+export async function saveCriticSettingsAction(form: FormData) {
+  const founder = await requireFounder();
+  const parsed = SwitchesAndMinutes.safeParse({ enabled: form.get("enabled") === "on", minutes: Number(form.get("minutes")), apply: form.getAll("apply") });
+  if (!parsed.success) return;
+  await updateCriticSettings(parsed.data, founder.email);
+  await record(founder.email, "changed critic settings", { detail: `${parsed.data.enabled ? "On" : "Off"}; ${parsed.data.minutes} minutes; applies without a founder: ${parsed.data.apply.join(", ") || "nothing"}` });
+  revalidatePath("/admin/setup/runner");
 }

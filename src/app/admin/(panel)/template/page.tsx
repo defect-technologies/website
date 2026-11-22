@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Moved to Setup. */
+/** Moved to Setup > Outreach. */
 export default function Moved() {
-  redirect("/admin/setup/template");
+  redirect("/admin/setup/outreach");
 }

@@ -130,7 +130,7 @@ async function claimNewLead(runnerName: string, settings: RunnerSettings): Promi
  * With design boards on, the runner draws designs for founders to review: first for an unreviewed preview whose
  * kit-only update was queued (it gets three new designs, not the old design on a newer kit), then for a new lead.
  * Both stop at their boards and build nothing, so they go ahead past the daily cap, until as many designs wait for a
- * choice as Setup > Bots allows.
+ * choice as Setup > Runner allows.
  */
 async function claimDesignWork(runnerName: string, settings: RunnerSettings): Promise<PreviewJob | null> {
   if ((await countBoardsWaiting()) >= settings.mostDesignsWaiting) return null;
@@ -153,7 +153,7 @@ async function claimBuildWork(runnerName: string, kinds: JobKind[], limits: Limi
 async function whyIdle(limits: Limits): Promise<string> {
   if (limits.paused) return limits.noBuilds ?? "Paused.";
   const waiting = limits.settings.designBoards ? await countBoardsWaiting() : 0;
-  if (waiting >= limits.settings.mostDesignsWaiting) return `${waiting} designs wait for a founder's choice, as many as Setup > Bots allows, so no new ones are drawn.`;
+  if (waiting >= limits.settings.mostDesignsWaiting) return `${waiting} designs wait for a founder's choice, as many as Setup > Runner allows, so no new ones are drawn.`;
   return limits.noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.";
 }
 
@@ -350,10 +350,10 @@ function buildKindOf(note: string): BuildKind {
   return written === POINTING_NOTE ? "updated" : "rebuilt";
 }
 
-/** The email that a built preview waits. One the owner must not see yet is answered on Today, where its flag is. */
+/** The email that a built preview waits. One the owner must not see yet is answered on To do, where its flag is. */
 async function tellFoundersPreviewWaits(job: PreviewJob, lead: Business, wait: PreviewWait) {
   const onToday = wait === "owner";
-  const email = (adminUrl: string) => previewWaitsEmail({ business: lead.businessName, build: buildKindOf(job.note), wait, link: onToday ? adminUrl : `${adminUrl}/review?id=${lead.id}`, list: onToday ? null : `${adminUrl}/turn` });
+  const email = (adminUrl: string) => previewWaitsEmail({ business: lead.businessName, build: buildKindOf(job.note), wait, link: onToday ? adminUrl : `${adminUrl}/review?id=${lead.id}`, list: onToday ? null : adminUrl });
   await tellFounders(email, onToday ? {} : { onYourTurn: lead.id });
 }
 

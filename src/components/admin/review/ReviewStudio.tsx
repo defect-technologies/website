@@ -286,7 +286,7 @@ function Studio({ item, ...queue }: Props) {
       if (!outcome.ok) return;
       dictation.stop();
       saveNotes(item.id, item.previewUrl, []);
-      // Back to Your turn, which lists what waits next: another site, or a design to choose.
+      // Back to To do, which lists what waits next: another site, or a design to choose.
       router.replace(paths.done);
       router.refresh();
     });

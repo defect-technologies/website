@@ -22,7 +22,7 @@ const pglite = new PGlite();
 const database = drizzle(pglite, { schema });
 (globalThis as { defectDb?: Promise<unknown> }).defectDb = Promise.resolve(database);
 
-const { disconnectMailboxAction } = await import("@/app/admin/(panel)/setup/connections/actions");
+const { disconnectMailboxAction } = await import("@/app/admin/(panel)/setup/outreach/actions");
 const { settleMonth } = await import("../expenses/expenses");
 const { FOUNDER_EMAILS } = await import("@/lib/founders");
 

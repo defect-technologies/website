@@ -54,7 +54,7 @@ export async function redrawAllWaitingAction() {
 
 /**
  * A founder wants every waiting design gone without new ones: each is cleared and nothing is queued, so the runner
- * draws designs again only as Setup > Bots allows. Nothing is learned from them.
+ * draws designs again only as Setup > Runner allows. Nothing is learned from them.
  */
 export async function clearAllWaitingAction() {
   const founder = await requireFounder();

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { BoardActions } from "@/components/admin/designs/boardActions";
 import DesignScreen from "@/components/admin/designs/DesignScreen";
+import { TURN_PATH } from "@/lib/turn";
 import { requireFounder } from "@/server/auth/session";
 import { boardById } from "@/server/boards/store";
 import { chooseBoardAction, redrawBoardsAction, reviseBoardAction } from "../actions";
@@ -15,5 +16,5 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
   await requireFounder();
   const board = await boardById((await params).id);
   if (!board) notFound();
-  return <DesignScreen board={board} actions={FOUNDER_BOARD_ACTIONS} close={{ href: "/admin/designs", label: "Back to designs" }} />;
+  return <DesignScreen board={board} actions={FOUNDER_BOARD_ACTIONS} close={{ href: TURN_PATH, label: "Back to To do" }} />;
 }

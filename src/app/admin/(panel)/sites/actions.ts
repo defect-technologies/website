@@ -152,3 +152,14 @@ export async function settleAbandonedJobAction(form: FormData) {
   await record(founder.email, requeue ? "put an abandoned build back in the queue" : "marked an abandoned build failed", { businessId: job.businessId });
   revalidatePath("/admin", "layout");
 }
+
+/** Points a lead's emails at an earlier (or later) version of its preview. */
+export async function switchPreviewVersionAction(form: FormData) {
+  const founder = await requireFounder();
+  const businessId = String(form.get("businessId") ?? "");
+  const url = String(form.get("url") ?? "");
+  if (!businessId || !url.startsWith("https://")) return;
+  await updateBusiness(businessId, { previewUrl: url });
+  await record(founder.email, "switched preview version", { businessId, detail: url });
+  revalidatePath("/admin", "layout");
+}

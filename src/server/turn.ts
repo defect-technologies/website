@@ -27,7 +27,7 @@ const waitingDesign = (board: BoardWithLead): WaitingDesign => ({
 });
 
 /**
- * How many other things wait on Your turn besides this lead's. The founders are emailed only when this is 0: once
+ * How many other things wait on To do besides this lead's. The founders are emailed only when this is 0: once
  * something waits, they come to the list and find the rest, and a runner drawing designs every few minutes would
  * otherwise send an email for each.
  */

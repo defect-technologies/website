@@ -5,7 +5,7 @@ import type { ReviewNote } from "@/lib/review";
 import { db } from "../db/client";
 import { businesses, designBoards, previewReviews, spotChecks } from "../db/schema";
 
-/** How many of a founder's newest notes of each kind the Taste page reads. */
+/** How many of a founder's newest notes of each kind a founder's page on Designers reads. */
 const NOTES_READ = 200;
 
 /** Something a founder wrote while judging a design or a preview, kept with what they were judging. */
@@ -52,7 +52,7 @@ async function spotCheckNotes(email: string): Promise<FounderNote[]> {
     .where(and(eq(spotChecks.reviewedBy, email), ne(spotChecks.note, "")))
     .orderBy(desc(spotChecks.reviewedAt))
     .limit(NOTES_READ);
-  return rows.map((row) => ({ id: `spot:${row.id}`, text: row.text, at: row.at ?? new Date(0), business: row.business, about: "Spot check", href: "/admin/spot-checks" }));
+  return rows.map((row) => ({ id: `spot:${row.id}`, text: row.text, at: row.at ?? new Date(0), business: row.business, about: "Spot check", href: "/admin/setup/spot-checks" }));
 }
 
 /**

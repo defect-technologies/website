@@ -80,7 +80,7 @@ function optedOutRecipient(edits: EmailEdits | undefined, blocked: Set<string>) 
   return address ? `${address} opted out, so it can't be emailed.` : null;
 }
 
-const dailyLimitReached = (limit: number) => `You've sent today's ${limit}. Raise the limit in Setup > Email template, or send tomorrow.`;
+const dailyLimitReached = (limit: number) => `You've sent today's ${limit}. Raise the limit in Setup > Outreach, or send tomorrow.`;
 
 async function prepare(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<Prepared | string> {
   const [stored, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);

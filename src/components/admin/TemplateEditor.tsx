@@ -2,7 +2,7 @@
 
 import { FloppyDisk } from "@phosphor-icons/react";
 import { useActionState, useRef, useState } from "react";
-import { saveTemplateAction, type TemplateResult } from "@/app/admin/(panel)/setup/template/actions";
+import { saveTemplateAction, type TemplateResult } from "@/app/admin/(panel)/setup/outreach/actions";
 import { PLACEHOLDERS, type OutreachSettings, type Placeholder, type TemplateValues } from "@/lib/emailTemplate";
 import { controlClass, TextField } from "./fields";
 import Letter from "./Letter";

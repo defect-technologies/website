@@ -57,14 +57,14 @@ const LessonId = z.uuid();
 export async function addTasteLessonAction(form: FormData) {
   const founder = await requireFounder();
   await addTasteLessons([String(form.get("text") ?? "")], founder.email);
-  revalidatePath("/admin/setup/taste");
+  revalidatePath("/admin/setup/designers", "layout");
 }
 
 export async function updateTasteLessonAction(form: FormData) {
   const founder = await requireFounder();
   const id = LessonId.safeParse(form.get("id"));
   if (id.success) await updateTasteLesson(id.data, String(form.get("text") ?? ""), founder.email);
-  revalidatePath("/admin/setup/taste");
+  revalidatePath("/admin/setup/designers", "layout");
 }
 
 export async function retireTasteLessonAction(form: FormData) {
@@ -73,12 +73,12 @@ export async function retireTasteLessonAction(form: FormData) {
   if (!id.success) return;
   await retireTasteLesson(id.data, founder.email);
   await record(founder.email, "retired a taste lesson", { detail: id.data });
-  revalidatePath("/admin/setup/taste");
+  revalidatePath("/admin/setup/designers", "layout");
 }
 
 export async function restoreTasteLessonAction(form: FormData) {
   const founder = await requireFounder();
   const id = LessonId.safeParse(form.get("id"));
   if (id.success) await restoreTasteLesson(id.data, founder.email);
-  revalidatePath("/admin/setup/taste");
+  revalidatePath("/admin/setup/designers", "layout");
 }

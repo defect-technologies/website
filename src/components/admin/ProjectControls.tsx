@@ -2,7 +2,8 @@
 
 import { ArrowsClockwise, Star, X } from "@phosphor-icons/react";
 import { useState, useTransition } from "react";
-import { disconnectMailboxAction, makeSenderAction, syncPaymentsAction } from "@/app/admin/(panel)/setup/connections/actions";
+import { syncPaymentsAction } from "@/app/admin/(panel)/money/actions";
+import { disconnectMailboxAction, makeSenderAction } from "@/app/admin/(panel)/setup/outreach/actions";
 import { Button } from "../Button";
 
 export function MakeSenderButton({ mailboxId }: { mailboxId: string }) {

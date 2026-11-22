@@ -1,6 +1,6 @@
 import { FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import type { ReactNode } from "react";
-import { saveRunnerSettingsAction } from "@/app/admin/(panel)/setup/bots/actions";
+import { saveRunnerSettingsAction } from "@/app/admin/(panel)/setup/runner/actions";
 import type { RunnerSettings } from "@/lib/previewJobs";
 import { TextField } from "./fields";
 import SubmitButton from "./SubmitButton";

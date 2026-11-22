@@ -1,6 +1,6 @@
 import { ArrowCounterClockwise, CaretRight, CheckCircle, Kanban } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { switchPreviewVersionAction } from "@/app/admin/(panel)/setup/connections/actions";
+import { switchPreviewVersionAction } from "@/app/admin/(panel)/sites/actions";
 import type { Business, Stage } from "@/server/db/schema";
 import { PREVIEW_LIFETIME_DAYS, type PreviewDeployment } from "@/server/integrations/vercel";
 import CopyLinkButton from "./CopyLinkButton";

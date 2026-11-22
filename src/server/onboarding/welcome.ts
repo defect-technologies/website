@@ -15,7 +15,7 @@ export const STUDIO_NAME = "Defect Technologies";
 
 export async function studioMailboxId() {
   const studio = (await connectedMailboxes()).find((mailbox) => mailbox.email.toLowerCase() === STUDIO_INBOX);
-  if (!studio) throw new Error(`${STUDIO_INBOX} isn't connected in Setup > Connections.`);
+  if (!studio) throw new Error(`${STUDIO_INBOX} isn't connected in Setup > Outreach.`);
   return studio.id;
 }
 

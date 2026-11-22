@@ -20,7 +20,7 @@ export async function checkMailAction(): Promise<{ summary: string }> {
   await requireFounder();
   const result = await syncMail();
   revalidatePath("/admin", "layout");
-  if (result.mailboxes === 0) return { summary: "No inbox is connected yet. Connect one in Setup > Connections." };
+  if (result.mailboxes === 0) return { summary: "No inbox is connected yet. Connect one in Setup > Outreach." };
   if (result.errors.length > 0) return { summary: result.errors.join(" ") };
   return { summary: result.newMessages === 1 ? "1 new message." : `${result.newMessages} new messages.` };
 }

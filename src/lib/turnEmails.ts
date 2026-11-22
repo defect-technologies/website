@@ -1,10 +1,10 @@
 // The emails that tell the founders it is their turn: three designs wait for a choice, or a built site waits for a
-// look. Only the first thing to wait on Your turn is emailed; what follows gathers there without an email.
+// look. Only the first thing to wait on the To do page is emailed; what follows gathers there without an email.
 
 export type TurnEmail = { subject: string; body: string };
 
-/** The last line of an email about Your turn: why no email follows for the next ones. */
-const quietUntilCleared = (list: string) => `Designs and sites that come after this one wait on Your turn without an email, until you have cleared it: ${list}`;
+/** The last line of an email about To do: why no email follows for the next ones. */
+const quietUntilCleared = (list: string) => `Designs and sites that come after this one wait on the To do page without an email, until you have cleared it: ${list}`;
 
 export function designsWaitEmail(business: string, options: { letter: string; name: string }[], link: string, list: string): TurnEmail {
   const names = options.map((option) => `${option.letter.toUpperCase()}. ${option.name}`);
@@ -31,7 +31,7 @@ const WHY_IT_WAITS: Record<Exclude<PreviewWait, null>, string> = {
   owner: "The owner still sees the earlier preview until one of you approves this one.",
 };
 
-/** `list` is Your turn's address, for a site that waits there; null for one answered on Today. */
+/** `list` is To do's address, for a site that waits there; null for one answered by its flag on To do. */
 export function previewWaitsEmail({ business, build, wait, link, list }: { business: string; build: BuildKind; wait: PreviewWait; link: string; list: string | null }): TurnEmail {
   const lines = [WHAT_HAPPENED[build](business), ...(wait ? [WHY_IT_WAITS[wait]] : []), `Review it: ${link}`, ...(list ? [quietUntilCleared(list)] : [])];
   return { subject: `Review the site for ${business}`, body: lines.join("\n\n") };

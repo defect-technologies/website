@@ -1,8 +1,8 @@
-// Your turn: everything that waits for a founder's taste, as one list. A design to choose and a built site to look at
-// are the same kind of work for a founder with a phone and two minutes, so they sit on one page.
+// A founder's turns: everything that waits for their taste, as one list at the top of To do. A design to choose and a
+// built site to look at are the same kind of work for a founder with a phone and two minutes, so they sit together.
 
-/** Where the list lives. The home screen icon opens it, and every decision on Designs or Review comes back to it. */
-export const TURN_PATH = "/admin/turn";
+/** Where the list lives: To do. The home screen icon opens it, and every decision on a design or a review comes back to it. */
+export const TURN_PATH = "/admin";
 
 /** What waits, in the order a founder takes it. */
 export const TURN_KINDS = ["repair", "design", "review"] as const;

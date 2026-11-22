@@ -14,7 +14,7 @@ import { sheetRows, type LeadRow } from "@/server/overview";
 import { runnerStatus } from "@/server/runner/status";
 import { allClientSites } from "@/server/sites/clientSites";
 
-export const metadata: Metadata = { title: "Sites" };
+export const metadata: Metadata = { title: "Businesses" };
 
 function parseStatus(status?: string): LeadStatus | null {
   return (LEAD_STATUSES as readonly string[]).includes(status ?? "") ? (status as LeadStatus) : null;
@@ -51,10 +51,10 @@ export default async function SitesPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Sites">
+      <PageHeader title="Businesses">
         <LiveRefresh renderedAt={readAt} />
       </PageHeader>
-      <PageTabs label="Sites views" tabs={[{ ...SITE_TABS[0], count: all.length }, ...SITE_TABS.slice(1)]} current="/admin/sites" />
+      <PageTabs label="Businesses views" tabs={[{ ...SITE_TABS[0], count: all.length }, ...SITE_TABS.slice(1)]} current="/admin/sites" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Search query={query} status={status} />
         <details className="group/tools">

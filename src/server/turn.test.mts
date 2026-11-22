@@ -1,5 +1,5 @@
 /**
- * Your turn: the one queue of what waits for a founder's taste.
+ * To do: the one queue of what waits for a founder's taste.
  *
  *   npm test
  *

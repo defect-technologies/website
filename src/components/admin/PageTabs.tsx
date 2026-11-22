@@ -7,6 +7,7 @@ export const SITE_TABS: PageTab[] = [
   { href: "/admin/sites", label: "Sites" },
   { href: "/admin/sites/previews", label: "Previews" },
   { href: "/admin/sites/changes", label: "Site changes" },
+  { href: "/admin/sites/prospects", label: "Prospects" },
 ];
 
 /** Views of one page. The current one sits on a knife stroke, like the current page in the nav. */

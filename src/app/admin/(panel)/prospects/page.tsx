@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Moved to Setup. */
+/** Prospects are a tab of Businesses. */
 export default function Moved() {
-  redirect("/admin/setup/prospects");
+  redirect("/admin/sites/prospects");
 }

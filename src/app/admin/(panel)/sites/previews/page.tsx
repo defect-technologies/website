@@ -36,8 +36,8 @@ export default async function PreviewsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Sites" />
-      <PageTabs label="Sites views" tabs={SITE_TABS} current="/admin/sites/previews" />
+      <PageHeader title="Businesses" />
+      <PageTabs label="Businesses views" tabs={SITE_TABS} current="/admin/sites/previews" />
       <Card className="flex flex-col gap-4 p-5">
         <IntegrationPanel result={previews}>
           {(data) => (

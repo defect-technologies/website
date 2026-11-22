@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Inboxes and health checks are in Setup > Connections. */
+/** Inboxes are on Setup > Outreach, and health checks on Setup > Runner. */
 export default function Moved() {
-  redirect("/admin/setup/connections");
+  redirect("/admin/setup/outreach");
 }

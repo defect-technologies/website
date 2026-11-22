@@ -64,7 +64,7 @@ function threeOptions(businessId: string) {
 const lastEmail = () => sent[sent.length - 1];
 const { designBoards } = await import("../db/schema");
 
-/** Clears Your turn, as founders deciding everything would. */
+/** Clears To do, as founders deciding everything would. */
 async function clearYourTurn() {
   await database.update(designBoards).set({ chosenLetter: "a", chosenAt: new Date(), chosenBy: "one@example.com" });
   await database.update(businesses).set({ stage: "lost" });
@@ -84,7 +84,7 @@ test("a built site that waits for a look is emailed, and the email says why it w
   const first = await leadWithRunningJob("Built Plumbing");
   await reportDone(first.job.id, { status: "done", previewUrl: "https://built-1.vercel.app" });
   assert.equal(lastEmail().subject, "Review the site for Built Plumbing");
-  assert.equal(lastEmail().body, `The site for Built Plumbing is built.\n\nReview it: https://admin.example/admin/review?id=${first.lead.id}\n\nDesigns and sites that come after this one wait on Your turn without an email, until you have cleared it: https://admin.example/admin/turn`);
+  assert.equal(lastEmail().body, `The site for Built Plumbing is built.\n\nReview it: https://admin.example/admin/review?id=${first.lead.id}\n\nDesigns and sites that come after this one wait on the To do page without an email, until you have cleared it: https://admin.example/admin`);
 
   await clearYourTurn();
   const held = await leadWithRunningJob("Held Electric", {}, "On / at phone width, the <h1>: too large.");
@@ -95,7 +95,7 @@ test("a built site that waits for a look is emailed, and the email says why it w
   const shown = await leadWithRunningJob("Shown Dental", { stage: "sent", previewUrl: "https://shown-1.vercel.app" }, "Use the owner's new photo.");
   await reportDone(shown.job.id, { status: "done", previewUrl: "https://shown-2.vercel.app" });
   assert.match(lastEmail().body, /The owner still sees the earlier preview until one of you approves this one\./);
-  assert.match(lastEmail().body, /Review it: https:\/\/admin\.example\/admin$/, "its flag is answered on Today");
+  assert.match(lastEmail().body, /Review it: https:\/\/admin\.example\/admin$/, "its flag is answered on To do");
 
   await clearYourTurn();
   const pointed = await leadWithRunningJob("Pointed Roofing", { previewUrl: "https://pointed-1.vercel.app" }, POINTING_NOTE);
@@ -103,13 +103,13 @@ test("a built site that waits for a look is emailed, and the email says why it w
   assert.match(lastEmail().body, /^The preview for Pointed Roofing is updated\. You can now point at its parts\./);
 });
 
-test("only the first thing to wait on Your turn is emailed, and the next comes once the list is cleared", async () => {
+test("only the first thing to wait on To do is emailed, and the next comes once the list is cleared", async () => {
   await clearYourTurn();
   const before = sent.length;
   const first = await leadWithRunningJob("First Tattoo");
   await reportBoards(first.job.id, BoardsBody.parse({ options: threeOptions(first.lead.id) }));
   assert.equal(sent.length, before + 1);
-  assert.match(lastEmail().body, /wait on Your turn without an email, until you have cleared it: https:\/\/admin\.example\/admin\/turn$/);
+  assert.match(lastEmail().body, /wait on the To do page without an email, until you have cleared it: https:\/\/admin\.example\/admin$/);
 
   const second = await leadWithRunningJob("Second Tattoo");
   await reportBoards(second.job.id, BoardsBody.parse({ options: threeOptions(second.lead.id) }));

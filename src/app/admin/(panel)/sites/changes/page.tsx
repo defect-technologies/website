@@ -57,12 +57,12 @@ export default async function SiteChangesPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader title="Sites">
+      <PageHeader title="Businesses">
         <ButtonLink href="/admin/sites/new" size="sm" variant="soft" icon={<Plus size={16} weight="bold" aria-hidden="true" />}>
           Add a live site
         </ButtonLink>
       </PageHeader>
-      <PageTabs label="Sites views" tabs={SITE_TABS} current="/admin/sites/changes" />
+      <PageTabs label="Businesses views" tabs={SITE_TABS} current="/admin/sites/changes" />
       <Card className="flex flex-col gap-4 p-5">
           <IntegrationPanel result={changes}>
             {(data) => (

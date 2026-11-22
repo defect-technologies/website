@@ -1,6 +1,6 @@
 import { Play, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { resumeRunnerAction } from "@/app/admin/(panel)/setup/bots/actions";
+import { resumeRunnerAction } from "@/app/admin/(panel)/setup/runner/actions";
 import { BOT_LABEL } from "@/lib/bots";
 import { stepParts } from "@/lib/buildStatus";
 import type { RunnerStatus } from "@/server/runner/status";
@@ -41,7 +41,7 @@ function Bot({ agent, now }: { agent: AgentState; now: number }) {
   const detail = lastActionText(agent);
   return (
     <li>
-      <Link href="/admin/setup/bots" title={detail} className="hover:bg-paper-shade flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm">
+      <Link href="/admin/setup/runner" title={detail} className="hover:bg-paper-shade flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm">
         <PresenceMark presence={presence} />
         <span className={presence === "working" ? "text-ink font-medium" : "text-ink-soft"}>{BOT_LABEL[agent.bot]}</span>
         <span className="text-ink-faint tabular-nums">{agent.lastAction ? timeAgo(agent.lastAction.at, now) : ""}</span>

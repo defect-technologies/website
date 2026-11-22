@@ -5,6 +5,9 @@ export const FOUNDERS = [
 
 export const FOUNDER_EMAILS: string[] = FOUNDERS.map((founder) => founder.email);
 
+/** A founder's name as it appears in the address of their page on Designers. */
+export const founderSlug = (name: string) => name.toLowerCase();
+
 export function founderName(email: string) {
   return FOUNDERS.find((founder) => founder.email === email.trim().toLowerCase())?.name ?? email;
 }
