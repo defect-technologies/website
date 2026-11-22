@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, exists, gt, inArray } from "drizzle-orm";
 import { BOARD_LETTERS, type BoardLetter, type BoardOption } from "@/lib/boards";
 import { db } from "../db/client";
 import { designBoards, previewJobs, type DesignBoard } from "../db/schema";
@@ -14,24 +14,27 @@ function chosenOption(board: DesignBoard): BoardOption | null {
 }
 
 /**
- * The board whose choice `jobId` built, or else the newest board whose build finished: the one the business's current
- * preview came from. A build still running or one that failed left the earlier preview in place.
+ * The newest chosen board that a build finished after: the one the business's current preview came from. The job that
+ * took the choice may have failed and been retried by another, and a repair is another job too, so any build of the
+ * business finished after the choice counts. A later choice still building leaves the earlier preview up.
  */
-async function builtBoard(businessId: string, jobId?: string): Promise<DesignBoard | null> {
-  const builtBy = jobId ? eq(designBoards.builtJobId, jobId) : isNotNull(designBoards.builtJobId);
-  const [row] = await (await db())
-    .select({ board: designBoards })
+async function builtBoard(businessId: string): Promise<DesignBoard | null> {
+  const finishedBuild = (await db())
+    .select({ id: previewJobs.id })
+    .from(previewJobs)
+    .where(and(eq(previewJobs.businessId, businessId), eq(previewJobs.status, "done"), gt(previewJobs.createdAt, designBoards.chosenAt)));
+  const [board] = await (await db())
+    .select()
     .from(designBoards)
-    .innerJoin(previewJobs, eq(previewJobs.id, designBoards.builtJobId))
-    .where(and(eq(designBoards.businessId, businessId), builtBy, jobId ? undefined : eq(previewJobs.status, "done")))
+    .where(and(eq(designBoards.businessId, businessId), inArray(designBoards.chosenLetter, [...BOARD_LETTERS]), exists(finishedBuild)))
     .orderBy(desc(designBoards.chosenAt))
     .limit(1);
-  return row?.board ?? null;
+  return board ?? null;
 }
 
-/** The chosen design a business's preview was built from. Null for a preview built before boards recorded their build. */
-export async function builtDesignFor(businessId: string, jobId?: string): Promise<BuiltDesign | null> {
-  const board = await builtBoard(businessId, jobId);
+/** The chosen design a business's preview was built from. Null when no build finished after a choice. */
+export async function builtDesignFor(businessId: string): Promise<BuiltDesign | null> {
+  const board = await builtBoard(businessId);
   const option = board ? chosenOption(board) : null;
   if (!board || !option) return null;
   const by = (await deciders())(board.chosenBy ?? "").name;

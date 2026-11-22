@@ -16,7 +16,7 @@ process.env.AUTH_SECRET ??= "test-only-auth-secret-test-only-auth-secret";
 const closeDatabase = await startEmptyTestDatabase();
 after(closeDatabase);
 const { db } = await import("../db/client");
-const { businesses, designBoards, previewJobs } = await import("../db/schema");
+const { businesses, previewJobs } = await import("../db/schema");
 const { eq } = await import("drizzle-orm");
 const store = await import("./store");
 const { builtDesignFor } = await import("./builtDesign");
@@ -75,7 +75,16 @@ test("a preview built from a chosen design names the option, who chose it and wh
   assert.equal(design?.by, "Boris");
   assert.equal(design?.feedback, "Warmer photos.");
   assert.ok(design?.at instanceof Date);
-  assert.equal((await builtDesignFor(business.id, build.id))?.boardId, board.id, "the board linked to that job");
+});
+
+test("a choice whose first build failed and a retry built is the design of the preview", async () => {
+  const business = await lead();
+  await chosenBoard(business.id, "a", "");
+  const failed = await job(business.id, "failed");
+  await store.choiceForJob(business.id, failed.id);
+  assert.equal(await builtDesignFor(business.id), null, "nothing built from it yet");
+  await job(business.id, "done");
+  assert.equal((await builtDesignFor(business.id))?.letter, "a");
 });
 
 test("a later choice whose build has not finished leaves the current preview on the earlier design", async () => {
@@ -89,16 +98,13 @@ test("a later choice whose build has not finished leaves the current preview on 
   await store.choiceForJob(business.id, second.id);
 
   assert.equal((await builtDesignFor(business.id))?.letter, "b");
-  assert.equal((await builtDesignFor(business.id, second.id))?.letter, "c", "asked about the running job, it is the board that job builds");
   await database.update(previewJobs).set({ status: "done" }).where(eq(previewJobs.id, second.id));
   assert.equal((await builtDesignFor(business.id))?.letter, "c");
 });
 
-test("a business whose boards never recorded their build has no built design", async () => {
+test("a business with no build after its choice, or no boards, has no built design", async () => {
   const business = await lead();
-  const board = await chosenBoard(business.id, "a", "");
+  await chosenBoard(business.id, "a", "");
   assert.equal(await builtDesignFor(business.id), null);
-  const [row] = await database.select().from(designBoards).where(eq(designBoards.id, board.id));
-  assert.equal(row.builtJobId, null);
   assert.equal(await builtDesignFor((await lead()).id), null, "a business with no boards at all");
 });
