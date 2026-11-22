@@ -6,6 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { buttonClasses } from "@/components/Button";
 import BrandFiles from "@/components/admin/BrandFiles";
+import BuiltFrom from "@/components/admin/designs/BuiltFrom";
 import BuildProgress, { clockTime } from "@/components/admin/BuildProgress";
 import Conversation from "@/components/admin/Conversation";
 import FlagCard from "@/components/admin/FlagCard";
@@ -20,6 +21,7 @@ import SiteHistory from "@/components/admin/SiteHistory";
 import SpotCheckCard from "@/components/admin/SpotCheckCard";
 import { ArmChip, Card, KeyValue, Section, StatusMark, When } from "@/components/admin/ui";
 import { leadStatus } from "@/lib/leadStatus";
+import { builtDesignFor } from "@/server/boards/builtDesign";
 import type { Business } from "@/server/db/schema";
 import { env } from "@/server/env";
 import { buildCommand } from "@/server/leads/buildCommand";
@@ -161,7 +163,7 @@ function NeedsYou({ detail }: { detail: SiteDetail }) {
   );
 }
 
-function Overview({ business, detail }: { business: Business; detail: SiteDetail }) {
+async function Overview({ business, detail }: { business: Business; detail: SiteDetail }) {
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="flex min-w-0 flex-col gap-8">
@@ -178,6 +180,7 @@ function Overview({ business, detail }: { business: Business; detail: SiteDetail
       </div>
       <aside className="flex flex-col gap-6">
         <PreviewThumb url={business.previewUrl} name={business.businessName} />
+        {business.previewUrl && <BuiltFrom design={await builtDesignFor(business.id)} />}
         <KeyValue rows={facts(business)} />
       </aside>
     </div>

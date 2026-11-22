@@ -29,10 +29,13 @@ import { useProposalAnswer } from "./useProposalAnswer";
 import { useShowAsk } from "./useShowAsk";
 import { useStudioAsks } from "./useStudioAsks";
 import { usePhoneReview } from "./usePhoneReview";
+import DesignSwitch, { ADDRESS_LINK, DesignAddress, PhoneDesignBar } from "./DesignSwitch";
+import { type StagePicture } from "./PreviewStage";
+import { type DesignView, type StudioDesign, useDesignView } from "./useDesignView";
 import { reviewHref, type StudioActions, type StudioPaths, StudioProvider, useStudio } from "./StudioContext";
 import type { ReviewResult } from "@/server/review/verdicts";
 
-export type StudioItem = { id: string; businessName: string; website: string; previewUrl: string; held: boolean };
+export type StudioItem = { id: string; businessName: string; website: string; previewUrl: string; held: boolean; design: StudioDesign | null };
 
 type Props = { item: StudioItem; position: number; total: number; previousId: string | null; nextId: string | null };
 
@@ -99,24 +102,27 @@ function StudioBar({ item, ...queue }: Props) {
   );
 }
 
-function AddressBar({ previewUrl, path, device, onDevice }: { previewUrl: string; path: string; device: Device; onDevice: (device: Device) => void }) {
+type Compare = { design: StudioDesign | null; view: DesignView; onView: (view: DesignView) => void; picture: StagePicture | null };
+
+function PreviewAddress({ previewUrl, path }: { previewUrl: string; path: string }) {
+  return (
+    <a href={new URL(path, previewUrl).toString()} target="_blank" rel="noreferrer" title="Open this page in a new tab" className={ADDRESS_LINK}>
+      <span className="min-w-0 flex-1 truncate">
+        {hostOf(previewUrl)}
+        <span className="text-ink">{path === "/" ? "" : path}</span>
+      </span>
+      <ArrowSquareOut size={14} aria-hidden="true" className="shrink-0" />
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  );
+}
+
+function AddressBar({ previewUrl, path, device, onDevice, compare }: { previewUrl: string; path: string; device: Device; onDevice: (device: Device) => void; compare: Compare }) {
   return (
     <div className="flex items-center gap-3">
       <DeviceSwitch device={device} onChange={onDevice} />
-      <a
-        href={new URL(path, previewUrl).toString()}
-        target="_blank"
-        rel="noreferrer"
-        title="Open this page in a new tab"
-        className="bg-surface shadow-card text-ink-soft hover:text-ink flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-control px-4 text-sm"
-      >
-        <span className="min-w-0 flex-1 truncate">
-          {hostOf(previewUrl)}
-          <span className="text-ink">{path === "/" ? "" : path}</span>
-        </span>
-        <ArrowSquareOut size={14} aria-hidden="true" className="shrink-0" />
-        <span className="sr-only"> (opens in a new tab)</span>
-      </a>
+      <DesignSwitch design={compare.design} view={compare.view} onView={compare.onView} />
+      {compare.design && compare.picture ? <DesignAddress design={compare.design} src={compare.picture.src} /> : <PreviewAddress previewUrl={previewUrl} path={path} />}
     </div>
   );
 }
@@ -131,7 +137,9 @@ function Verdict({ count, pending, onSubmit }: { count: number; pending: boolean
   );
 }
 
-function useStudioShortcuts(actions: { point: () => void; stopPointing: () => void; talk: () => void; submit: () => void }) {
+const SHORTCUT_KEYS: Record<string, "point" | "talk" | "flipDesign"> = { p: "point", m: "talk", d: "flipDesign" };
+
+function useStudioShortcuts(actions: { point: () => void; stopPointing: () => void; talk: () => void; submit: () => void; flipDesign: () => void }) {
   const latest = useRef(actions);
   useEffect(() => {
     latest.current = actions;
@@ -145,9 +153,8 @@ function useStudioShortcuts(actions: { point: () => void; stopPointing: () => vo
       }
       if (event.key === "Escape") latest.current.stopPointing();
       if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === "p") latest.current.point();
-      if (key === "m") latest.current.talk();
+      const action = SHORTCUT_KEYS[event.key.toLowerCase()];
+      if (action) latest.current[action]();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -260,6 +267,7 @@ function Studio({ item, ...queue }: Props) {
   const answerProposal = useProposalAnswer(currentAsk, flow, add);
   const answerRepair = useRepairAnswer(currentAsk, flow, add);
   const repair = useRepairView(currentAsk);
+  const designView = useDesignView(item.design, device);
   useShowAsk(bridge, currentAsk);
   // While pointing at a preview that reports its sections, the card steps through them; otherwise it asks its questions.
   const askCard = (className: string) =>
@@ -295,7 +303,8 @@ function Studio({ item, ...queue }: Props) {
   const nextHref = queue.nextId ? reviewHref(paths, queue.nextId) : paths.review;
   const point = pointHandler({ addPointing: actions.addPointing, bridgeState: bridge.state, businessId: item.id, hasNotes: notes.length > 0 || Boolean(draft.text.trim()), setPointing, setResult, startTransition, leave: () => router.replace(nextHref) });
 
-  useStudioShortcuts({ point, stopPointing: () => setPointing(false), talk: dictation.toggle, submit });
+  useStudioShortcuts({ point, stopPointing: () => setPointing(false), talk: dictation.toggle, submit, flipDesign: designView.flip });
+  const compare: Compare = { design: item.design, view: designView.view, onView: designView.setView, picture: designView.picture };
   const count = notes.length + (draft.text.trim() ? 1 : 0);
   const phone = usePhoneReview({ draft: target, setDraft, dictation, add, device, path: bridge.path, confirming, setConfirming, submit, ask: { open: Boolean(openQuestion), answered: flow.noted } });
 
@@ -303,12 +312,13 @@ function Studio({ item, ...queue }: Props) {
     <div className="bg-paper fixed inset-0 z-20 flex flex-col gap-3 lg:p-4">
       <StudioBar item={item} {...queue} />
       <PhoneTopBar item={item} position={queue.position} total={queue.total} nextId={queue.nextId} notes={count} notesOpen={notesOpen} onNotes={() => setNotesOpen((open) => !open)} />
+      <PhoneDesignBar design={item.design} view={designView.view} onView={designView.setView} src={designView.picture?.src ?? null} />
       <div className="relative grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section aria-label="Preview" className="flex min-h-0 flex-col gap-3 max-lg:absolute max-lg:inset-0">
           <div className="max-lg:hidden">
-            <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} />
+            <AddressBar previewUrl={item.previewUrl} path={bridge.path} device={device} onDevice={setDevice} compare={compare} />
           </div>
-          <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} picture={repair.picture} />
+          <PreviewStage frame={frame} previewUrl={item.previewUrl} businessName={item.businessName} device={device} pointing={pointing} onLoad={bridge.greet} picture={designView.picture ?? repair.picture} />
         </section>
         <aside
           aria-label="Notes"

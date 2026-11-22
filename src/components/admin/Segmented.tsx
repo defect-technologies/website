@@ -16,7 +16,7 @@ export default function Segmented<Value extends string>({ label, options, value,
           type="button"
           aria-pressed={value === option}
           onClick={() => onChange(option)}
-          className={`focus-visible:outline-ink inline-flex min-h-9 items-center gap-1.5 rounded-control-inset px-3 text-sm font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-2 ${value === option ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:text-ink"}`}
+          className={`focus-visible:outline-ink inline-flex min-h-9 items-center gap-1.5 rounded-control-inset px-3 text-sm whitespace-nowrap font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-2 ${value === option ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:text-ink"}`}
         >
           {OptionIcon && <OptionIcon size={18} weight={value === option ? "fill" : "regular"} aria-hidden="true" />}
           {name}
