@@ -59,5 +59,5 @@ export async function saveCriticSettingsAction(form: FormData) {
   if (!parsed.success) return;
   await updateCriticSettings(parsed.data, founder.email);
   await record(founder.email, "changed critic settings", { detail: `${parsed.data.enabled ? "On" : "Off"}; ${parsed.data.minutes} minutes; applies without a founder: ${parsed.data.apply.join(", ") || "nothing"}` });
-  revalidatePath("/admin/setup/runner");
+  revalidatePath("/admin/setup/bots");
 }

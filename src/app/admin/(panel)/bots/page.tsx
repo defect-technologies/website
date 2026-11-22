@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Moved to Setup > Runner. */
+/** Moved to Setup > Bots. */
 export default function Moved() {
-  redirect("/admin/setup/runner");
+  redirect("/admin/setup/bots");
 }

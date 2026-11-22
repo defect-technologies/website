@@ -1,5 +1,5 @@
 import { Check, FloppyDisk, Question, ShieldCheck, X } from "@phosphor-icons/react/dist/ssr";
-import { saveCriticSettingsAction } from "@/app/admin/(panel)/setup/runner/actions";
+import { saveCriticSettingsAction } from "@/app/admin/(panel)/setup/bots/actions";
 import { TextField } from "@/components/admin/fields";
 import SubmitButton from "@/components/admin/SubmitButton";
 import Switch from "@/components/admin/Switch";

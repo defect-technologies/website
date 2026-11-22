@@ -130,7 +130,7 @@ async function claimNewLead(runnerName: string, settings: RunnerSettings): Promi
  * With design boards on, the runner draws designs for founders to review: first for an unreviewed preview whose
  * kit-only update was queued (it gets three new designs, not the old design on a newer kit), then for a new lead.
  * Both stop at their boards and build nothing, so they go ahead past the daily cap, until as many designs wait for a
- * choice as Setup > Runner allows.
+ * choice as Setup > Bots allows.
  */
 async function claimDesignWork(runnerName: string, settings: RunnerSettings): Promise<PreviewJob | null> {
   if ((await countBoardsWaiting()) >= settings.mostDesignsWaiting) return null;
@@ -153,7 +153,7 @@ async function claimBuildWork(runnerName: string, kinds: JobKind[], limits: Limi
 async function whyIdle(limits: Limits): Promise<string> {
   if (limits.paused) return limits.noBuilds ?? "Paused.";
   const waiting = limits.settings.designBoards ? await countBoardsWaiting() : 0;
-  if (waiting >= limits.settings.mostDesignsWaiting) return `${waiting} designs wait for a founder's choice, as many as Setup > Runner allows, so no new ones are drawn.`;
+  if (waiting >= limits.settings.mostDesignsWaiting) return `${waiting} designs wait for a founder's choice, as many as Setup > Bots allows, so no new ones are drawn.`;
   return limits.noBuilds ?? "Nothing queued, and no new lead with an email is waiting for a preview.";
 }
 

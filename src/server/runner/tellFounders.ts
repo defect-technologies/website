@@ -17,7 +17,7 @@ async function shouldTell(onYourTurn: string | undefined): Promise<boolean> {
 }
 
 /**
- * Emails both founders that something waits for them, unless they switched these emails off in Setup > Runner. A design
+ * Emails both founders that something waits for them, unless they switched these emails off in Setup > Bots. A design
  * or a site for To do is emailed only when it is the first thing to wait there. The email is written from the
  * admin's own address, so its links open the admin. It never throws: the runner's report that led here has to be kept
  * whether or not the email goes out. True when it was sent.

@@ -12,7 +12,7 @@ import { hiddenOutcomes } from "@/lib/previewJobs";
 import { runnerDay } from "@/server/overview";
 import { buildHistory } from "@/server/runner/history";
 import { runnerStatus, type CurrentBuild, type JobRow, type QueuedBuild } from "@/server/runner/status";
-import { resumeRunnerAction } from "../setup/runner/actions";
+import { resumeRunnerAction } from "../setup/bots/actions";
 import { runNextAction, settleAbandonedJobAction } from "../sites/actions";
 
 export const metadata: Metadata = { title: "Builds" };

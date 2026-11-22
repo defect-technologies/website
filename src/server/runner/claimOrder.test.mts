@@ -113,7 +113,7 @@ test("new designs stop once as many wait for a choice as Setup allows, and the r
   await lead();
   assert.equal(await ask(), null);
   const answer = (await claimNext({ name: "runner-1" } as never, new Request("https://defect.tech/api/runner/next?runner=runner-order"))) as Response;
-  assert.equal(answer.headers.get("X-Runner-Reason"), "2 designs wait for a founder's choice, as many as Setup > Runner allows, so no new ones are drawn.", "not the daily cap");
+  assert.equal(answer.headers.get("X-Runner-Reason"), "2 designs wait for a founder's choice, as many as Setup > Bots allows, so no new ones are drawn.", "not the daily cap");
 });
 
 test("with design boards off, a new lead is built before a kit-only update, which keeps its design", async () => {

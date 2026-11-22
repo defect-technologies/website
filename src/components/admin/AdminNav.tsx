@@ -12,7 +12,7 @@ const isCurrent = (pathname: string, item: Item) => isCurrentIn(pathname, item.h
 
 const SETUP: Item[] = [
   { href: "/admin/setup/outreach", label: "Outreach", icon: PaperPlaneTilt },
-  { href: "/admin/setup/runner", label: "Runner", icon: Robot },
+  { href: "/admin/setup/bots", label: "Bots", icon: Robot },
   { href: "/admin/setup/designers", label: "Designers", icon: UsersThree },
   { href: "/admin/setup/spot-checks", label: "Spot checks", icon: Eye },
 ];
