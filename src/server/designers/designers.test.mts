@@ -119,7 +119,7 @@ test("a designer decides only their own business's designs, under their own name
   await claimBoard(theirs.board.id, leo.id);
   await signInAs(MAYA);
 
-  await redirectsTo(() => designerActions.chooseAsDesignerAction(form({ id: theirs.board.id, letter: "a", feedback: "" })), /designer$/);
+  await redirectsTo(() => designerActions.chooseAsDesignerAction(form({ id: theirs.board.id, letter: "a", feedback: "" })), /designer\?missed=taken$/);
   const [untouched] = await database.select().from(designBoards).where(eq(designBoards.id, theirs.board.id));
   assert.equal(untouched.chosenAt, null, "Leo's business is left alone");
 
@@ -226,4 +226,14 @@ test("marking a designer paid records exactly what they are owed, and a second c
   const ledger = await ledgerOf(rio.id);
   assert.deepEqual(ledger.payments.map((payment) => payment.amountCents), [7900]);
   assert.equal(ledger.owedCents, 0);
+});
+
+test("deciding on an open design makes it the designer's, with no step before it", async () => {
+  const { lead, board } = await waitingBoard("Open Bakery");
+  await signInAs(MAYA);
+  await redirectsTo(() => designerActions.reviseAsDesignerAction(form({ id: board.id, letter: "c", feedback: "Bigger bread." })), /designer$/);
+  assert.ok((await designerBusinesses(maya.id)).some((row) => row.id === lead.id), "the bakery is Maya's");
+  assert.ok(!(await pool()).some((waiting) => waiting.id === board.id), "and leaves the open designs");
+  await signInAs(LEO);
+  await redirectsTo(() => designerActions.chooseAsDesignerAction(form({ id: board.id, letter: "a", feedback: "" })), /designer\?missed=/);
 });

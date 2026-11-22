@@ -1,4 +1,4 @@
-import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
+import { ArrowLeft, ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { ButtonLink } from "@/components/Button";
 import { PageHeader } from "@/components/admin/ui";
 import { type BoardWithLead, revisionOf } from "@/server/boards/store";
@@ -19,6 +19,10 @@ export default async function DesignScreen({ board, actions, close }: Props) {
   const lead = await businessById(board.businessId);
   const header = (
     <PageHeader title={board.businessName}>
+      <ButtonLink href={close.href} variant="ghost">
+        <ArrowLeft size={18} aria-hidden="true" />
+        {close.label}
+      </ButtonLink>
       {lead?.website && (
         <ButtonLink href={lead.website} target="_blank" rel="noreferrer" variant="soft" icon={<ArrowSquareOut size={18} aria-hidden="true" />}>
           Their site today

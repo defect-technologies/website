@@ -15,5 +15,5 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
   await requireFounder();
   const board = await boardById((await params).id);
   if (!board) notFound();
-  return <DesignScreen board={board} actions={FOUNDER_BOARD_ACTIONS} close={{ href: "/admin/designs", label: "Close and go back to Designs" }} />;
+  return <DesignScreen board={board} actions={FOUNDER_BOARD_ACTIONS} close={{ href: "/admin/designs", label: "Back to designs" }} />;
 }

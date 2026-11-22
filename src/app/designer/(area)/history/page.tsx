@@ -8,7 +8,7 @@ import { requireDesigner } from "@/server/auth/designerSession";
 import { ledgerOf } from "@/server/designers/pay";
 import { DESIGNER_TURN_PATHS, type DesignerBusiness, designerBusinesses } from "@/server/designers/work";
 
-export const metadata: Metadata = { title: "Your designs" };
+export const metadata: Metadata = { title: "Past designs" };
 
 /** A design waiting on the designer opens where they act on it; any other opens its designs and what was decided. */
 function designerHref(business: DesignerBusiness): string | null {
@@ -23,13 +23,11 @@ export default async function DesignerHistoryPage() {
   const { settled } = await ledgerOf(designer.id, businesses);
   return (
     <>
-      <PageHeader title="Your designs" />
+      <PageHeader title="Past designs" />
       {businesses.length ? (
         <WorkList businesses={businesses} hrefFor={designerHref} settled={settled} />
       ) : (
-        <EmptyState title="You haven't taken a design yet" action={<ButtonLink href="/designer/pool" variant="solid" icon={<Swatches size={18} aria-hidden="true" />} className="mt-2">Take a design</ButtonLink>}>
-          Each design you take stays here with where it stands, through to whether the business signs up.
-        </EmptyState>
+        <EmptyState title="You haven't decided on a design yet" action={<ButtonLink href="/designer" variant="solid" icon={<Swatches size={18} aria-hidden="true" />} className="mt-2">See open designs</ButtonLink>} />
       )}
     </>
   );

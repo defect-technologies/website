@@ -69,7 +69,7 @@ test("the scan sees the admin pages", () => {
 
 test("every designer page checks the designer itself", () => {
   const pages = pagesUnder(DESIGNER_FOLDER);
-  assert.ok(pages.length >= 6, "the scan sees the designer pages");
+  assert.ok(pages.length >= 5, "the scan sees the designer pages");
   const unguarded = pages.filter((path) => !readFileSync(path, "utf8").includes("await requireDesigner()"));
   assert.deepEqual(unguarded.map((path) => path.slice(DESIGNER_FOLDER.length)), []);
 });

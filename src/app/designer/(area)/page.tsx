@@ -1,53 +1,54 @@
-import { Swatches } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
-import { ButtonLink } from "@/components/Button";
 import EmptyState from "@/components/admin/EmptyState";
+import PoolCard from "@/components/admin/designers/PoolCard";
 import { TurnList, UpNext } from "@/components/admin/turn/TurnParts";
-import { PageHeader, Section } from "@/components/admin/ui";
+import { Notice, PageHeader, Section } from "@/components/admin/ui";
+import { messageFor } from "@/lib/messageFor";
 import { requireDesigner } from "@/server/auth/designerSession";
 import { pool } from "@/server/designers/claims";
-import { designerTurns } from "@/server/designers/work";
+import { designerTurns, placesOf } from "@/server/designers/work";
 
-export const metadata: Metadata = { title: "Your turn" };
+export const metadata: Metadata = { title: "To do" };
 
-async function NothingWaits() {
-  const open = (await pool()).length;
-  return (
-    <EmptyState
-      title="Nothing waits for you"
-      action={
-        open > 0 && (
-          <ButtonLink href="/designer/pool" variant="solid" icon={<Swatches size={18} aria-hidden="true" />} className="mt-2">
-            Take a business
-          </ButtonLink>
-        )
-      }
-    >
-      {open > 0 ? `${open} ${open === 1 ? "design waits" : "designs wait"} for a designer.` : "No design waits for a designer right now. New designs arrive as the runner draws them."}
-    </EmptyState>
-  );
-}
+const MISSED: Record<string, string> = {
+  taken: "Another designer decided on those designs first.",
+  gone: "Those designs were decided or cleared before you chose.",
+};
 
-/** What waits for this designer: designs to choose on their businesses, then built sites to review. */
-export default async function DesignerTurnPage() {
+/** Everything a designer can act on: their own designs and sites first, then designs nobody has decided on yet. */
+export default async function DesignerHomePage({ searchParams }: { searchParams: Promise<{ missed?: string }> }) {
   const designer = await requireDesigner();
-  const [next, ...rest] = await designerTurns(designer.id);
+  const missed = messageFor(MISSED, (await searchParams).missed);
+  const [[next, ...rest], open] = await Promise.all([designerTurns(designer.id), pool()]);
+  const places = await placesOf(open.map((board) => board.businessId));
   const designs = rest.filter((turn) => turn.kind === "design");
   const sites = rest.filter((turn) => turn.kind !== "design");
   return (
     <>
-      <PageHeader title="Your turn" />
-      {next ? <UpNext turn={next} /> : <NothingWaits />}
-      {designs.length > 0 && (
-        <Section title="Designs to choose" count={designs.length}>
-          <TurnList turns={designs} />
-        </Section>
-      )}
+      <PageHeader title="To do" />
+      {missed && <Notice tone="warn">{missed}</Notice>}
+      {next && <UpNext turn={next} />}
       {sites.length > 0 && (
-        <Section title="Sites to check" count={sites.length}>
+        <Section title="Your sites to check" count={sites.length}>
           <TurnList turns={sites} />
         </Section>
       )}
+      {designs.length > 0 && (
+        <Section title="Your designs to choose" count={designs.length}>
+          <TurnList turns={designs} />
+        </Section>
+      )}
+      <Section title="Open designs" count={open.length}>
+        {open.length ? (
+          <ul className="grid gap-5 xl:grid-cols-2">
+            {open.map((board) => (
+              <PoolCard key={board.id} board={board} place={places.get(board.businessId) ?? ""} />
+            ))}
+          </ul>
+        ) : (
+          <EmptyState title="No open designs right now" />
+        )}
+      </Section>
     </>
   );
 }

@@ -18,7 +18,7 @@ export default async function DesignerLayout({ children }: { children: React.Rea
         <Link href="/" className="font-script text-ink w-fit rounded-md px-3 text-3xl leading-[1.4] focus-visible:outline-2 focus-visible:outline-ink">
           defect.tech
         </Link>
-        <DesignerNav counts={{ turn: turns.length, pool: open.length }} />
+        <DesignerNav counts={{ todo: turns.length + open.length }} />
         <form action={designerSignOutAction} className="flex items-center gap-2 lg:mt-auto">
           <span className="text-ink-faint min-w-0 truncate px-3 text-sm" title={designer.email}>
             {designer.name}
