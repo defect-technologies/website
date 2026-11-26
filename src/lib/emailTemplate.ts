@@ -34,6 +34,10 @@ export type OutreachSettings = {
   mailingAddress: string;
   dailyLimit: number;
   followUpAfterDays: number;
+  /** First emails and follow-ups go out on their own once a founder approves the site on Review. */
+  autoSend: boolean;
+  /** The booking page defect.tech/call forwards to, where an owner books a call. */
+  callLink: string;
 };
 
 export const DEFAULT_SETTINGS: OutreachSettings = {
@@ -80,6 +84,8 @@ export const DEFAULT_SETTINGS: OutreachSettings = {
   mailingAddress: "",
   dailyLimit: 10,
   followUpAfterDays: 4,
+  autoSend: false,
+  callLink: "",
 };
 
 export function fillTemplate(template: string, values: Partial<TemplateValues>): string {

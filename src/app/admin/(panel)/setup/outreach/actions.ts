@@ -7,6 +7,8 @@ import { record } from "@/server/activity";
 import { requireFounder } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import { mailboxes } from "@/server/db/schema";
+import { listFromLines, MOST_SEARCHES_PER_NIGHT } from "@/lib/research";
+import { updateResearchSettings } from "@/server/research";
 import { saveOutreachSettings } from "@/server/settings";
 
 export type TemplateResult = { ok: boolean; message: string };
@@ -21,6 +23,8 @@ const Settings = z.object({
   mailingAddress: z.string().trim().max(200),
   dailyLimit: z.coerce.number().int().min(1).max(50),
   followUpAfterDays: z.coerce.number().int().min(1).max(30),
+  autoSend: z.preprocess((value) => value === "on", z.boolean()),
+  callLink: z.union([z.literal(""), z.url({ protocol: /^https$/, error: "Use the booking page's https:// address." })]),
 });
 
 export async function saveTemplateAction(_previous: TemplateResult, form: FormData): Promise<TemplateResult> {
@@ -47,4 +51,30 @@ export async function disconnectMailboxAction(mailboxId: string) {
   const [removed] = await (await db()).delete(mailboxes).where(eq(mailboxes.id, mailboxId)).returning();
   await record(founder.email, "disconnected inbox", { detail: removed?.email ?? "" });
   revalidatePath("/admin", "layout");
+}
+
+export type ResearchResult = { ok: boolean; message: string };
+
+const ResearchForm = z.object({
+  enabled: z.boolean(),
+  niches: z.array(z.string().max(120)).max(40),
+  areas: z.array(z.string().max(120)).max(40),
+  searchesPerNight: z.coerce.number().int().min(1).max(MOST_SEARCHES_PER_NIGHT),
+});
+
+/** The niches and areas the nightly lead search goes through, and whether it adds leads. */
+export async function saveResearchAction(_previous: ResearchResult, form: FormData): Promise<ResearchResult> {
+  const founder = await requireFounder();
+  const parsed = ResearchForm.safeParse({
+    enabled: form.get("enabled") === "on",
+    niches: listFromLines(String(form.get("niches") ?? "")),
+    areas: listFromLines(String(form.get("areas") ?? "")),
+    searchesPerNight: form.get("searchesPerNight"),
+  });
+  if (!parsed.success) return { ok: false, message: z.prettifyError(parsed.error) };
+  if (parsed.data.enabled && !(parsed.data.niches.length && parsed.data.areas.length)) return { ok: false, message: "Add at least one niche and one area to search." };
+  await updateResearchSettings(parsed.data, founder.email);
+  await record(founder.email, "changed the nightly lead search", { detail: `${parsed.data.enabled ? "on" : "off"}; ${parsed.data.niches.length} niches in ${parsed.data.areas.length} areas, ${parsed.data.searchesPerNight} a night` });
+  revalidatePath("/admin", "layout");
+  return { ok: true, message: "Saved." };
 }

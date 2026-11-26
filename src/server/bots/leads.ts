@@ -9,7 +9,7 @@ import { activity, businesses, messages, type Business, type BotKey } from "../d
 import { businessById, optOut, updateBusiness } from "../leads/businesses";
 import { domainFacts } from "../integrations/domain";
 import { BOT_READ_FRESH_MS, syncMailIfStale } from "../mail/sync";
-import { previewLink, welcomeLink } from "../outreach/compose";
+import { callLink, previewLink, welcomeLink } from "../outreach/compose";
 import { actorOf, BotError } from "./http";
 import { buildAndLaunchState } from "./sites";
 import { editorEmailsOfBusiness } from "../sites/siteEditors";
@@ -34,6 +34,8 @@ function leadView(lead: Business) {
     previewUrl: lead.previewUrl,
     /** The owner's welcome page: how it works, what's included, and checkout. Send it when they want to go ahead. */
     welcomeLink: welcomeLink(lead),
+    /** Send it when the owner wants to talk: it opens Brendan's booking page. */
+    callLink: callLink(),
     siteUrl: lead.siteUrl,
     /** Set by a founder when the site launches somewhere other than the old website's domain. */
     launchDomain: lead.launchDomain,

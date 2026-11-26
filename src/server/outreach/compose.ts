@@ -16,6 +16,11 @@ export function previewLink(business: Business) {
 }
 
 /** Where an owner who wants to go ahead learns how it works and signs up: the video, what's included and checkout. */
+/** Where an owner books a call with us. It forwards to the booking page set in Setup > Outreach. */
+export function callLink() {
+  return new URL("/call", env.siteUrl()).toString();
+}
+
 export function welcomeLink(business: Business) {
   return new URL(`/welcome/${business.linkCode}`, env.siteUrl()).toString();
 }
