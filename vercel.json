@@ -3,6 +3,7 @@
   "git": { "deploymentEnabled": false },
   "crons": [
     { "path": "/api/cron/sync", "schedule": "5,35 * * * *" },
+    { "path": "/api/cron/outreach", "schedule": "3,14,27,41,52 * * * *" },
     { "path": "/api/cron/digest", "schedule": "0 2 * * *" },
     { "path": "/api/cron/analytics-spend", "schedule": "0 16 * * *" },
     { "path": "/api/cron/vercel-usage", "schedule": "0 17 9 * *" },

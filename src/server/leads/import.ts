@@ -120,7 +120,12 @@ function remember(row: NewBusiness, existing: Existing) {
 
 /** Adds the lead finder's leads.csv. Businesses already here (by place ID or website) are skipped, as the lead finder does. */
 export async function importLeads(csv: string): Promise<{ added: number; skipped: number }> {
-  const rows = parseCsv(csv).filter((row) => row.business_name);
+  return addLeadRows(parseCsv(csv));
+}
+
+/** Adds rows in the lead finder's CSV columns. Businesses already here (by place ID or website) are skipped. */
+export async function addLeadRows(given: Record<string, string>[]): Promise<{ added: number; skipped: number }> {
+  const rows = given.filter((row) => row.business_name);
   const existing = await loadExisting();
   const blocked = await blockedContacts();
   const fresh: NewBusiness[] = [];

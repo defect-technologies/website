@@ -7,6 +7,7 @@ import { PLACEHOLDERS, type OutreachSettings, type Placeholder, type TemplateVal
 import { controlClass, TextField } from "./fields";
 import Letter from "./Letter";
 import SubmitButton from "./SubmitButton";
+import Switch from "./Switch";
 import { Card, Notice } from "./ui";
 
 const TARGET_LINES = 6;
@@ -112,7 +113,16 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
           <legend className="mb-2 text-lg font-semibold">Pace</legend>
           <TextField label="Emails a day" name="dailyLimit" type="number" min={1} max={50} defaultValue={settings.dailyLimit} />
           <TextField label="Follow up after (days)" name="followUpAfterDays" type="number" min={1} max={30} defaultValue={settings.followUpAfterDays} />
+          <Switch name="autoSend" defaultChecked={settings.autoSend} label="Send each email once a founder approves its site" className="sm:col-span-2" />
         </fieldset>
+        <TextField
+          label="Booking page for calls"
+          name="callLink"
+          type="url"
+          placeholder="https://calendar.app.google/..."
+          defaultValue={settings.callLink}
+          hint="The bots send owners defect.tech/call, which opens this page."
+        />
         {state.message && <Notice tone={state.ok ? "good" : "bad"}>{state.message}</Notice>}
         <div>
           <SubmitButton variant="solid" icon={<FloppyDisk size={18} aria-hidden="true" />}>
