@@ -23,7 +23,8 @@ export class MailboxNeedsReconnect extends Error {}
 
 const accessTokens = new Map<string, { token: string; expiresAt: number }>();
 
-async function accessToken(mailbox: Mailbox): Promise<string> {
+/** Also used for the sending inbox's calendar, which the same connection covers. */
+export async function accessToken(mailbox: Mailbox): Promise<string> {
   const cached = accessTokens.get(mailbox.id);
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
   const google = googleClient("mail");

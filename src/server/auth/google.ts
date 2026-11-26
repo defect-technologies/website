@@ -5,7 +5,7 @@ import { env } from "../env";
 
 /**
  * Two Google clients. Founders sign in with basic scopes. The mail client asks
- * for Gmail send and read, and should live in a project owned by the sending
+ * for Gmail send and read, and for the calendar the booked calls go on, and should live in a project owned by the sending
  * inbox's Workspace with its consent screen set to Internal, so its refresh
  * tokens don't expire after a week.
  */
@@ -25,6 +25,9 @@ const FLOWS: Record<GoogleFlow, { path: string; scopes: string[]; client: () => 
       "profile",
       "https://www.googleapis.com/auth/gmail.send",
       "https://www.googleapis.com/auth/gmail.readonly",
+      // The sending inbox organizes the calls owners book on defect.tech/call.
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/calendar.freebusy",
     ],
     client: env.mailClient,
   },

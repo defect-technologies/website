@@ -38,6 +38,14 @@ export const env = {
   portalGoogle: () => optional("PORTAL_GOOGLE_SIGN_IN") === "1",
   signInClient: () => ({ id: optional("GOOGLE_SIGNIN_CLIENT_ID"), secret: optional("GOOGLE_SIGNIN_CLIENT_SECRET") }),
   mailClient: () => ({ id: optional("GOOGLE_MAIL_CLIENT_ID"), secret: optional("GOOGLE_MAIL_CLIENT_SECRET") }),
+  /** The service account that reads free/busy for defect.tech/call. Each calendar is shared with it as "See only free/busy". */
+  serviceAccountJson: () => optional("GOOGLE_SERVICE_ACCOUNT_JSON"),
+  /** The calendars a call must not clash with. The first one is also invited to each call. */
+  callCalendars: () =>
+    optional("CALL_CALENDARS")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
   engineToken: () => optional("ENGINE_TOKEN"),
   cronSecret: () => optional("CRON_SECRET"),
   stripeKey: () => optional("STRIPE_API_KEY"),

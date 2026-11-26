@@ -121,7 +121,7 @@ export default function TemplateEditor({ settings, sample, sampleName }: EditorP
           type="url"
           placeholder="https://calendar.app.google/..."
           defaultValue={settings.callLink}
-          hint="The bots send owners defect.tech/call, which opens this page."
+          hint="The bots send owners defect.tech/call. It books on our own calendars, and opens this page only when it can't."
         />
         {state.message && <Notice tone={state.ok ? "good" : "bad"}>{state.message}</Notice>}
         <div>
