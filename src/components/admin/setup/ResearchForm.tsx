@@ -23,7 +23,9 @@ export default function ResearchForm({ settings, tonight }: Props) {
           <TextAreaField label="Niches" name="niches" defaultValue={settings.niches.join("\n")} placeholder={"auto repair\ntattoo studio"} hint="One a line" rows={6} />
           <TextAreaField label="Areas" name="areas" defaultValue={settings.areas.join("\n")} placeholder={"Pasadena, CA\nGlendale, CA"} hint="One a line" rows={6} />
         </div>
-        <TextField label="Searches a night" name="searchesPerNight" type="number" min={1} max={MOST_SEARCHES_PER_NIGHT} defaultValue={settings.searchesPerNight} className="w-28" />
+        <div className="w-40">
+          <TextField label="Searches a night" name="searchesPerNight" type="number" min={1} max={MOST_SEARCHES_PER_NIGHT} defaultValue={settings.searchesPerNight} />
+        </div>
         {state.message && <Notice tone={state.ok ? "good" : "bad"}>{state.message}</Notice>}
         <div>
           <SubmitButton variant="solid" icon={<FloppyDisk size={18} aria-hidden="true" />}>
