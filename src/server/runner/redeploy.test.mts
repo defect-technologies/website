@@ -66,6 +66,16 @@ test("a preview past the cleanup's age is expired: not sendable, not on Review, 
   assert.equal(leadStatus("sent", "done", "", true), "waiting");
 });
 
+test("a preview the runner didn't deploy never expires: the cleanup doesn't touch it", async () => {
+  made += 1;
+  const [byHand] = await database
+    .insert(businesses)
+    .values({ businessName: "By hand", slug: `by-hand-${made}`, linkCode: `by-hand-${made}`, stage: "preview_built", previewUrl: "https://by-hand.vercel.app", previewBuiltAt: daysAgo(60) } as never)
+    .returning();
+  assert.ok(!(await expiredPreviewIds()).has(byHand.id));
+  assert.ok(!(await oldPreviewsToPutBack()).some((lead) => lead.id === byHand.id));
+});
+
 test("a paying client's old preview isn't expired, since the cleanup keeps it", async () => {
   const paid = await builtLead(40, { stage: "paid", paidAt: daysAgo(10) });
   assert.ok(!(await expiredPreviewIds()).has(paid.id));
