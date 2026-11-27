@@ -12,6 +12,7 @@ process.env.CRON_SECRET = "test-cron-secret";
 let mail: { mailboxes: number; newMessages: number; errors: string[] };
 let payments: { state: string };
 let cancellations: { state: string };
+let bots: { stopped: string[]; recovered: string[] } | Error;
 let mailRuns = 0;
 let paymentRuns = 0;
 mock.module("@/server/mail/sync", {
@@ -37,6 +38,15 @@ mock.module("@/server/integrations/stripeCancellations", {
   },
 });
 
+mock.module("@/server/bots/watch", {
+  namedExports: {
+    watchBots: async () => {
+      if (bots instanceof Error) throw bots;
+      return bots;
+    },
+  },
+});
+
 const { GET } = await import("./route");
 const call = () => GET(new Request("https://defect.tech/api/cron/sync", { headers: { Authorization: "Bearer test-cron-secret" } }));
 
@@ -44,6 +54,7 @@ beforeEach(() => {
   mail = { mailboxes: 1, newMessages: 0, errors: [] };
   payments = { state: "ok" };
   cancellations = { state: "ok" };
+  bots = { stopped: [], recovered: [] };
   mailRuns = 0;
   paymentRuns = 0;
 });
@@ -57,7 +68,7 @@ describe("the sync cron status", () => {
     payments = { state: "error" };
     const response = await call();
     assert.equal(response.status, 500);
-    assert.deepEqual(await response.json(), { mail, payments, cancellations });
+    assert.deepEqual(await response.json(), { mail, payments, cancellations, bots });
     assert.equal(mailRuns, 1);
     assert.equal(paymentRuns, 1);
   });
@@ -70,6 +81,14 @@ describe("the sync cron status", () => {
   it("is 500 when the cancellations sync fails", async () => {
     cancellations = { state: "error" };
     assert.equal((await call()).status, 500);
+  });
+
+  it("is 500 when the bot check-in watch fails, and the syncs still ran", async () => {
+    bots = new Error("ADMIN_EMAILS is empty");
+    const response = await call();
+    assert.equal(response.status, 500);
+    assert.deepEqual((await response.json()).bots, { error: "ADMIN_EMAILS is empty" });
+    assert.equal(mailRuns, 1);
   });
 
   it("stays 200 when payments are not configured", async () => {
