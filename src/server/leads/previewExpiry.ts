@@ -11,13 +11,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const REDEPLOY_TRIES = 2;
 
 /**
- * When the lead's current preview link was deployed: the finished job that deployed it, or previewBuiltAt for a
- * preview reported some other way (the builder run by hand reports through /api/engine/previews, with no job).
+ * When the runner deployed the lead's current preview link, from the finished job that did. Null for a preview deployed
+ * some other way, such as Nikkei Nexus from its own repository: the cleanup doesn't delete those, and the runner has no
+ * site folder to deploy one again from.
  */
-export const previewDeployedAt = sql<Date | null>`coalesce(
-  (select max(deployed.finished_at) from preview_jobs deployed
-    where deployed.business_id = ${businesses.id} and deployed.preview_url = ${businesses.previewUrl} and deployed.status = 'done'),
-  ${businesses.previewBuiltAt})`;
+export const previewDeployedAt = sql<Date | null>`(select max(deployed.finished_at) from preview_jobs deployed
+    where deployed.business_id = ${businesses.id} and deployed.preview_url = ${businesses.previewUrl} and deployed.status = 'done')`;
 
 const oldestKept = () => new Date(Date.now() - PREVIEW_DAYS_KEPT * DAY_MS).toISOString();
 
