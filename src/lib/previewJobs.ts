@@ -63,9 +63,18 @@ export function hiddenOutcomes(value: string | undefined): BuildOutcome[] {
   return BUILD_OUTCOMES.filter((outcome) => named.has(outcome));
 }
 
-/** A preview build (or rebuild with a note), or a launch onto the client's own Vercel project. */
-export const JOB_KINDS = ["preview", "launch"] as const;
+/**
+ * A preview build (or rebuild with a note), a launch onto the client's own Vercel project, or a redeploy: the site the
+ * runner already built, deployed again unchanged because the cleanup deleted its old preview. A redeploy uses no Claude.
+ */
+export const JOB_KINDS = ["preview", "launch", "redeploy"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
+
+/**
+ * How long a preview deployment stays up. engine/ops/cleanup_previews.py reads this number from the admin and deletes
+ * unpaid leads' previews older than it, so no email may link to one past this age.
+ */
+export const PREVIEW_DAYS_KEPT = 30;
 
 /** How many times a lead's build may fail in a row before it's left for a founder. */
 export const MAX_FAILED_BUILDS = 2;

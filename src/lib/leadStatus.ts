@@ -7,7 +7,7 @@ import type { Stage } from "./stages";
  * lead might be untouched, queued, building, or stuck on a failed build, which
  * only its latest preview job knows. A live lead is a client.
  */
-export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "skipped", "needs_a_look", "ready_to_send", "waiting", "negotiating", "setting_up", "live", "closed"] as const;
+export const LEAD_STATUSES = ["not_queued", "queued", "building", "build_failed", "skipped", "needs_a_look", "ready_to_send", "preview_expired", "waiting", "negotiating", "setting_up", "live", "closed"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
@@ -18,6 +18,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   skipped: "Site already good",
   needs_a_look: "Needs a look",
   ready_to_send: "Ready to send",
+  preview_expired: "Preview expired",
   waiting: "Waiting for reply",
   negotiating: "Negotiating",
   setting_up: "Setting up",
@@ -36,6 +37,7 @@ export const LEAD_STATUS_OWNER: Record<LeadStatus, Owner> = {
   skipped: "nobody",
   needs_a_look: "founders",
   ready_to_send: "founders",
+  preview_expired: "runner",
   waiting: "outreach",
   negotiating: "outreach",
   setting_up: "onboarding",
@@ -64,8 +66,16 @@ const BY_JOB: Record<PreviewJobStatus, LeadStatus> = {
   done: "needs_a_look",
 };
 
+/** A preview waiting for a founder or for its first email that the cleanup deleted: the runner puts it back up. */
+const EXPIRES: LeadStatus[] = ["ready_to_send", "needs_a_look"];
+
 /** A new lead's status comes from its latest build; every later stage speaks for itself. */
-export function leadStatus(stage: Stage, latestJob: PreviewJobStatus | null, latestStep = ""): LeadStatus {
+export function leadStatus(stage: Stage, latestJob: PreviewJobStatus | null, latestStep = "", previewExpired = false): LeadStatus {
+  const status = statusFromStageAndJob(stage, latestJob, latestStep);
+  return previewExpired && EXPIRES.includes(status) ? "preview_expired" : status;
+}
+
+function statusFromStageAndJob(stage: Stage, latestJob: PreviewJobStatus | null, latestStep: string): LeadStatus {
   if (stage !== "new") return BY_STAGE[stage] ?? "closed";
   if (latestJob && isSkipped({ status: latestJob, step: latestStep })) return "skipped";
   return latestJob ? BY_JOB[latestJob] : "not_queued";

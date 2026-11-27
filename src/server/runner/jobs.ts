@@ -22,6 +22,7 @@ export async function activeJobFor(businessId: string): Promise<PreviewJob | nul
 const REQUEST_ACTION: Record<JobKind, (note: string) => string> = {
   preview: (note) => (note ? "requested a preview rebuild" : "requested a preview"),
   launch: () => "requested a launch",
+  redeploy: () => "asked for an expired preview to be put back up",
 };
 
 /**

@@ -1,6 +1,7 @@
 import "server-only";
 import { asClause, fillTemplate, offerSentence, unfilledPlaceholders, type OutreachSettings, type TemplateValues } from "@/lib/emailTemplate";
 import { replySubject } from "@/lib/emailLinks";
+import { PREVIEW_DAYS_KEPT } from "@/lib/previewJobs";
 import type { Business } from "../db/schema";
 import { env } from "../env";
 import { isBlocked } from "../leads/contactKeys";
@@ -59,14 +60,18 @@ export function composeSubject(kind: EmailKind, business: Business, settings: Ou
   return fillTemplate(settings.subject, templateValues(business, settings));
 }
 
+/** Who can't be emailed (opted-out addresses and domains), and which leads' previews the cleanup has deleted. */
+export type SendContext = { blocked: Set<string>; expired: Set<string> };
+
 /** fixedByEditing marks what the founder covers by writing the email themselves: the address and the problem line. */
-type Check = { failed: (b: Business, s: OutreachSettings, blocked: Set<string>) => boolean; fix: string; coldOnly?: boolean; fixedByEditing?: boolean };
+type Check = { failed: (b: Business, s: OutreachSettings, context: SendContext) => boolean; fix: string; coldOnly?: boolean; fixedByEditing?: boolean };
 
 /** Reasons an email can't go yet, each written as what to do about it. */
 const CHECKS: Check[] = [
   { failed: (b) => !b.email, fix: "Add an email address for this business.", fixedByEditing: true },
-  { failed: (b, _s, blocked) => isBlocked(blocked, b), fix: "This business opted out, so it can't be emailed." },
+  { failed: (b, _s, { blocked }) => isBlocked(blocked, b), fix: "This business opted out, so it can't be emailed." },
   { failed: (b) => !b.previewUrl, fix: "Build and deploy the preview first." },
+  { failed: (b, _s, { expired }) => expired.has(b.id), fix: `This preview was deleted after ${PREVIEW_DAYS_KEPT} days. Wait for the runner to put it back up, or rebuild it.` },
   { failed: (b) => !b.priceArm, fix: "Pick $59 or $79 for this lead." },
   { failed: (b) => !(b.emailProblem || b.problemSummary), fix: "Write the problem line.", coldOnly: true, fixedByEditing: true },
   { failed: (_b, s) => !s.mailingAddress, fix: "Add the mailing address in Setup > Outreach." },
@@ -85,12 +90,12 @@ type CheckOptions = { kind?: EmailKind; edited?: boolean };
 
 const applies = (check: Check, { kind = "first", edited = false }: CheckOptions) => !(kind === "requested" && check.coldOnly) && !(edited && check.fixedByEditing);
 
-export function failingChecks(business: Business, settings: OutreachSettings, blocked: Set<string>, options: CheckOptions = {}): string[] {
-  return CHECKS.filter((check) => applies(check, options) && check.failed(business, settings, blocked)).map((check) => check.fix);
+export function failingChecks(business: Business, settings: OutreachSettings, context: SendContext, options: CheckOptions = {}): string[] {
+  return CHECKS.filter((check) => applies(check, options) && check.failed(business, settings, context)).map((check) => check.fix);
 }
 
-export function blockers(business: Business, settings: OutreachSettings, blocked: Set<string>, body: string, options: CheckOptions = {}): string[] {
-  const failing = [...failingChecks(business, settings, blocked, options), ...BODY_CHECKS.filter((check) => check.failed(body, settings)).map((check) => check.fix)];
+export function blockers(business: Business, settings: OutreachSettings, context: SendContext, body: string, options: CheckOptions = {}): string[] {
+  const failing = [...failingChecks(business, settings, context, options), ...BODY_CHECKS.filter((check) => check.failed(body, settings)).map((check) => check.fix)];
   const leftovers = unfilledPlaceholders(body);
   if (leftovers.length > 0 && failing.length === 0) failing.push(`The email has unfilled placeholders: ${leftovers.join(", ")}.`);
   return failing;
