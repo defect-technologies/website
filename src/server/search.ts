@@ -3,6 +3,7 @@ import { desc, ilike, inArray, or } from "drizzle-orm";
 import { leadStatus, type LeadStatus } from "@/lib/leadStatus";
 import { db } from "./db/client";
 import { businesses, previewJobs } from "./db/schema";
+import { expiredPreviewIds } from "./leads/previewExpiry";
 
 export type SearchHit = { id: string; name: string; where: string; status: LeadStatus };
 
@@ -27,13 +28,14 @@ export async function searchSites(text: string): Promise<SearchHit[]> {
     .where(inArray(previewJobs.businessId, found.map((lead) => lead.id)))
     .orderBy(previewJobs.businessId, desc(previewJobs.createdAt));
   const latest = new Map(jobs.map((job) => [job.businessId, job]));
+  const expired = await expiredPreviewIds(found.map((lead) => lead.id));
   return found.map((lead) => {
     const job = latest.get(lead.id);
     return {
       id: lead.id,
       name: lead.businessName,
       where: (lead.siteUrl || lead.website || lead.email).replace(/^https?:\/\//, "").replace(/\/$/, ""),
-      status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? ""),
+      status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? "", expired.has(lead.id)),
     };
   });
 }

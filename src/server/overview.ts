@@ -5,13 +5,14 @@ import { leadStatus, type LeadStatus } from "@/lib/leadStatus";
 import { db } from "./db/client";
 import { activity, botCalls, businesses, messages, previewJobs, type Activity, type BotKey, type Business, type Message, type PreviewJob } from "./db/schema";
 import { listBotKeys } from "./bots/keys";
+import { expiredPreviewIds } from "./leads/previewExpiry";
 import { deciders } from "./designers/people";
 import { buildsToday, spentToday } from "./runner/jobs";
 import { activePause, runnerSettings } from "./runner/settings";
 
 export type LastEmail = Pick<Message, "at" | "direction" | "sentBy" | "subject">;
 /** The build columns the Sites sheet reads. The log, critic notes and launch result stay in the database. */
-export type SheetJob = Pick<PreviewJob, "id" | "businessId" | "status" | "step" | "runnerName" | "requestedBy" | "criticVerdict" | "createdAt" | "claimedAt" | "startedAt" | "finishedAt">;
+export type SheetJob = Pick<PreviewJob, "id" | "businessId" | "kind" | "status" | "step" | "runnerName" | "requestedBy" | "criticVerdict" | "createdAt" | "claimedAt" | "startedAt" | "finishedAt">;
 export type LeadRow = { lead: Business; job: SheetJob | null; lastEmail: LastEmail | null; status: LeadStatus };
 
 async function latestJobs(): Promise<Map<string, SheetJob>> {
@@ -19,6 +20,7 @@ async function latestJobs(): Promise<Map<string, SheetJob>> {
     .selectDistinctOn([previewJobs.businessId], {
       id: previewJobs.id,
       businessId: previewJobs.businessId,
+      kind: previewJobs.kind,
       status: previewJobs.status,
       step: previewJobs.step,
       runnerName: previewJobs.runnerName,
@@ -44,10 +46,10 @@ async function lastEmails(): Promise<Map<string, LastEmail>> {
 
 /** Every business with its latest build and email. Live ones are clients; the rest are leads. */
 export async function sheetRows(): Promise<{ all: LeadRow[]; leads: LeadRow[]; clients: LeadRow[]; readAt: number }> {
-  const [all, jobs, emails] = await Promise.all([(await db()).select().from(businesses).orderBy(desc(businesses.updatedAt)), latestJobs(), lastEmails()]);
+  const [all, jobs, emails, expired] = await Promise.all([(await db()).select().from(businesses).orderBy(desc(businesses.updatedAt)), latestJobs(), lastEmails(), expiredPreviewIds()]);
   const rows = all.map((lead) => {
     const job = jobs.get(lead.id) ?? null;
-    return { lead, job, lastEmail: emails.get(lead.id) ?? null, status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? "") };
+    return { lead, job, lastEmail: emails.get(lead.id) ?? null, status: leadStatus(lead.stage, job?.status ?? null, job?.step ?? "", expired.has(lead.id)) };
   });
   return { all: rows, leads: rows.filter((row) => row.lead.stage !== "live"), clients: rows.filter((row) => row.lead.stage === "live"), readAt: Date.now() };
 }

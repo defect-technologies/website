@@ -25,11 +25,13 @@ import { welcomeLink } from "../outreach/compose";
 import { updateBusiness } from "../leads/businesses";
 import { BuildName, withBuildName } from "./naming";
 import { maybePickForSpotCheck } from "../spotChecks";
-import { autoQueueNext, buildsToday, claimJob, claimNextJob, failuresInARow, isActive, jobById, leadForJob, queuedPreviewJobs, requeueOrphans, requestPreview, updateJob } from "./jobs";
+import { AUTO_QUEUE_ACTOR, autoQueueNext, buildsToday, claimJob, claimNextJob, failuresInARow, isActive, jobById, leadForJob, queuedPreviewJobs, requeueOrphans, requestPreview, updateJob } from "./jobs";
 import { diagnose, failureLines } from "./diagnose";
 import { repairChecks, repairNotesFor, RepairsField } from "./repairs";
 import { activePause, runnerSettings, updateRunnerSettings } from "./settings";
 import { tellFounders } from "./tellFounders";
+import { oldPreviewsToPutBack, previewIsUp } from "../leads/previewExpiry";
+import { carryReviews } from "../review/carryReviews";
 
 const ACTOR = RUNNER_ACTOR;
 const PAUSE_WITHOUT_RESUME_MS = 60 * 60 * 1000;
@@ -64,14 +66,32 @@ async function limitsNow(): Promise<Limits> {
   return { settings, noBuilds: capped, paused: false };
 }
 
+/** Kinds that use no Claude: they go ahead through a pause or the daily cap, for a runner that says it can do them. */
+const WITHOUT_CLAUDE: JobKind[] = ["launch", "redeploy"];
+
 /**
- * The kinds of work this runner may take now. A launch uses no Claude and a paying client is
- * waiting, so it goes ahead through a pause or the daily cap. Runners from before launches
- * existed don't send can=launch, so they're never handed one.
+ * The kinds of work this runner may take now. A launch and a redeploy use no Claude, so they go ahead through a pause
+ * or the daily cap. A runner from before a kind existed doesn't send its can=, so it's never handed one.
  */
 function kindsAllowed(search: URLSearchParams, noBuilds: string | null): JobKind[] {
-  const launches: JobKind[] = search.getAll("can").includes("launch") ? ["launch"] : [];
-  return noBuilds ? launches : [...launches, "preview"];
+  const can = search.getAll("can");
+  const withoutClaude = WITHOUT_CLAUDE.filter((kind) => can.includes(kind));
+  return noBuilds ? withoutClaude : [...withoutClaude, "preview"];
+}
+
+/**
+ * Deploys again an old preview the cleanup deleted, or is about to: the site the runner already built, unchanged.
+ * A paying client's preview is kept by the cleanup, so it's put back only when it's actually gone.
+ */
+async function claimPutBack(runnerName: string, search: URLSearchParams): Promise<PreviewJob | null> {
+  if (!search.getAll("can").includes("redeploy")) return null;
+  for (const lead of await oldPreviewsToPutBack()) {
+    if (lead.paidAt && (await previewIsUp(lead.previewUrl))) continue;
+    const { job, created } = await requestPreview(lead, AUTO_QUEUE_ACTOR, "", "redeploy");
+    const claimed = created ? await claimJob(runnerName, job.id) : null;
+    if (claimed) return claimed;
+  }
+  return null;
 }
 
 /**
@@ -117,6 +137,8 @@ function jobPayload(job: PreviewJob, lead: Business, checkoutUrl: string, brand:
       brandFiles: brand.map(({ url, name }) => ({ url, name })),
     },
     ...launchPayload(job, lead),
+    // The preview the redeploy puts back: the runner deploys the site only if it still holds that design.
+    ...(job.kind === "redeploy" ? { redeploy: { previewUrl: lead.previewUrl } } : {}),
   };
 }
 
@@ -181,7 +203,10 @@ async function claimAsked(runnerName: string, search: URLSearchParams, limits: L
 /** The next job: work a founder or client is waiting on first, then designs to review, or builds with boards off. */
 async function claimWork(runnerName: string, search: URLSearchParams, limits: Limits): Promise<PreviewJob | null> {
   const asked = await claimAsked(runnerName, search, limits);
-  if (asked || limits.paused) return asked && founderJob(asked);
+  if (asked) return founderJob(asked);
+  // Putting an old preview back up uses no Claude, so it goes ahead through a pause, before any new design or build.
+  const putBack = await claimPutBack(runnerName, search);
+  if (putBack || limits.paused) return putBack;
   // New designs a founder asked for build nothing, so they go ahead past the daily cap, and before any the runner draws itself.
   const redraw = await claimNextJob(runnerName, ["preview"], "redraw");
   if (redraw) return founderJob(redraw);
@@ -213,6 +238,7 @@ async function wouldRepair(job: PreviewJob, lead: Business): Promise<boolean> {
  * and the note is repaired on the site as it is. The job keeps whether it was a repair, for the daily cap.
  */
 async function designAndRepairFor(job: PreviewJob, lead: Business) {
+  if (job.kind === "redeploy") return { boards: { on: false, choice: null, redraw: null }, repair: { on: false, notes: null } };
   const choice = job.kind === "preview" ? await choiceForJob(lead.id, job.id) : null;
   const redraw = job.kind === "preview" && !choice ? await redrawFor(lead.id) : null;
   const boards = { on: Boolean(redraw) || ((await runnerSettings()).designBoards && (Boolean(choice) || !changesBuiltPreview(job.note, lead.previewUrl))), choice, redraw };
@@ -220,6 +246,8 @@ async function designAndRepairFor(job: PreviewJob, lead: Business) {
   await updateJob(job.id, { repair });
   return { boards, repair: { on: repair, notes: repair ? await repairNotesFor(lead.id, lead.previewUrl) : null } };
 }
+
+const CLAIMED: Record<JobKind, string> = { preview: "claimed a preview build", launch: "claimed a launch", redeploy: "claimed an expired preview to put back up" };
 
 /** GET /api/runner/next: claims one queued build, or 204 with why there's nothing to do. */
 export async function claimNext(key: BotKey, request: Request) {
@@ -232,7 +260,7 @@ export async function claimNext(key: BotKey, request: Request) {
   const job = await claimWork(runnerName, search, limits);
   if (!job) return idle(await whyIdle(limits));
   const lead = await leadForJob(job);
-  await record(ACTOR, job.kind === "launch" ? "claimed a launch" : "claimed a preview build", { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
+  await record(ACTOR, CLAIMED[job.kind as JobKind], { businessId: lead.id, detail: `${runnerName}, attempt ${job.attempts}` });
   const { boards, repair } = await designAndRepairFor(job, lead);
   // A client who has paid already has their plan, so their previews carry no "Make it live" button.
   return jobPayload(job, lead, lead.paidAt ? "" : welcomeLink(lead), await brandFilesFor(lead.id), boards, repair);
@@ -271,6 +299,10 @@ export const DoneBody = z.object({
   logTail: z.string().max(LOG_TAIL_LIMIT * 4).optional(),
   /** A repair's before and after pictures, by note id. Each was stored with PUT /api/runner/:job/repairs/:picture. */
   repairs: RepairsField,
+  /** A redeploy: the runner's site folder still holds the design the old preview showed (its deploy log says so). */
+  sameDesign: z.boolean().optional(),
+  /** A failed redeploy: the runner has no site folder for this lead, or it holds a different design now. */
+  siteGone: z.boolean().optional(),
   /** With status "failed": the runner skipped this lead before building, because its current site is already good. */
   skipped: z.boolean().optional(),
   resumeAt: z.iso.datetime({ offset: true }).optional(),
@@ -395,8 +427,26 @@ async function finishLaunched(job: PreviewJob, lead: Business, body: Done) {
   await record(ACTOR, "launched the site", { businessId: lead.id, detail: `${body.launch.liveUrl}; ${records}` });
 }
 
+/**
+ * An old preview is up again at a new address. Every link we send goes through /p/<code>, so emails already sent open
+ * the new one. Founders' reviews come along only when the runner confirmed it deployed the same design.
+ */
+async function finishRedeployed(job: PreviewJob, lead: Business, body: Done) {
+  if (!body.previewUrl) throw new BotError(400, "A finished redeploy needs previewUrl, the deployed preview's https address.");
+  if (body.sameDesign) await carryReviews(lead.id, lead.previewUrl, body.previewUrl);
+  await updateBusiness(lead.id, { previewUrl: body.previewUrl });
+  await updateJob(job.id, { status: "done", previewUrl: body.previewUrl, step: "Deployed again", ...results(body) });
+  await record(ACTOR, "put an expired preview back up", { businessId: lead.id, detail: `${lead.previewUrl} is now ${body.previewUrl}` });
+}
+
+const FINISH_DONE: Record<JobKind, (job: PreviewJob, lead: Business, body: Done) => Promise<void>> = {
+  preview: finishBuilt,
+  launch: finishLaunched,
+  redeploy: finishRedeployed,
+};
+
 function finishDone(job: PreviewJob, lead: Business, body: Done) {
-  return job.kind === "launch" ? finishLaunched(job, lead, body) : finishBuilt(job, lead, body);
+  return FINISH_DONE[job.kind as JobKind](job, lead, body);
 }
 
 function lastLines(text: string, count: number) {
@@ -419,8 +469,30 @@ async function finishSkipped(job: PreviewJob, lead: Business, body: Done) {
   await record(ACTOR, "skipped a lead", { businessId: lead.id, detail: body.criticVerdict || "Their current site is already good." });
 }
 
+/** Stages where nobody has emailed the owner, so a new design can replace a preview whose site is gone. */
+const REBUILD_WHEN_GONE: Business["stage"][] = ["new", "preview_built"];
+
+/**
+ * A redeploy that failed because the runner no longer has the site: a lead nobody has emailed gets a new design for a
+ * founder to choose, and anyone who has seen the old preview reaches a founder. Any other failure is tried again on a
+ * later poll, up to twice (oldPreviewsToPutBack).
+ */
+async function afterFailedRedeploy(job: PreviewJob, lead: Business, body: Done) {
+  if (!body.siteGone) return;
+  if (!lead.paidAt && REBUILD_WHEN_GONE.includes(lead.stage)) {
+    await requestPreview(lead, ACTOR, NEW_DESIGN_NOTE);
+    return;
+  }
+  await flagFailure(job, lead, body);
+}
+
 async function finishFailed(job: PreviewJob, lead: Business, body: Done) {
   if (body.skipped && job.kind === "preview") return finishSkipped(job, lead, body);
+  if (job.kind === "redeploy") {
+    await updateJob(job.id, { status: "failed", step: "Failed", ...results(body) });
+    await record(ACTOR, "couldn't put an expired preview back up", { businessId: lead.id, detail: lastLines(body.logTail ?? "", 3) });
+    return afterFailedRedeploy(job, lead, body);
+  }
   await updateJob(job.id, { status: "failed", step: "Failed", ...results(body) });
   await record(ACTOR, job.kind === "launch" ? "launch failed" : "preview build failed", { businessId: lead.id, detail: lastLines(body.logTail ?? "", 3) });
   await retryOrGiveUp(job, lead, body);
@@ -429,6 +501,13 @@ async function finishFailed(job: PreviewJob, lead: Business, body: Done) {
 const FAILED_HEADLINE: Record<JobKind, (name: string) => string> = {
   launch: (name) => `${name} couldn't go live`,
   preview: (name) => `${name}'s new site didn't build`,
+  redeploy: (name) => `${name}'s preview link couldn't be put back up`,
+};
+
+const FAILED_DETAILS: Record<JobKind, string> = {
+  preview: "Nothing was deployed, and the client still sees what they saw before.",
+  launch: "Nothing was deployed, and the client still sees what they saw before.",
+  redeploy: "The old preview was deleted after it got too old, and the runner no longer has the site it was built from, so its link opens nothing. Rebuild it, or tell the owner a new one is coming.",
 };
 
 async function flagFailure(job: PreviewJob, lead: Business, body: Done) {
@@ -440,7 +519,7 @@ async function flagFailure(job: PreviewJob, lead: Business, body: Done) {
     ...diagnose(log, kind),
     topic: kind === "launch" ? "launch" : "build",
     urgent: false,
-    details: `Nothing was deployed, and the client still sees what they saw before.\n\n${failureLines(log)}`,
+    details: `${FAILED_DETAILS[kind]}\n\n${failureLines(log)}`,
     options: [],
   });
 }

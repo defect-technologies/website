@@ -7,7 +7,8 @@ import { blockedContacts } from "../leads/businesses";
 import { outreachSettings } from "../settings";
 import { requestThreads } from "../inbound/threads";
 import { PACIFIC_MIDNIGHT } from "./pacificDay";
-import { blockers, composeBody, failingChecks, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread } from "./compose";
+import { expiredPreviewIds } from "../leads/previewExpiry";
+import { blockers, composeBody, failingChecks, composeSubject, firstKindFor, templateFor, templateValues, type EmailKind, type RequestThread, type SendContext } from "./compose";
 
 export type QueueItem = {
   business: Business;
@@ -68,9 +69,9 @@ async function firstSubjects(ids: string[]): Promise<Map<string, string>> {
   return new Map(rows.map((row) => [row.businessId, row.subject]));
 }
 
-type ItemContext = { settings: OutreachSettings; blocked: Set<string>; firstSubject?: string; thread?: RequestThread };
+type ItemContext = { settings: OutreachSettings; send: SendContext; firstSubject?: string; thread?: RequestThread };
 
-function toItem(kind: EmailKind, business: Business, { settings, blocked, firstSubject = "", thread }: ItemContext): QueueItem {
+function toItem(kind: EmailKind, business: Business, { settings, send, firstSubject = "", thread }: ItemContext): QueueItem {
   const body = composeBody(kind, business, settings);
   return {
     business,
@@ -79,21 +80,22 @@ function toItem(kind: EmailKind, business: Business, { settings, blocked, firstS
     body,
     template: templateFor(kind, settings),
     values: templateValues(business, settings),
-    blockers: blockers(business, settings, blocked, body, { kind }),
-    editBlockers: failingChecks(business, settings, blocked, { kind, edited: true }),
+    blockers: blockers(business, settings, send, body, { kind }),
+    editBlockers: failingChecks(business, settings, send, { kind, edited: true }),
   };
 }
 
 export async function outreachQueue() {
   const settings = await outreachSettings();
-  const [ready, due, blocked, sent] = await Promise.all([readyForFirstEmail(), dueForFollowUp(settings), blockedContacts(), sentToday()]);
+  const [ready, due, blocked, sent, expired] = await Promise.all([readyForFirstEmail(), dueForFollowUp(settings), blockedContacts(), sentToday(), expiredPreviewIds()]);
+  const send = { blocked, expired };
   const requested = ready.filter((b) => firstKindFor(b) === "requested");
   const [subjects, threads] = await Promise.all([firstSubjects(due.map((b) => b.id)), requestThreads(requested.map((b) => b.id))]);
   return {
     settings,
     sentToday: sent,
-    requested: requested.map((b) => toItem("requested", b, { settings, blocked, thread: threads.get(b.id) })),
-    followUps: due.map((b) => toItem("follow_up", b, { settings, blocked, firstSubject: subjects.get(b.id) })),
-    firstEmails: ready.filter((b) => firstKindFor(b) === "first").map((b) => toItem("first", b, { settings, blocked })),
+    requested: requested.map((b) => toItem("requested", b, { settings, send, thread: threads.get(b.id) })),
+    followUps: due.map((b) => toItem("follow_up", b, { settings, send, firstSubject: subjects.get(b.id) })),
+    firstEmails: ready.filter((b) => firstKindFor(b) === "first").map((b) => toItem("first", b, { settings, send })),
   };
 }

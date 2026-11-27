@@ -4,7 +4,7 @@ import type { Fixer } from "@/lib/flags";
 
 type Cause = { pattern: RegExp; cause: string; step: string; fixer: Fixer };
 
-const RETRY: Record<JobKind, string> = { launch: "press Retry launch", preview: "press Rebuild preview" };
+const RETRY: Record<JobKind, string> = { launch: "press Retry launch", preview: "press Rebuild preview", redeploy: "press Rebuild preview" };
 
 /** Failures we've seen before, in plain words, with who fixes them. Anything else goes to Claude. */
 const KNOWN: Cause[] = [

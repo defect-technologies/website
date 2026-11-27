@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasBearer } from "@/server/auth/bearer";
 import { env } from "@/server/env";
+import { PREVIEW_DAYS_KEPT } from "@/lib/previewJobs";
+import { previewsToKeep } from "@/server/leads/previewExpiry";
 import { recordBuiltPreview } from "@/server/leads/previewReports";
 
 const PreviewReport = z.object({
@@ -15,6 +17,15 @@ const PreviewReport = z.object({
  * The preview builder calls this after `build_preview.sh --deploy`, so the
  * lead shows up in the outreach queue with its preview and problem line.
  */
+/**
+ * GET /api/engine/previews: what the daily cleanup (engine/ops/cleanup_previews.py) deletes, `{daysKept, keep}`. It
+ * deletes preview deployments older than daysKept, except the addresses in keep: each paying client's current preview.
+ */
+export async function GET(request: Request) {
+  if (!hasBearer(request, env.engineToken())) return NextResponse.json({ error: "Wrong or missing ENGINE_TOKEN." }, { status: 401 });
+  return NextResponse.json({ daysKept: PREVIEW_DAYS_KEPT, keep: await previewsToKeep() });
+}
+
 export async function POST(request: Request) {
   if (!hasBearer(request, env.engineToken())) return NextResponse.json({ error: "Wrong or missing ENGINE_TOKEN." }, { status: 401 });
   const parsed = PreviewReport.safeParse(await request.json().catch(() => null));

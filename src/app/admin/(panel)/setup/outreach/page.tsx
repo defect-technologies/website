@@ -1,5 +1,5 @@
 import { requireFounder } from "@/server/auth/session";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, not } from "drizzle-orm";
 import type { Metadata } from "next";
 import Inboxes, { MAILBOX_NOTICE } from "@/components/admin/setup/Inboxes";
 import ResearchForm from "@/components/admin/setup/ResearchForm";
@@ -9,6 +9,7 @@ import { offerSentence, type TemplateValues } from "@/lib/emailTemplate";
 import { nextSearches } from "@/lib/research";
 import { db } from "@/server/db/client";
 import { businesses } from "@/server/db/schema";
+import { previewExpired } from "@/server/leads/previewExpiry";
 import { connectedMailboxes } from "@/server/mail/outbox";
 import { templateValues } from "@/server/outreach/compose";
 import { researchSettings } from "@/server/research";
@@ -32,7 +33,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
   await requireFounder();
   const { mailbox } = await searchParams;
   const [settings, inboxes, research] = await Promise.all([outreachSettings(), connectedMailboxes(), researchSettings()]);
-  const [next] = await (await db()).select().from(businesses).where(eq(businesses.stage, "preview_built")).orderBy(asc(businesses.previewBuiltAt)).limit(1);
+  const [next] = await (await db()).select().from(businesses).where(and(eq(businesses.stage, "preview_built"), not(previewExpired()))).orderBy(asc(businesses.previewBuiltAt)).limit(1);
   const sample = next ? templateValues(next, settings) : MADE_UP;
   const notice = mailbox ? MAILBOX_NOTICE[mailbox] : undefined;
 

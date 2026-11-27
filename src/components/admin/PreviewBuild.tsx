@@ -1,6 +1,6 @@
 import { ArrowsClockwise, CaretRight, Eye, Globe, Hammer, HourglassMedium, PaperPlaneTilt, RocketLaunch } from "@phosphor-icons/react/dist/ssr";
 import { approvePreviewAction, launchSiteAction, requestPreviewAction } from "@/app/admin/(panel)/sites/actions";
-import { JOB_STATUS_LABEL } from "@/lib/previewJobs";
+import { JOB_STATUS_LABEL, type JobKind } from "@/lib/previewJobs";
 import type { Business, PreviewJob } from "@/server/db/schema";
 import { launchDomainOf } from "@/server/integrations/domain";
 import { launchBlocker } from "@/server/runner/jobs";
@@ -9,11 +9,13 @@ import { TextAreaField } from "./fields";
 import SubmitButton from "./SubmitButton";
 import { SectionHeading, StatusMark, When } from "./ui";
 
+const JOB_PREFIX: Partial<Record<JobKind, string>> = { launch: "Launch: ", redeploy: "Putting the preview back up: " };
+
 function Queued({ job }: { job: PreviewJob }) {
   const detail = `Requested by ${job.requestedBy}${job.note ? `. Note: ${job.note}` : ""}`;
   return (
     <p className="flex flex-wrap items-center gap-x-3 text-sm">
-      <StatusMark icon={HourglassMedium} tone="ink" label={`${job.kind === "launch" ? "Launch: " : ""}${JOB_STATUS_LABEL[job.status]}`} detail={detail} />
+      <StatusMark icon={HourglassMedium} tone="ink" label={`${JOB_PREFIX[job.kind as JobKind] ?? ""}${JOB_STATUS_LABEL[job.status]}`} detail={detail} />
       {job.step && <span className="text-ink-soft">{job.step}</span>}
       <span className="text-ink-faint">
         <When date={job.createdAt} />

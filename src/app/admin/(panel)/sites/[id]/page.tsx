@@ -28,6 +28,7 @@ import { buildCommand } from "@/server/leads/buildCommand";
 import { businessById } from "@/server/leads/businesses";
 import { markThreadRead } from "@/server/mail/threads";
 import { previewLink } from "@/server/outreach/compose";
+import { expiredPreviewIds } from "@/server/leads/previewExpiry";
 import { activeJobFor } from "@/server/runner/jobs";
 import { clientSite } from "@/server/sites/clientSites";
 import { siteDetail, type SiteDetail } from "@/server/sites/siteDetail";
@@ -224,7 +225,8 @@ export default async function SitePage({ params, searchParams }: Params) {
   const tab = TABS.includes(requested) ? requested : "overview";
   const detail = await siteDetail(business);
   if (tab === "messages") await markThreadRead(business.id);
-  const status = leadStatus(business.stage, detail.jobs[0]?.status ?? null, detail.jobs[0]?.step ?? "");
+  const expired = await expiredPreviewIds([business.id]);
+  const status = leadStatus(business.stage, detail.jobs[0]?.status ?? null, detail.jobs[0]?.step ?? "", expired.has(business.id));
   const base = `/admin/sites/${business.id}`;
 
   return (

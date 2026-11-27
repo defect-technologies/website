@@ -6,6 +6,7 @@ import { db } from "../db/client";
 import { businesses, messages, type Business, type Mailbox } from "../db/schema";
 import { advanceStage, blockedContacts, businessById, updateBusiness } from "../leads/businesses";
 import { isBlocked } from "../leads/contactKeys";
+import { expiredPreviewIds } from "../leads/previewExpiry";
 import { SendOutcomeUnknown } from "../mail/gmail";
 import { deliver } from "../mail/outbox";
 import type { OutgoingEmail } from "../mail/mime";
@@ -83,14 +84,14 @@ function optedOutRecipient(edits: EmailEdits | undefined, blocked: Set<string>) 
 const dailyLimitReached = (limit: number) => `You've sent today's ${limit}. Raise the limit in Setup > Outreach, or send tomorrow.`;
 
 async function prepare(kind: EmailKind, id: string, problem?: string, edits?: EmailEdits): Promise<Prepared | string> {
-  const [stored, settings, blocked, sent] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday()]);
+  const [stored, settings, blocked, sent, expired] = await Promise.all([businessById(id), outreachSettings(), blockedContacts(), sentToday(), expiredPreviewIds([id])]);
   if (!stored) return "That business no longer exists.";
   if (isCold(kind) && sent >= settings.dailyLimit) return dailyLimitReached(settings.dailyLimit);
   const optedOut = optedOutRecipient(edits, blocked);
   if (optedOut) return optedOut;
   const business = edits ? { ...stored, email: edits.to[0] } : stored;
   const body = edits?.body ?? composeBody(kind, business, settings, problem);
-  const problems = blockers(business, settings, blocked, body, { kind, edited: Boolean(edits) });
+  const problems = blockers(business, settings, { blocked, expired }, body, { kind, edited: Boolean(edits) });
   if (problems.length > 0) return problems[0];
   const thread = kind === "requested" ? ((await requestThreads([business.id])).get(business.id) ?? null) : null;
   const subject = edits?.subject ?? composeSubject(kind, business, settings, await firstSubject(business), thread);

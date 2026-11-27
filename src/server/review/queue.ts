@@ -1,8 +1,9 @@
 import "server-only";
-import { and, asc, desc, eq, exists, inArray, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, ne, not, notExists, sql } from "drizzle-orm";
 import { ACTIVE_JOB_STATUSES } from "@/lib/previewJobs";
 import { db } from "../db/client";
 import { businesses, previewJobs, previewReviews, type Business } from "../db/schema";
+import { previewExpired } from "../leads/previewExpiry";
 
 export type ReviewItem = Pick<Business, "id" | "businessName" | "website" | "previewUrl" | "stage" | "previewBuiltAt" | "niche" | "area">;
 
@@ -57,7 +58,7 @@ export async function reviewQueue(limit = 60, among?: string[]): Promise<ReviewI
       area: businesses.area,
     })
     .from(businesses)
-    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database), among ? inArray(businesses.id, among) : undefined))
+    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database), not(previewExpired()), among ? inArray(businesses.id, among) : undefined))
     .orderBy(asc(sql`case when ${businesses.stage} = 'new' then 0 else 1 end`), desc(businesses.previewBuiltAt))
     .limit(limit);
 }
@@ -67,6 +68,6 @@ export async function reviewQueueCount(): Promise<number> {
   const [row] = await database
     .select({ count: sql<number>`count(*)::int` })
     .from(businesses)
-    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database)));
+    .where(and(ne(businesses.previewUrl, ""), inArray(businesses.stage, [...REVIEWABLE_STAGES]), notReviewedYet(database), notBuilding(database), builtByTheRunner(database), not(previewExpired())));
   return row?.count ?? 0;
 }

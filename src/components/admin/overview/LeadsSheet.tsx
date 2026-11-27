@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { actorLabel } from "@/lib/bots";
 import { stepParts } from "@/lib/buildStatus";
 import { LEAD_STATUS_LABEL, LEAD_STATUSES, type LeadStatus } from "@/lib/leadStatus";
-import { JOB_STATUS_LABEL } from "@/lib/previewJobs";
+import { JOB_STATUS_LABEL, PREVIEW_DAYS_KEPT } from "@/lib/previewJobs";
 import { senderName } from "@/lib/senders";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { LastEmail, LeadRow } from "@/server/overview";
@@ -132,6 +132,14 @@ const NOW: Record<LeadStatus, (row: TimedRow) => ReactNode> = {
       Built <When date={lead.previewBuiltAt} />
     </>
   ),
+  preview_expired: ({ job }) =>
+    job?.kind === "redeploy" && job.status !== "failed" ? (
+      <>Being put back up</>
+    ) : (
+      <>
+        Deleted after {PREVIEW_DAYS_KEPT} days. The runner puts it back up.
+      </>
+    ),
   waiting: Waiting,
   negotiating: Negotiating,
   setting_up: ({ lead }) => (

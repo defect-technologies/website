@@ -1,6 +1,7 @@
 import type { PreviewJob } from "@/server/db/schema";
 import { BOT_LABEL, type Bot } from "./bots";
 import { founderName } from "./founders";
+import type { JobKind } from "./previewJobs";
 
 /** Used for ETAs until a few builds have finished with a recorded duration. */
 export const DEFAULT_BUILD_MINUTES = 60;
@@ -83,12 +84,14 @@ function requester(actor: string): string | null {
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
 
+const JOB_NOUN: Record<JobKind, string> = { preview: "preview", launch: "launch", redeploy: "redeploy" };
+
 /**
  * How a job came to be, as a sentence: "Claude queued this preview with notes for the builder." or "Queued again
  * automatically after a failed build." The note itself is the line's tooltip.
  */
 export function requestSentence(job: Pick<PreviewJob, "requestedBy" | "kind" | "note">): string {
-  const what = job.kind === "launch" ? "launch" : "preview";
+  const what = JOB_NOUN[job.kind as JobKind] ?? "preview";
   const who = requester(job.requestedBy);
   if (!who) return job.note ? "Queued again automatically after a failed build." : `Queued automatically as a new lead's ${what}.`;
   return `${who} queued this ${what}${job.note ? " with notes for the builder" : ""}.`;
