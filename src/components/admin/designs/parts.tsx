@@ -7,10 +7,15 @@ export const DRAWN_AT = { board: 1600, desktop: 1440 } as const;
 
 const REACH: Record<number, string> = { 1: "Close to how they look today", 2: "A step away from today", 3: "Far from how they look today" };
 
+/** How far an option goes from how the business looks today, in words. */
+export function reachLabel(boldness: number): string {
+  return REACH[boldness] ?? REACH[2];
+}
+
 /** How far an option goes from how the business looks today, as three steps with the reached ones filled. */
 export function Reach({ boldness }: { boldness: number }) {
   return (
-    <span role="img" aria-label={REACH[boldness] ?? REACH[2]} title={REACH[boldness] ?? REACH[2]} className="flex shrink-0 gap-1">
+    <span role="img" aria-label={reachLabel(boldness)} title={reachLabel(boldness)} className="flex shrink-0 gap-1">
       {[1, 2, 3].map((step) => (
         <span key={step} className={`h-1.5 w-5 ${step <= boldness ? "bg-ink" : "bg-ink/15"}`} />
       ))}

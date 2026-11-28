@@ -5,13 +5,21 @@ import { appendPhrase, useDictation } from "@/hooks/useDictation";
 import { MAX_NOTE_TEXT } from "@/lib/review";
 import { Button } from "../../Button";
 
-/** What the founder thinks of the three designs, typed or said, naming them by letter. It is the form's `feedback` field. */
-export default function FeedbackField({ text, setText }: { text: string; setText: (update: (current: string) => string) => void }) {
+type Props = {
+  text: string;
+  setText: (update: (current: string) => string) => void;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+};
+
+/** What someone thinks of the three designs, typed or said, naming them by letter. It is the form's `feedback` field. */
+export default function FeedbackField({ text, setText, label = "What should change?", placeholder = "B is the closest, but its serif is too plain for this shop.", required = false }: Props) {
   const dictation = useDictation((phrase) => setText((current) => appendPhrase(current, phrase)));
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       <label htmlFor="board-feedback" className="text-sm font-medium">
-        What should change?
+        {label}
       </label>
       <div className="flex items-end gap-2">
         <textarea
@@ -19,7 +27,8 @@ export default function FeedbackField({ text, setText }: { text: string; setText
           name="feedback"
           rows={2}
           maxLength={MAX_NOTE_TEXT}
-          placeholder="B is the closest, but its serif is too plain for this shop."
+          placeholder={placeholder}
+          required={required}
           value={dictation.listening ? `${text} ${dictation.interim}`.trim() : text}
           readOnly={dictation.listening}
           onChange={(event) => setText(() => event.target.value)}

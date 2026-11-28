@@ -1,15 +1,32 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import type { BoardActions } from "@/components/admin/designs/boardActions";
-import DesignScreen from "@/components/admin/designs/DesignScreen";
+import BusinessBrief from "@/components/admin/designers/BusinessBrief";
+import DesignerChooser, { type DesignerBoardActions } from "@/components/admin/designers/DesignerChooser";
+import { Decided } from "@/components/admin/designs/DecidedBoard";
 import { DESIGNER_HOME, requireDesigner } from "@/server/auth/designerSession";
-import { boardById } from "@/server/boards/store";
+import { type BoardWithLead, boardById, notesBehind } from "@/server/boards/store";
 import { ownerOf } from "@/server/designers/claims";
-import { chooseAsDesignerAction, reviseAsDesignerAction, redrawAsDesignerAction } from "../../actions";
+import { deciders } from "@/server/designers/people";
+import { placesOf } from "@/server/designers/work";
+import { businessById } from "@/server/leads/businesses";
+import { chooseAsDesignerAction, redrawAsDesignerAction } from "../../actions";
 
 export const metadata: Metadata = { title: "Choose a design" };
 
-const DESIGNER_BOARD_ACTIONS: BoardActions = { choose: chooseAsDesignerAction, revise: reviseAsDesignerAction, redraw: redrawAsDesignerAction };
+const DESIGNER_BOARD_ACTIONS: DesignerBoardActions = { choose: chooseAsDesignerAction, redraw: redrawAsDesignerAction };
+
+/** What a designer may know of the business behind the designs: never its owner's contact details. */
+async function briefOf(board: BoardWithLead) {
+  const [lead, places, notes] = await Promise.all([businessById(board.businessId), placesOf([board.businessId]), notesBehind(board)]);
+  return {
+    businessName: board.businessName,
+    place: places.get(board.businessId) ?? "",
+    website: lead?.website ?? "",
+    problemSummary: lead?.problemSummary ?? "",
+    notesBehind: board.chosenAt ? "" : notes,
+    back: { href: DESIGNER_HOME, label: "Back to To do" },
+  };
+}
 
 /** Three designs to decide on: open to every designer until one decides, then only to that designer. */
 export default async function DesignerDesignPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,5 +34,19 @@ export default async function DesignerDesignPage({ params }: { params: Promise<{
   const board = await boardById((await params).id);
   const owner = board ? await ownerOf(board.businessId) : null;
   if (!board || (owner && owner !== designer.id)) notFound();
-  return <DesignScreen board={board} actions={DESIGNER_BOARD_ACTIONS} close={{ href: DESIGNER_HOME, label: "Back to designs" }} />;
+  const brief = <BusinessBrief {...await briefOf(board)} />;
+  if (board.chosenAt) {
+    return (
+      <>
+        {brief}
+        <Decided board={board} by={(await deciders())(board.chosenBy ?? "").name} />
+      </>
+    );
+  }
+  return (
+    <>
+      {brief}
+      <DesignerChooser boardId={board.id} options={board.options} actions={DESIGNER_BOARD_ACTIONS} />
+    </>
+  );
 }

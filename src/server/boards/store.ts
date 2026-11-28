@@ -178,14 +178,26 @@ export async function redrawFor(businessId: string): Promise<BoardRedraw | null>
   return { feedback: newest.feedback, by: (await deciders())(newest.chosenBy ?? "").name, ...named, ...replaced, board: newest.id };
 }
 
-/** The board a lead had before this one, when a founder asked for these as revisions of one of its options. */
-export async function revisionOf(board: Pick<DesignBoard, "businessId" | "createdAt">): Promise<{ option: BoardOption; feedback: string } | null> {
+async function boardBefore(board: Pick<DesignBoard, "businessId" | "createdAt">): Promise<DesignBoard | undefined> {
   const [earlier] = await (await db())
     .select()
     .from(designBoards)
     .where(and(eq(designBoards.businessId, board.businessId), lt(designBoards.createdAt, board.createdAt)))
     .orderBy(desc(designBoards.createdAt))
     .limit(1);
+  return earlier;
+}
+
+/** The notes someone gave when they turned down the lead's previous designs and asked for these, or "" when none. */
+export async function notesBehind(board: Pick<DesignBoard, "businessId" | "createdAt">): Promise<string> {
+  const earlier = await boardBefore(board);
+  const askedForThese = earlier && (isRedrawn(earlier.chosenLetter) || revisedLetter(earlier.chosenLetter));
+  return askedForThese ? earlier.feedback : "";
+}
+
+/** The board a lead had before this one, when a founder asked for these as revisions of one of its options. */
+export async function revisionOf(board: Pick<DesignBoard, "businessId" | "createdAt">): Promise<{ option: BoardOption; feedback: string } | null> {
+  const earlier = await boardBefore(board);
   const letter = revisedLetter(earlier?.chosenLetter ?? null);
   const option = letter ? earlier?.options.find((entry) => entry.letter === letter) : undefined;
   return option ? { option, feedback: earlier!.feedback } : null;
